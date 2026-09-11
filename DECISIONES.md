@@ -1,5 +1,32 @@
 # Decisiones
 
+## Fase 5 — Tools de validación y dictamen
+
+### Servicios probados con la geometría y las reglas reales de San Carlos Centro
+
+`servicios/geo.py` y `servicios/reglas.py` se testearon contra la geometría real de la fixture de San Carlos Centro (Fase 3), no contra coordenadas inventadas. Las coordenadas de los puntos "a 80 m" y "a 100 m" de la Escuela N 12 se calcularon con `pyproj.Geod.fwd()` (geodésico real sobre WGS84), no a ojo -- así el test reproduce literalmente el criterio de aceptación del plan ("un lote a 80 m de una escuela con regla de 100 m devuelve OBSERVADA con cita") con precisión submétrica, verificado contra Postgres real de punta a punta en `tests/tools/test_evaluar_viabilidad_legal.py`.
+
+### Hallazgo real: las reglas de la jurisdicción del lote se aplican a zonas de cualquier localidad dentro del radio (confirmado, no solo documentado)
+
+Al testear `evaluar_riesgo` con radio 2000 m se encontró que la escuela de **colonia-vecina** también entra dentro del radio de búsqueda desde un punto en San Carlos Centro, y el chequeo de distancia se evalúa igual contra las reglas de San Carlos (la jurisdicción del lote), no las de colonia-vecina. Esto es exactamente lo que pide la skill ("Se aplican las reglas de la jurisdicción del lote" a zonas de localidades vecinas), pero causó que un primer test fallara (asumía una sola zona `tipo=="escuela"` en el resultado, cuando en realidad hay dos: la cercana, que no cumple, y la de colonia-vecina, que sí). Se corrigió el test para buscar la zona por distancia, no solo por tipo -- y queda como confirmación de que el comportamiento multi-jurisdicción funciona como se diseñó.
+
+### `EvaluarRiesgoArgs.productos`: lista de nombres, no de `ProductoConBanda`
+
+Documentado como cambio en `docs/matriz-parametros.md`: la Fase 1 había previsto que quien llama a `evaluar_riesgo` proveyera la banda toxicológica de cada producto. En la implementación, la tool resuelve cada producto contra el catálogo (mismo mecanismo que `validar_producto_registro`) y toma la banda del registro -- el operario de campo no suele saber la banda toxicológica de memoria, así que pedírsela como parámetro requerido no tenía sentido práctico.
+
+### `evaluar_viabilidad_legal` no reinvoca las otras tools; llama los mismos servicios
+
+Implementado tal como lo describe la skill ("Arquitectura"): `evaluar_viabilidad_legal_logica` no llama a `validar_producto_registro`/`evaluar_riesgo` como tools, sino que usa directamente `servicios/validacion_producto.py::resolver_y_validar_producto` (compartido con `validar_producto_registro`) y los mismos retrievers de `evaluar_riesgo`. Evita duplicar la lógica de resolución de producto entre las tres tools.
+
+### Multi-producto en `evaluar_riesgo`/`evaluar_viabilidad_legal`: cada producto se evalúa por separado contra cada zona
+
+No se colapsa a un "peor caso" por banda toxicológica: con una receta de 2+ productos, cada uno se evalúa contra cada zona con su propia banda, porque una regla puede aplicar a un producto y no a otro (ej. una regla específica de banda II no aplica a un producto banda IV en la misma receta). Es más conservador (nunca oculta una observación real) a costa de evaluar N×M combinaciones en vez de una sola; para las recetas típicas (1-2 productos, pocas zonas en radio) el costo es insignificante.
+
+### Alcance no cubierto en esta fase
+
+- Task 3.2 del plan original ("evaluar_riesgo... dosis del uso registrado") se cubre solo cuando el producto tiene `aplicacionesPorProducto` estructurado (`fuente=senasa_estructurado`); dosis extraídas de marbete (`fuente=marbete_extraido`, Fase 2 tarea 3) no se implementaron en esta sesión y por lo tanto no hay ninguna para probar el camino de comparación con esa fuente.
+- No se implementó un mecanismo de reintento/paralelismo real para "producto y riesgo en paralelo" (la skill menciona "en paralelo" como optimización de latencia, no como requisito funcional); la implementación actual es secuencial. Documentado como posible optimización futura, no como bug.
+
 ## Fase 4 — `leer_receta`
 
 ### Corrección a la Fase 1: `Receta` no tenía campo `adversidad`

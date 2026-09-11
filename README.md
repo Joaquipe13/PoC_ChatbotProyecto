@@ -34,7 +34,7 @@ Los tests nunca salen a la red: con `USE_FIXTURES=true` (default) el LLM es un f
 
 ## Estado del proyecto
 
-Fases 0 (Setup), 1 (Dominio y contratos), 2 (Scraper SENASA), 3 (Ingesta SIG y normativa) y 4 (`leer_receta`) completadas. Próxima: **Fase 5 — Tools de validación y dictamen**, pendiente de confirmación del usuario (ver `plandefases.md`).
+Fases 0 (Setup), 1 (Dominio y contratos), 2 (Scraper SENASA), 3 (Ingesta SIG y normativa), 4 (`leer_receta`) y 5 (Tools de validación y dictamen) completadas. Próxima: **Fase 6 — `responder_consulta_normativa`**, pendiente de confirmación del usuario (ver `plandefases.md`).
 
 Documentos de la Fase 1: [`docs/modelo-datos.md`](docs/modelo-datos.md) (diagrama ER + consultas SQL de las tools RAG), [`docs/matriz-parametros.md`](docs/matriz-parametros.md), [`docs/especificacion-plantillas.md`](docs/especificacion-plantillas.md), [`docs/contrato-insumos.md`](docs/contrato-insumos.md).
 
@@ -43,3 +43,5 @@ Catálogo SENASA (Fase 2): listado completo real cargado (7.370 productos), deta
 Insumos SIG/normativa (Fase 3): pipeline completo (`validador.py`, `loader_geo.py`, `loader_normativa.py`, `loader_reglas.py`) probado de punta a punta contra Postgres real con fixtures sintéticas (2 localidades, normativa provincial y nacional) — ver `docs/validacion-insumos.md`. Los insumos reales de las 10 localidades del caso de estudio todavía no los subió el equipo.
 
 `leer_receta` (Fase 4): extracción multimodal (Gemini real) verificada contra 3 imágenes sintéticas con 3/3 aciertos — ver `docs/casos-leer-receta.md`.
+
+Tools de validación y dictamen (Fase 5): `validar_producto_registro`, `consultar_productos`, `evaluar_riesgo` y `evaluar_viabilidad_legal` probadas de punta a punta contra Postgres real (catálogo SENASA + San Carlos Centro), incluidos los 3 resultados del dictamen (APTA, OBSERVADA, NO_EVALUABLE) y el caso exacto del plan (lote a 80 m de una escuela con regla de 100 m).

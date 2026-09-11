@@ -33,20 +33,18 @@ class ValidarProductoRegistroArgs(BaseModel):
 ## `evaluar_riesgo`
 
 ```python
-class ProductoConBanda(BaseModel):
-    nombre: str
-    banda_toxicologica: str
-
 class EvaluarRiesgoArgs(BaseModel):
     lat: float
     lon: float
-    tipo_aplicacion: TipoAplicacion
-    productos: list[ProductoConBanda]
+    tipo_aplicacion: str  # "terrestre" | "aerea"
+    productos: list[str]  # nombres tal como los escribió el operario
     cultivo: str
     dosis_valor: float
     dosis_unidad: str
     adversidad: str | None = None  # pasa a requerida si el uso registrado varía por adversidad
 ```
+
+**Implementado distinto de lo planeado en la Fase 1** (ver DECISIONES.md, Fase 5): acá se había previsto `productos: list[ProductoConBanda]`, con `banda_toxicologica` provista por quien llama. En la implementación real (Fase 5), `evaluar_riesgo` resuelve cada producto contra `catalogo.producto` (mismo mecanismo que `validar_producto_registro`) y toma la banda del registro, no de un dato que el operario tendría que saber de memoria -- el operario no suele conocer la banda toxicológica de un producto.
 
 | Requeridos | Opcionales | Si falta |
 |---|---|---|

@@ -2,6 +2,12 @@
 
 Registro de qué falló y cómo se resolvió. Una entrada por dificultad relevante, en orden cronológico (más reciente arriba).
 
+## Fase 5 — Tools de validación y dictamen
+
+### Test de `evaluar_riesgo` fallaba por asumir una sola zona "escuela" en el resultado
+
+`test_riesgo_observado_por_distancia_a_escuela` usaba `next(z for z in ... if z["tipo"]=="escuela")` asumiendo que solo iba a haber una zona de tipo escuela en el radio de búsqueda. Con `RADIO_BUSQUEDA_ZONAS_M=2000`, la escuela de colonia-vecina también entra en el radio desde un punto en San Carlos Centro, así que el resultado real trae dos zonas `tipo="escuela"` (la cercana, que no cumple, y la lejana, que sí). El `next()` agarraba la que aparecía primero en la lista, que no siempre era la cercana, y el test fallaba de forma intermitente según el orden de la consulta SQL. Se corrigió filtrando por `not z["cumple"]` en vez de solo por tipo. No es un bug del código de producción: el comportamiento (reglas de la jurisdicción del lote aplicadas a zonas de localidades vecinas) es exactamente el que pide la skill; el bug estaba en la suposición del test.
+
 ## Fase 3 — Ingesta SIG y normativa
 
 ### Regex de artículos no reconocía "Articulo" sin tilde
