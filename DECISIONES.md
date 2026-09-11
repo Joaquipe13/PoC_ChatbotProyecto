@@ -24,9 +24,17 @@ Se probó primero con el alias `-latest`, pero se reemplazó por `gemini-3.5-fla
 
 No se pudo confirmar con una fuente oficial (los resultados de búsqueda disponibles eran de blogs, no de developers.facebook.com) cuál es la versión vigente de Graph API al 11/09/2026. Se deja `v23.0` como placeholder explícitamente marcado **(verificar)** en `.env.example` y acá; hay que confirmarlo contra `https://developers.facebook.com/docs/graph-api/changelog` antes de la Fase 8.
 
-### Modelo de embeddings: `sentence-transformers/paraphrase-multilingual-mpnet-base-v2`
+### Modelo de embeddings: `sentence-transformers/paraphrase-multilingual-mpnet-base-v2` (confirmado con benchmark)
 
-Ya justificado en `plandefases.md` (decisión abierta #3): buen soporte de español, calidad superior a MiniLM para similitud semántica de nombres de producto y texto normativo, tamaño manejable en CPU. Pendiente confirmar con benchmark real en la Fase 1 (tarea 11 de esa fase).
+Ya justificado en `plandefases.md` (decisión abierta #3): buen soporte de español, calidad superior a MiniLM para similitud semántica de nombres de producto y texto normativo, tamaño manejable en CPU.
+
+**Confirmado con benchmark real (Fase 1, tarea 11)** el 12/09/2026, corriendo `scripts/benchmark_embeddings.py` sobre 200 nombres de producto sintéticos en esta máquina (CPU, sin GPU):
+
+- Carga del modelo (primera vez, incluye descarga de ~1 GB): 110,6 s; con el modelo ya cacheado localmente, 10,7 s.
+- Embeber 200 nombres: 2,20-2,93 s totales → **11-15 ms/nombre** en batches de 32.
+- Dimensión del embedding: 768 (coincide con `vector(768)` en las migraciones de `catalogo` y `territorio`).
+
+A ese ritmo, embeber el catálogo completo de SENASA (~7.374 productos, más principios activos/cultivos/adversidades) es del orden de 1-2 minutos de cómputo puro, insignificante frente al tiempo del crawl (Fase 2, throttled a ~1 req/s). **Decisión cerrada**, no queda como decisión abierta. Dimensión 768 fijada en las migraciones SQL de la Fase 1; si se cambia de modelo más adelante hay que migrar esas columnas `vector` también.
 
 ### Excepción de cuota agotada del LLM: detección heurística por texto
 

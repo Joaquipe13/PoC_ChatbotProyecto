@@ -34,4 +34,6 @@ Los tests nunca salen a la red: con `USE_FIXTURES=true` (default) el LLM es un f
 
 ## Estado del proyecto
 
-Fase actual: **Fase 0 — Setup**. Ver `plandefases.md` para el resto de las fases y sus criterios de aceptación.
+Fases 0 (Setup) y 1 (Dominio y contratos) completadas. Próxima: **Fase 2 — Scraper SENASA y base de productos**, pendiente de confirmación del usuario (ver `plandefases.md`).
+
+Documentos de la Fase 1: [`docs/modelo-datos.md`](docs/modelo-datos.md) (diagrama ER + consultas SQL de las tools RAG), [`docs/matriz-parametros.md`](docs/matriz-parametros.md), [`docs/especificacion-plantillas.md`](docs/especificacion-plantillas.md), [`docs/contrato-insumos.md`](docs/contrato-insumos.md).
