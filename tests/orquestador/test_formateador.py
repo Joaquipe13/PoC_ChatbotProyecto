@@ -1,0 +1,204 @@
+"""Tests de snapshot de las 9 plantillas (ver docs/especificacion-plantillas.md).
+"snapshot" acá es un string esperado fijo por plantilla, no una librería de
+snapshot testing -- alcanza para las 9 plantillas y deja el `assert` legible."""
+
+from fitosanitarios.dominio.modelos import CampoFaltante, Cita, RespuestaAgente, ResultadoTool
+from fitosanitarios.dominio.motivos import MotivoNoResuelto
+from fitosanitarios.orquestador.formateador import formatear_respuesta, partir_por_seccion
+
+
+def _un_mensaje(respuesta, resultados) -> str:
+    mensajes = formatear_respuesta(respuesta, resultados)
+    assert len(mensajes) == 1
+    return mensajes[0]
+
+
+def test_confirmacion_receta():
+    respuesta = RespuestaAgente(tipo="confirmacion_receta")
+    resultado = ResultadoTool(
+        estado="faltan_datos",
+        datos={
+            "numero": "0042", "cultivo": "soja", "lote": "4",
+            "adversidad": "malezas de hoja ancha",
+            "items": [{"producto_nombre": "Glifosato 48%", "dosis_declarada": "2 L/ha"}],
+            "superficie_ha": 35, "tipo_aplicacion": None,
+        },
+    )
+    texto = _un_mensaje(respuesta, [resultado])
+    assert texto == (
+        "*Leí la receta N.° 0042*. Confirmá los datos:\n"
+        "- *Cultivo:* soja\n"
+        "- *Lote:* 4\n"
+        "- *Adversidad:* malezas de hoja ancha\n"
+        "- *Producto:* Glifosato 48% — 2 L/ha\n"
+        "- *Superficie:* 35 ha\n"
+        "- *Tipo de aplicación:* no figura ⚠️\n"
+        "[Confirmar] [Corregir]"
+    )
+
+
+def test_dictamen_observada_con_citas():
+    respuesta = RespuestaAgente(tipo="dictamen")
+    resultado = ResultadoTool(
+        estado="observado",
+        datos={
+            "jurisdiccion_id": "san-carlos-centro",
+            "dictamen": {
+                "resultado": "OBSERVADA",
+                "observaciones": [
+                    {"descripcion": "Distancia a escuela insuficiente: 80 m, mínimo 100 m."},
+                ],
+                "chequeos_no_realizados": [],
+                "citas": [
+                    {"fuente": "normativa", "norma": "ordenanza-914-2018", "articulo": "8",
+                     "jurisdiccion_id": "san-carlos-centro"},
+                ],
+            },
+        },
+        citas=[Cita(fuente="normativa", norma="ordenanza-914-2018", articulo="8",
+                    jurisdiccion_id="san-carlos-centro")],
+    )
+    texto = _un_mensaje(respuesta, [resultado])
+    assert texto == (
+        "*Dictamen* — san-carlos-centro\n"
+        "*Resultado:* ❌ OBSERVADA\n\n"
+        "*Observaciones*\n"
+        "1. Distancia a escuela insuficiente: 80 m, mínimo 100 m.\n\n"
+        "*Fuentes*\n"
+        "- ordenanza-914-2018, art. 8 (san-carlos-centro)"
+    )
+
+
+def test_dictamen_apta_sin_observaciones():
+    respuesta = RespuestaAgente(tipo="dictamen")
+    resultado = ResultadoTool(
+        estado="ok",
+        datos={
+            "jurisdiccion_id": "san-carlos-centro",
+            "dictamen": {"resultado": "APTA", "observaciones": [],
+                         "chequeos_no_realizados": [], "citas": []},
+        },
+    )
+    texto = _un_mensaje(respuesta, [resultado])
+    assert "✅ APTA" in texto
+    assert "Observaciones" not in texto
+
+
+def test_consulta_producto_listado():
+    respuesta = RespuestaAgente(tipo="consulta_producto")
+    resultado = ResultadoTool(
+        estado="ok",
+        datos={
+            "total": 1,
+            "productos": [{
+                "marca": "Flyer 10 Ec", "numero_inscripcion": "41881",
+                "banda_toxicologica": "II",
+                "dosis": {"texto_original": "160-180 cm3/ha"},
+            }],
+        },
+        citas=[Cita(fuente="senasa", documento="vademécum")],
+    )
+    texto = _un_mensaje(respuesta, [resultado])
+    assert "*Productos registrados* (1 de 1)" in texto
+    assert "Flyer 10 Ec" in texto
+    assert "*Fuentes*" in texto
+
+
+def test_consulta_producto_puntual():
+    respuesta = RespuestaAgente(tipo="consulta_producto")
+    resultado = ResultadoTool(
+        estado="ok",
+        datos={
+            "producto": "Flyer 10 Ec", "numero_inscripcion": "41881",
+            "banda_toxicologica": "II", "cultivo_autorizado": True,
+        },
+        citas=[Cita(fuente="senasa", registro_senasa="41881", documento="detalle API")],
+    )
+    texto = _un_mensaje(respuesta, [resultado])
+    assert texto.startswith("*Flyer 10 Ec* · Reg. SENASA 41881 · Banda II · ✅")
+
+
+def test_consulta_normativa():
+    respuesta = RespuestaAgente(tipo="consulta_normativa")
+    resultado = ResultadoTool(
+        estado="ok",
+        datos={"veredicto": "No", "regla": "La distancia mínima es de 100 metros."},
+        citas=[Cita(fuente="normativa", norma="ordenanza-914-2018", articulo="8",
+                    jurisdiccion_id="san-carlos-centro")],
+    )
+    texto = _un_mensaje(respuesta, [resultado])
+    assert texto == (
+        "*No.* La distancia mínima es de 100 metros.\n\n"
+        "*Fuentes*\n"
+        "- ordenanza-914-2018, art. 8 (san-carlos-centro)"
+    )
+
+
+def test_repregunta_agrupada_hasta_3():
+    respuesta = RespuestaAgente(
+        tipo="repregunta",
+        faltantes=[
+            CampoFaltante(campo="ubicacion_lote", motivo="no informada",
+                          pregunta_sugerida="Mandá la ubicación del lote",
+                          tipo_entrada="ubicacion"),
+            CampoFaltante(campo="tipo_aplicacion", motivo="no informado",
+                          pregunta_sugerida="Elegí una opción", tipo_entrada="botones",
+                          opciones=["Terrestre", "Aérea"]),
+        ],
+    )
+    texto = _un_mensaje(respuesta, [])
+    assert texto == (
+        "Para continuar necesito 2 datos:\n"
+        "1. *ubicacion_lote*: Mandá la ubicación del lote\n"
+        "2. *tipo_aplicacion*: Elegí una opción\n"
+        "[Terrestre] [Aérea]"
+    )
+
+
+def test_fuera_de_dominio_es_texto_fijo():
+    respuesta = RespuestaAgente(tipo="fuera_de_dominio", intro="algo que no debería aparecer")
+    texto = _un_mensaje(respuesta, [])
+    assert texto.startswith("Solo puedo ayudarte con recetas de fitosanitarios")
+    assert "algo que no debería aparecer" not in texto
+
+
+def test_no_resuelto_con_motivo():
+    respuesta = RespuestaAgente(tipo="no_resuelto")
+    resultado = ResultadoTool(
+        estado="no_resuelto", motivo=MotivoNoResuelto.JURISDICCION_NO_CUBIERTA
+    )
+    texto = _un_mensaje(respuesta, [resultado])
+    assert "no cae en ningún polígono de localidad cargado" in texto
+
+
+def test_ayuda_es_texto_fijo():
+    respuesta = RespuestaAgente(tipo="ayuda")
+    texto = _un_mensaje(respuesta, [])
+    assert texto.startswith("Hola 👋")
+
+
+def test_error_es_texto_fijo():
+    respuesta = RespuestaAgente(tipo="error")
+    texto = _un_mensaje(respuesta, [])
+    assert "problema técnico" in texto
+
+
+def test_intro_se_antepone_salvo_en_fuera_de_dominio_ayuda_y_error():
+    respuesta = RespuestaAgente(tipo="consulta_normativa", intro="Che, mirá esto:")
+    resultado = ResultadoTool(estado="ok", datos={"veredicto": "Si", "regla": "Se puede."})
+    texto = _un_mensaje(respuesta, [resultado])
+    assert texto.startswith("Che, mirá esto:")
+
+
+def test_partir_por_seccion_no_corta_una_lista_a_mitad():
+    seccion_a = "A" * 3000
+    seccion_b = "B" * 3000
+    texto = f"{seccion_a}\n\n{seccion_b}"
+    partes = partir_por_seccion(texto, limite=4096)
+    assert len(partes) == 2
+    assert partes[0] == seccion_a
+    assert partes[1] == seccion_b
+
+
+def test_partir_por_seccion_texto_corto_no_se_parte():
+    assert partir_por_seccion("hola", limite=4096) == ["hola"]

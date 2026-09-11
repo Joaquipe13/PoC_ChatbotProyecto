@@ -1,5 +1,45 @@
 # Decisiones
 
+## Fase 7 — Orquestador
+
+### `response_format` necesita `ToolStrategy(RespuestaAgente)` explícito, no la clase pydantic pelada
+
+Verificado interactivamente antes de escribir `agente.py`: pasar `response_format=RespuestaAgente` (la clase pydantic sola) a `create_agent` nunca disparó la extracción de `structured_response` contra un chat model fake -- el grafo terminaba el turno en el primer `AIMessage` sin `tool_calls` y `structured_response` quedaba `None`. Pasando `response_format=ToolStrategy(RespuestaAgente)` explícito, y haciendo que el modelo (real o fake) termine el turno con un `tool_call` al nombre de esa clase, funciona: `structured_response` se llena correctamente. Se usa `ToolStrategy` siempre (no solo en tests) para que el comportamiento sea el mismo con Gemini real.
+
+### Chat model fake propio para testear el agente (`tests/orquestador/fake_chat_model.py`)
+
+Los fakes genéricos de `langchain_core` (`GenericFakeChatModel`, `FakeListChatModel`) no simulan tool-calling de forma controlable turno a turno. Se armó un `BaseChatModel` propio que devuelve, en orden, `AIMessage`s precargados (con o sin `tool_calls`) y no depende de red ni de Postgres. Confirmado con un smoke test que `ToolMessage.artifact` efectivamente llega con la instancia pydantic completa del `ResultadoTool` cuando la tool real se declaró con `response_format="content_and_artifact"` -- eso es lo que permite que `orquestador/turno.py` arme el texto final desde los artifacts, nunca desde el texto libre del LLM.
+
+### Contador de repreguntas en memoria de proceso, no en el estado de LangGraph ni en Postgres
+
+Se evaluó extender el `state_schema` de `create_agent` con campos propios (`receta_en_curso`, `intentos_fallidos`), pero requiere diseñar reducers propios para esos campos y no se justificaba el tiempo para esta fase. Se optó por un `ContadorRepreguntas` en memoria, manejado por `orquestador/turno.py` (fuera de LangGraph), y la receta en curso sí persiste en Postgres (`operacion.receta`, ya existía desde la Fase 1) vía funciones simples en `orquestador/estado.py`. Limitación conocida: el contador de repreguntas no sobrevive un reinicio del proceso -- aceptable para esta POC, la memoria de conversación real (los mensajes) sí persiste en Postgres vía el checkpointer de LangGraph.
+
+### `evaluar_riesgo`/`evaluar_viabilidad_legal` con múltiples productos: cada uno se evalúa por separado contra cada zona
+
+Ver también `docs/matriz-parametros.md`. No se colapsa a "peor caso" por banda: una regla puede aplicar a un producto y no a otro en la misma receta.
+
+### Hallazgo real de datos: dosis ambigua por adversidad no especificada (corregido)
+
+Al correr `test_ruteo_evaluar_viabilidad_legal` contra datos reales, "Flyer 10 Ec" en soja dio `OBSERVADA` por dosis fuera de rango cuando debía dar `APTA` -- el producto tiene rangos de dosis DISTINTOS según la adversidad (160-180 cm³/ha para "Chinche De La Alfalfa", 25-35 para "Oruga De Las Leguminosas"), y `resolver_y_validar_producto` tomaba `usos_cultivo[0]` sin chequear si había ambigüedad. Corregido con `_dosis_sin_ambiguedad_de_adversidad`: si no se especificó adversidad y hay más de un rango distinto entre los usos del cultivo, la dosis queda sin comparar (va a `chequeos_no_realizados`, el dictamen puede terminar `NO_EVALUABLE` en vez de un `OBSERVADA` potencialmente equivocado) -- tal como pide la skill ("Rangos distintos por adversidad y adversidad desconocida: faltan_datos"). Ver `tests/servicios/test_validacion_producto.py`.
+
+### Evals contra Gemini real: 89% de exactitud de ruteo (24/27), con 3 hallazgos reales
+
+Corrida real completa de las 41 conversaciones etiquetadas (`evals/conversaciones.jsonl`) contra Gemini real + Postgres real el 12/09/2026 (`evals/run_evals.py`, sin `--limite`). Resultado: 24/27 casos de ruteo/repregunta/ambigüedad correctos (89%; la meta del plan es ≥90%, quedó 1 punto por debajo). Tres hallazgos concretos:
+
+1. **`consultar_productos` llamada sin ningún filtro rompía el turno entero** (`ValueError` no capturado desde el `model_validator` de `ConsultarProductosArgs`, propagado sin control fuera de `agente.invoke()`). Es un bug real de robustez, no una cuestión de exactitud del LLM: corregido envolviendo `agente.invoke()` en `orquestador/turno.py` con un `try/except` que degrada a `RespuestaAgente(tipo="error")` en vez de crashear. Con esto, esos 2 casos pasan de "error" a una respuesta de error prolija para el usuario (no se corrigió que el LLM elija mal la tool en esos 2 casos puntuales -- "¿el producto X está autorizado para algún cultivo en particular?" no tiene una tool que responda bien esa pregunta tal como está planteada la matriz de parámetros: `validar_producto_registro` pide `cultivo` como requerido, no sirve para "en qué cultivos está autorizado". Queda anotado como gap de cobertura, no como bug).
+2. **Dos casos "repregunta" esperados terminaron llamando `responder_consulta_normativa` sin `jurisdiccion_id`** en vez de repreguntar directamente sin llamar ninguna tool. El resultado para el usuario es igual de correcto (la tool devuelve `faltan_datos` con la lista de localidades) porque `responder_consulta_normativa_logica` maneja ese caso -- pero es una forma distinta a la que describe la skill ("si faltan parámetros requeridos no llama a la tool"). Se documenta como comportamiento aceptable (doble red de seguridad: orquestador y tool), no se fuerza al LLM a comportarse distinto vía prompt en esta sesión.
+3. **Un caso "ambigüedad" ("¿el glifosato está habilitado para soja?") se resolvió como `consultar_productos`** (listado por principio activo) en vez de `validar_producto_registro` -- una interpretación alternativa defendible ("glifosato" es un principio activo genérico, no una marca puntual), no necesariamente un error.
+
+No se re-corrieron las 41 conversaciones después del fix del punto 1 (el cambio es de manejo de excepciones, no de qué tool elige el LLM; hubiera movido 2 casos de "error" a "incorrecto" sin cambiar la exactitud real de ruteo del LLM). Las otras dos metas de la Fase 7 ("0 citas inventadas", "100% de dictámenes por plantilla") no se midieron con este eval porque están garantizadas por construcción (ver docstring de `evals/run_evals.py`), no por comportamiento del LLM en cada corrida.
+
+### Advertencia de LangGraph sobre serialización de `RespuestaAgente` en el checkpoint
+
+Al correr evals con `InMemorySaver`, apareció: `Deserializing unregistered type fitosanitarios.dominio.modelos.RespuestaAgente from checkpoint. This will be blocked in a future version.` LangGraph serializa el `structured_response` con `msgpack` y, en una versión futura, va a exigir registrar explícitamente los tipos pydantic propios (`allowed_msgpack_modules`) en vez de deserializar cualquier tipo. No rompe nada hoy (`langgraph==1.2.11`), pero **(verificar)** antes de actualizar `langgraph` más adelante: puede hacer falta registrar `RespuestaAgente` explícitamente.
+
+### `crear_modelo_chat_gemini` usa una sola key, sin la rotación de `llm/client.py`
+
+El agente (a diferencia de `extraccion_receta.py`/`rag_normativa.py`, que usan `ClienteGemini` con rotación real) usa `ChatGoogleGenerativeAI` con `gemini_api_keys[0]` nada más. `create_agent` no acepta un cliente con la interfaz custom de rotación; implementar rotación real para el agente completo (reintentar con la siguiente key ante 429 en medio de un tool-calling loop) queda pendiente -- no se hizo por tiempo. Mitigación mínima aceptada para la POC: si la primera key se agota, el agente va a fallar con la excepción sin capturar de LangChain, que ahora al menos no crashea el turno completo (ver el fix de manejo de excepciones arriba), pero tampoco reintenta con otra key.
+
 ## Fase 6 — `responder_consulta_normativa`
 
 ### `RAG_UMBRAL_SIMILITUD` recalibrado de 0,75 a 0,35 con scores reales

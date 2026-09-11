@@ -26,6 +26,40 @@ class ResolucionProducto:
     usos_registrados: list[dict] | None = None
 
 
+def _dosis_sin_ambiguedad_de_adversidad(
+    usos_cultivo: list[dict], adversidad: str | None
+) -> dict | None:
+    """Si no se especificó `adversidad` y los usos para el cultivo tienen
+    rangos de dosis DISTINTOS entre sí, no hay un único rango contra el que
+    comparar (ver skill, "Dosis": "Rangos distintos por adversidad y
+    adversidad desconocida: faltan_datos"). Devuelve `None` en ese caso --
+    nunca se elige un rango al azar entre varios posibles.
+
+    Hallazgo real (Fase 7): antes de este chequeo, se usaba directamente
+    `usos_cultivo[0]`, lo que podía comparar la dosis declarada contra un
+    rango que no correspondía a la adversidad real y dar un OBSERVADA
+    equivocado. Ver DECISIONES.md.
+    """
+    if not usos_cultivo:
+        return None
+    if adversidad:
+        # Si `adversidad` se especificó, `usos_cultivo` ya viene filtrado a
+        # esa adversidad (si hubo match) más arriba: no hay ambigüedad.
+        return usos_cultivo[0].get("dosis")
+
+    rangos_distintos = {
+        (
+            (u.get("dosis") or {}).get("valor_min"),
+            (u.get("dosis") or {}).get("valor_max"),
+            (u.get("dosis") or {}).get("unidad"),
+        )
+        for u in usos_cultivo
+    }
+    if len(rangos_distintos) > 1:
+        return None
+    return usos_cultivo[0].get("dosis")
+
+
 def resolver_y_validar_producto(
     conn,
     modelo_embeddings,
@@ -86,8 +120,8 @@ def resolver_y_validar_producto(
 
     chequeo_dosis = None
     if cultivo_autorizado and dosis_valor is not None and dosis_unidad is not None:
-        dosis_registrada = usos_cultivo[0].get("dosis") or {}
-        if dosis_registrada.get("parseable"):
+        dosis_registrada = _dosis_sin_ambiguedad_de_adversidad(usos_cultivo, adversidad)
+        if dosis_registrada is not None and dosis_registrada.get("parseable"):
             chequeo_dosis = comparar_dosis(
                 dosis_valor, dosis_unidad,
                 dosis_registrada.get("valor_min"), dosis_registrada.get("valor_max"),

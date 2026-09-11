@@ -2,6 +2,12 @@
 
 Registro de qué falló y cómo se resolvió. Una entrada por dificultad relevante, en orden cronológico (más reciente arriba).
 
+## Fase 7 — Orquestador
+
+### `operacion.receta` en la base real no tenía la columna `adversidad`
+
+Al testear `orquestador/estado.py::obtener_receta_en_curso` contra Postgres real, falló con `psycopg.errors.UndefinedColumn: column "adversidad" does not exist`. Causa: en la Fase 4 se agregó `adversidad TEXT` a `003_operacion.sql` (el archivo de migración), pero nunca se re-ejecutó esa migración contra la base de desarrollo -- `CREATE TABLE IF NOT EXISTS` no altera una tabla que ya existe, aunque el `CREATE TABLE` del archivo ya incluya la columna nueva. Se corrigió con un `ALTER TABLE operacion.receta ADD COLUMN IF NOT EXISTS adversidad TEXT;` manual. Mismo patrón de fondo que el hallazgo de la Fase 6 (embeddings fake pisando datos reales): cambiar un archivo de migración no alcanza, hay que aplicarlo. Para un entorno real haría falta una herramienta de migraciones que detecte y aplique diffs de esquema (Alembic u otra, marcado `(verificar)` desde la Fase 1) en vez de SQL plano idempotente solo para tablas nuevas.
+
 ## Fase 6 — `responder_consulta_normativa`
 
 ### Scores de similitud casi nulos: embeddings fake pisando embeddings reales en la base de desarrollo

@@ -1,0 +1,81 @@
+"""Agente orquestador: `create_agent` (LangGraph) con las 6 tools del
+núcleo, `response_format=RespuestaAgente` y checkpointer en Postgres (ver
+skill, "Arquitectura" y "Política del orquestador").
+
+Nota de API (verificar antes de la demo si cambia `langchain`/`langgraph`):
+`create_agent` viene de `langchain.agents` (`langchain==1.4.0` al escribir
+esto). `response_format` se pasa explícitamente como
+`ToolStrategy(RespuestaAgente)` en vez de la clase pydantic pelada: con la
+clase sola, un modelo que no declara soporte nativo de structured output
+(como el fake usado en los tests) nunca dispara la extracción y
+`structured_response` queda `None` -- confirmado interactivamente antes de
+escribir este módulo, ver DECISIONES.md.
+"""
+
+import logging
+from contextlib import contextmanager
+
+from langchain.agents import create_agent
+from langchain.agents.structured_output import ToolStrategy
+from langchain_core.language_models.chat_models import BaseChatModel
+from langgraph.checkpoint.postgres import PostgresSaver
+
+from fitosanitarios.config import Settings
+from fitosanitarios.dominio.modelos import RespuestaAgente
+from fitosanitarios.orquestador.prompt_sistema import PROMPT_SISTEMA
+from fitosanitarios.tools.consultar_productos import consultar_productos
+from fitosanitarios.tools.evaluar_riesgo import evaluar_riesgo
+from fitosanitarios.tools.evaluar_viabilidad_legal import evaluar_viabilidad_legal
+from fitosanitarios.tools.leer_receta import leer_receta
+from fitosanitarios.tools.responder_consulta_normativa import responder_consulta_normativa
+from fitosanitarios.tools.validar_producto_registro import validar_producto_registro
+
+logger = logging.getLogger(__name__)
+
+TOOLS = [
+    leer_receta,
+    validar_producto_registro,
+    consultar_productos,
+    evaluar_riesgo,
+    evaluar_viabilidad_legal,
+    responder_consulta_normativa,
+]
+
+
+def crear_modelo_chat_gemini(settings: Settings) -> BaseChatModel:
+    """Modelo de chat real para el agente (Gemini, multimodal, ver skill).
+    No reutiliza `llm/client.py::ClienteGemini` -- ese cliente es para
+    llamadas de texto/imagen sueltas (extracción, RAG), no implementa el
+    protocolo de tool-calling que `create_agent` necesita. Usa la primera
+    key configurada; la rotación ante 429 para el agente completo queda
+    pendiente (ver DECISIONES.md)."""
+    from langchain_google_genai import ChatGoogleGenerativeAI
+
+    if not settings.gemini_api_keys:
+        raise ValueError("Se necesita al menos una GEMINI_API_KEY_* para el agente real")
+    return ChatGoogleGenerativeAI(
+        model=settings.gemini_model, google_api_key=settings.gemini_api_keys[0]
+    )
+
+
+def crear_agente(model: BaseChatModel, checkpointer=None):
+    """`checkpointer=None` es válido (sin memoria entre invocaciones, útil
+    para tests); en producción pasar un `PostgresSaver` (ver
+    `checkpointer_postgres` acá abajo)."""
+    return create_agent(
+        model=model,
+        tools=TOOLS,
+        system_prompt=PROMPT_SISTEMA,
+        response_format=ToolStrategy(RespuestaAgente),
+        checkpointer=checkpointer,
+    )
+
+
+@contextmanager
+def checkpointer_postgres(database_url: str):
+    """Context manager: `PostgresSaver.setup()` crea sus propias tablas la
+    primera vez (ver skill: "Más las tablas propias del checkpointer de
+    LangGraph"), no están en las migraciones de `datos/migraciones/`."""
+    with PostgresSaver.from_conn_string(database_url) as saver:
+        saver.setup()
+        yield saver
