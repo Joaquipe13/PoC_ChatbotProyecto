@@ -1,0 +1,30 @@
+# Entorno y secretos
+.env
+.env.test
+*.local
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+
+# Datos crudos (nunca versionados; solo snapshots y fixtures sí)
+data/senasa/crudo/
+data/senasa/snapshot/
+data/insumos/**/*.pdf
+data/insumos/**/*.geojson
+!tests/fixtures/**
+
+# Notebooks: mantener limpios de outputs pesados no es automático,
+# se revisa a mano antes de commitear (ver DECISIONES.md)
+
+# Editor / SO
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

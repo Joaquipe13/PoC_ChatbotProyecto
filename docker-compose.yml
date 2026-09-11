@@ -1,0 +1,22 @@
+services:
+  db:
+    image: pgvector/pgvector:0.8.6-pg16
+    container_name: fitosanitarios-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: fitosanitarios
+    ports:
+      - "5433:5432"
+    volumes:
+      - fitosanitarios_db_data:/var/lib/postgresql/data
+      - ./scripts/smoke_db.sql:/docker-entrypoint-initdb.d/01-extensiones.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d fitosanitarios"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  fitosanitarios_db_data:
