@@ -23,6 +23,16 @@ class ClienteLLM(Protocol):
     def generar(self, prompt: str, *, system: str | None = None) -> str: ...
 
 
+class ClienteLLMMultimodal(Protocol):
+    """Subconjunto de proveedores que aceptan imagen + texto (hoy solo Gemini;
+    ver skill, "LLM: proveedor intercambiable... Gemini Flash multimodal como
+    principal"). `ClienteGroq` no lo implementa."""
+
+    def generar_con_imagen(
+        self, imagen: bytes, prompt: str, *, system: str | None = None
+    ) -> str: ...
+
+
 def _es_error_cuota(exc: BaseException) -> bool:
     texto = str(exc).upper()
     return "429" in texto or "RESOURCE_EXHAUSTED" in texto or "RATE LIMIT" in texto
@@ -38,10 +48,29 @@ class ClienteGemini:
         self._model = model
 
     def generar(self, prompt: str, *, system: str | None = None) -> str:
+        return self._con_rotacion(prompt, system, imagen=None)
+
+    def generar_con_imagen(
+        self,
+        imagen: bytes,
+        prompt: str,
+        *,
+        system: str | None = None,
+        mime_type: str = "image/jpeg",
+    ) -> str:
+        return self._con_rotacion(prompt, system, imagen=imagen, mime_type=mime_type)
+
+    def _con_rotacion(
+        self,
+        prompt: str,
+        system: str | None,
+        imagen: bytes | None,
+        mime_type: str = "image/jpeg",
+    ) -> str:
         ultimo_error: Exception | None = None
         for api_key in self._api_keys:
             try:
-                return self._generar_con_key(api_key, prompt, system)
+                return self._generar_con_key(api_key, prompt, system, imagen, mime_type)
             except Exception as exc:
                 if not _es_error_cuota(exc):
                     raise
@@ -57,13 +86,28 @@ class ClienteGemini:
         retry=retry_if_exception(_es_error_cuota),
         reraise=True,
     )
-    def _generar_con_key(self, api_key: str, prompt: str, system: str | None) -> str:
+    def _generar_con_key(
+        self,
+        api_key: str,
+        prompt: str,
+        system: str | None,
+        imagen: bytes | None,
+        mime_type: str = "image/jpeg",
+    ) -> str:
         from google import genai  # import diferido: no es dependencia de los tests con fake
+        from google.genai import types
 
         cliente = genai.Client(api_key=api_key)
         config = {"system_instruction": system} if system else None
+        if imagen is not None:
+            contents = [
+                types.Part.from_bytes(data=imagen, mime_type=mime_type),
+                prompt,
+            ]
+        else:
+            contents = prompt
         respuesta = cliente.models.generate_content(
-            model=self._model, contents=prompt, config=config
+            model=self._model, contents=contents, config=config
         )
         return respuesta.text
 

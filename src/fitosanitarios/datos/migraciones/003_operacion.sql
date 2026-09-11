@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS operacion.receta (
     numero TEXT,
     cultivo TEXT,
     lote TEXT,
+    adversidad TEXT,
     superficie_ha NUMERIC,
     tipo_aplicacion TEXT CHECK (tipo_aplicacion IN ('terrestre', 'aerea')),
     fecha_prevista DATE,

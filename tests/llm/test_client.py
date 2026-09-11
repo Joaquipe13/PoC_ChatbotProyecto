@@ -27,7 +27,7 @@ def test_cliente_gemini_rota_ante_error_de_cuota(monkeypatch):
 
     llamadas: list[str] = []
 
-    def falsa_generacion(self, api_key, prompt, system):
+    def falsa_generacion(self, api_key, prompt, system, imagen, mime_type="image/jpeg"):
         llamadas.append(api_key)
         if api_key == "key-agotada":
             raise RuntimeError("429 RESOURCE_EXHAUSTED")
@@ -44,10 +44,28 @@ def test_cliente_gemini_agota_todas_las_keys(monkeypatch):
 
     cliente = ClienteGemini(api_keys=["k1", "k2"], model="gemini-flash-latest")
 
-    def falsa_generacion(self, api_key, prompt, system):
+    def falsa_generacion(self, api_key, prompt, system, imagen, mime_type="image/jpeg"):
         raise RuntimeError("429 RESOURCE_EXHAUSTED")
 
     monkeypatch.setattr(ClienteGemini, "_generar_con_key", falsa_generacion)
 
     with pytest.raises(ServicioLLMNoDisponible):
         cliente.generar("hola")
+
+
+def test_cliente_gemini_generar_con_imagen_pasa_los_bytes(monkeypatch):
+    cliente = ClienteGemini(api_keys=["k1"], model="gemini-flash-latest")
+    recibido = {}
+
+    def falsa_generacion(self, api_key, prompt, system, imagen, mime_type="image/jpeg"):
+        recibido["imagen"] = imagen
+        recibido["mime_type"] = mime_type
+        return "ok"
+
+    monkeypatch.setattr(ClienteGemini, "_generar_con_key", falsa_generacion)
+
+    resultado = cliente.generar_con_imagen(b"contenido-jpeg", "describí esta imagen")
+
+    assert resultado == "ok"
+    assert recibido["imagen"] == b"contenido-jpeg"
+    assert recibido["mime_type"] == "image/jpeg"

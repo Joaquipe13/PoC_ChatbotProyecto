@@ -31,3 +31,13 @@ class ClienteLLMFake:
         if self._respuestas:
             return self._respuestas.pop(0)
         return ""
+
+    def generar_con_imagen(
+        self, imagen: bytes, prompt: str, *, system: str | None = None, **_kwargs
+    ) -> str:
+        self.llamadas.append({"prompt": prompt, "system": system, "imagen_bytes": len(imagen)})
+        if self._responder is not None:
+            return self._responder(prompt, system)
+        if self._respuestas:
+            return self._respuestas.pop(0)
+        return ""

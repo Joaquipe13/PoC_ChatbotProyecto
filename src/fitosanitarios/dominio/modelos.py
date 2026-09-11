@@ -48,6 +48,7 @@ class Receta(BaseModel):
     numero: str | None = None
     cultivo: str | None = None
     lote: str | None = None
+    adversidad: str | None = None
     items: list[RecetaItem] = Field(default_factory=list)
     superficie_ha: float | None = None
     tipo_aplicacion: TipoAplicacion | None = None

@@ -1,5 +1,37 @@
 # Decisiones
 
+## Fase 4 — `leer_receta`
+
+### Corrección a la Fase 1: `Receta` no tenía campo `adversidad`
+
+Al diseñar `extraccion_receta.py` se encontró que `dominio/modelos.py::Receta` (Fase 1) no tenía un campo `adversidad` a nivel receta -- solo `RecetaItem.adversidad`, por producto. Pero la plantilla de referencia de la skill (confirmación de receta) muestra `adversidad` como un campo único de la receta completa ("*Adversidad:* malezas de hoja ancha"), no por producto. Se agregó `Receta.adversidad: str | None` y la columna correspondiente `operacion.receta.adversidad TEXT` en la migración 003 (todavía no hay datos reales cargados en esa tabla, se pudo editar la migración directamente sin migración incremental). `RecetaItem.adversidad` queda para el caso, menos común, de que un ítem individual tenga una adversidad distinta a la de la receta.
+
+### API real de LangChain verificada: `@tool(nombre, args_schema=..., response_format="content_and_artifact")` funciona tal cual en `langchain-core` 1.6.3
+
+Confirmado instanciando la tool de verdad (no solo leyendo documentación): `leer_receta.name`, `.args_schema` y `.response_format` devuelven lo esperado. Coincide con lo que asumía la skill.
+
+### Cliente Gemini extendido con `generar_con_imagen` (multimodal)
+
+`llm/client.py` tenía solo `generar(prompt)` (texto). Se agregó `generar_con_imagen(imagen: bytes, prompt, *, system=None, mime_type="image/jpeg")`, reutilizando la misma rotación de keys y manejo de cuota que `generar`. Verificado con `google.genai.types.Part.from_bytes` + una lista `[Part, texto]` como `contents` -- confirmado funcionando contra la API real (ver más abajo). Solo `ClienteGemini` lo implementa; `ClienteGroq` no (la skill designa a Gemini como "multimodal, principal").
+
+### Umbral de confianza por campo: 0,6
+
+No estaba fijado por la skill ni por el plan (dejaba "confianza por campo" sin un número). Se eligió 0,6 como punto de partida razonable (ni tan laxo que acepte lecturas dudosas, ni tan estricto que repregunte todo el tiempo con una extracción típicamente buena). **Sin calibrar contra un volumen real de fotos** -- ajustar en base a los resultados de la Fase 10 (demo) o antes si hay quejas de repreguntas de más/de menos.
+
+### OCR clásico (Tesseract) como segunda señal: no implementado en esta sesión
+
+La tarea 3 de la Fase 4 pide "implementar el fallback/comparación con OCR clásico (Tesseract) como segunda señal, no como reemplazo" del LLM multimodal. Tesseract sigue sin estar instalado en esta máquina (mismo hallazgo que la Fase 3, ver DIFICULTADES.md), y la extracción multimodal por sí sola dio 100% de precisión en la verificación manual contra 3 imágenes reales (ver abajo). Se decide **no** escribir código de comparación con OCR que no se puede ejercitar ni una vez en esta sesión (se preferiría código real y probado a código muerto). Pendiente para cuando Tesseract esté disponible: usar `pytesseract.image_to_string` sobre la misma imagen y comparar contra los campos que extrajo el LLM (coincidencia de substring, por ejemplo) para subir o bajar la confianza reportada, nunca para reemplazar la extracción del LLM.
+
+### Verificación manual contra el LLM real (tarea 7): 3/3 casos correctos
+
+Corrido el 12/09/2026 contra Gemini real, sobre imágenes sintéticas (no hay fotos reales de recetas disponibles para esta POC -- generadas con `scripts/generar_fixtures_recetas.py`, texto renderizado con PIL, no fotografías):
+
+- `01_completa.jpg` (todos los campos presentes, mismo caso que el ejemplo de referencia de la skill: soja, lote 4, malezas de hoja ancha, Glifosato 48% 2 L/ha, 35 ha, terrestre): los 6 campos extraídos con confianza 1.0, `faltantes=[]`.
+- `07_multiples_faltantes.jpg` (solo cultivo y producto presentes en la imagen): cultivo y producto extraídos correctamente con confianza 1.0; lote, adversidad, superficie y tipo de aplicación devueltos como `null`/confianza 0.0 -- se generaron los 4 `CampoFaltante` esperados, ninguno de más ni de menos.
+- `10_no_es_receta.jpg` (una factura, no una receta): el LLM respondió `{"legible": false}` tal cual se le pidió en el prompt.
+
+No se corrieron las 7 imágenes restantes contra el LLM real (costo/tiempo); quedan cubiertas solo por los tests con LLM fake (`tests/tools/test_leer_receta.py`, `tests/servicios/test_extraccion_receta.py`), que fijan la expectativa por caso pero no validan que el LLM real lea la imagen igual.
+
 ## Fase 3 — Ingesta SIG y normativa
 
 ### Idempotencia de `loader_normativa.py`/`loader_reglas.py`: borrar y reinsertar por alcance, no `ON CONFLICT`
