@@ -1,0 +1,240 @@
+{
+  "establecimientos": [],
+  "toxicidadAves": null,
+  "toxicidadPeces": null,
+  "naturaleza": null,
+  "irritacionDermal": null,
+  "irritacionOcular": null,
+  "observaciones": null,
+  "tipoPresentacion": null,
+  "tipoRegistro": {
+    "id": 2,
+    "descripcion": "Linea Jardin - B"
+  },
+  "productosAptitudes": [],
+  "aplicacionesPorProducto": [],
+  "principiosActivos": [],
+  "tiempoReingresoAreaTratada": null,
+  "ambitoAplicacion": null,
+  "claseInhalatoria": null,
+  "claseToxicologica": null,
+  "toxicidadAbejas": null,
+  "productosFirmas": [
+    {
+      "firma": {
+        "idFirma": 672726,
+        "nroInscripcion": "267",
+        "fechaInscripcion": "15-08-2014",
+        "cuit": "30-57252355-8",
+        "nombre": "DELENTE S. R. L.",
+        "mail": "laboratoriosdelente@infobia.com.ar",
+        "nombreFantasia": null,
+        "nroRLM": null,
+        "nroResolucion": null,
+        "nroHabilitacion": "527000/7",
+        "enteHabilitacion": "Tres de Febrero",
+        "nroExpediente": "133/1993"
+      },
+      "estadoProducto": {
+        "id": 1,
+        "descripcion": "ACTIVO"
+      },
+      "estadoRevision": {
+        "id": 1,
+        "descripcion": "SIN CORROBORAR"
+      },
+      "marca": "DELENTE HERBICIDA TOTAL",
+      "propio": false,
+      "nombreComercial": null,
+      "fecha": "1993-09-24 00:00:00",
+      "numeroResolucion": null,
+      "fechaCreacion": "2021-03-17T12:27:46.000-0300",
+      "fechaUltMod": null,
+      "usuarioUltMod": "MIGRACION",
+      "prodReferenciado": null,
+      "esPrivado": null,
+      "registrado": false,
+      "comercializacionActiva": true,
+      "lotes": [],
+      "id": 104938,
+      "_links": {
+        "self": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/productosFirmas/104938{?projection}",
+          "templated": true
+        },
+        "firmaOrigen": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/productosFirmas/104938/firmaOrigen{?projection}",
+          "templated": true
+        },
+        "lotes": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/productosFirmas/104938/lotes{?projection}",
+          "templated": true
+        },
+        "producto": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/productosFirmas/104938/producto{?projection}",
+          "templated": true
+        },
+        "prodReferenciado": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/productosFirmas/104938/prodReferenciado{?projection}",
+          "templated": true
+        },
+        "firma": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/productosFirmas/104938/firma{?projection}",
+          "templated": true
+        },
+        "estadoRevision": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/productosFirmas/104938/estadoRevision"
+        },
+        "estadoProducto": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/productosFirmas/104938/estadoProducto"
+        }
+      }
+    }
+  ],
+  "tipoProducto": {
+    "id": 1,
+    "descripcion": "Agroquímico - Formulados"
+  },
+  "numeroInscripcion": "LJ 00069",
+  "productoDocumentos": [],
+  "estadoProducto": {
+    "id": 1,
+    "descripcion": "ACTIVO"
+  },
+  "envases": [],
+  "fechaVencimientoCesion": null,
+  "numeroExpediente": "0016/93",
+  "nombreProducto": null,
+  "coordinacion": {
+    "id": 1,
+    "fechaLimiteBaja": "2007-07-09 00:00:00",
+    "nombre": "Agroquímicos y Biologicos",
+    "activo": 1
+  },
+  "fechaInscripcion": "1993-09-24 00:00:00",
+  "fechaVencimientoTransitorio": null,
+  "motivoBaja": null,
+  "numeroResolucion": null,
+  "pais": null,
+  "productoRegistrado": true,
+  "sensibilizacion": false,
+  "id": 190758,
+  "_links": {
+    "self": {
+      "href": "https://aps2.senasa.gov.ar/adt_api/api/productosAgroquimicosFormulados/190758"
+    },
+    "productoAgroquimicoFormulado": {
+      "href": "https://aps2.senasa.gov.ar/adt_api/api/productosAgroquimicosFormulados/190758{?projection}",
+      "templated": true
+    },
+    "principiosActivos": {
+      "href": "https://aps2.senasa.gov.ar/adt_api/api/productosAgroquimicosFormulados/190758/principiosActivos{?projection}",
+      "templated": true
+    },
+    "productosAptitudes": {
+      "href": "https://aps2.senasa.gov.ar/adt_api/api/productosAgroquimicosFormulados/190758/productosAptitudes{?projection}",
+      "templated": true
+    },
+    "toxicidadPeces": {
+      "href": "https://aps2.senasa.gov.ar/adt_api/api/productosAgroquimicosFormulados/190758/toxicidadPeces{?projection}",
+      "templated": true
+    },
+    "aplicacionesPorProducto": {
+      "href": "https://aps2.senasa.gov.ar/adt_api/api/productosAgroquimicosFormulados/190758/aplicacionesPorProducto{?projection}",
+      "templated": true
+    },
+    "productoDocumentos": {
+      "href": "https://aps2.senasa.gov.ar/adt_api/api/productosAgroquimicosFormulados/190758/productoDocumentos{?projection}",
+      "templated": true
+    },
+    "claseToxicologica": {
+      "href": "https://aps2.senasa.gov.ar/adt_api/api/productosAgroquimicosFormulados/190758/claseToxicologica{?projection}",
+      "templated": true
+    },
+    "productosHijos": {
+      "href": "https://aps2.senasa.gov.ar/adt_api/api/productosAgroquimicosFormulados/190758/productosHijos{?projection}",
+      "templated": true
+    },
+    "claseInhalatoria": {
+      "href": "https://aps2.senasa.gov.ar/adt_api/api/productosAgroquimicosFormulados/190758/claseInhalatoria{?projection}",
+      "templated": true
+    },
+    "pais": {
+      "href": "https://aps2.senasa.gov.ar/adt_api/api/productosAgroquimicosFormulados/190758/pais"
+    },
+    "estadoProducto": {
+      "href": "https://aps2.senasa.gov.ar/adt_api/api/productosAgroquimicosFormulados/190758/estadoProducto"
+    },
+    "irritacionOcular": {
+      "href": "https://aps2.senasa.gov.ar/adt_api/api/productosAgroquimicosFormulados/190758/irritacionOcular{?projection}",
+      "templated": true
+    },
+    "paises": {
+      "href": "https://aps2.senasa.gov.ar/adt_api/api/productosAgroquimicosFormulados/190758/paises"
+    },
+    "vinculaciones": {
+      "href": "https://aps2.senasa.gov.ar/adt_api/api/productosAgroquimicosFormulados/190758/vinculaciones{?projection}",
+      "templated": true
+    },
+    "metodoRegistro": {
+      "href": "https://aps2.senasa.gov.ar/adt_api/api/productosAgroquimicosFormulados/190758/metodoRegistro"
+    },
+    "uso": {
+      "href": "https://aps2.senasa.gov.ar/adt_api/api/productosAgroquimicosFormulados/190758/uso"
+    },
+    "irritacionDermal": {
+      "href": "https://aps2.senasa.gov.ar/adt_api/api/productosAgroquimicosFormulados/190758/irritacionDermal{?projection}",
+      "templated": true
+    },
+    "tipoPresentacion": {
+      "href": "https://aps2.senasa.gov.ar/adt_api/api/productosAgroquimicosFormulados/190758/tipoPresentacion{?projection}",
+      "templated": true
+    },
+    "tipoProducto": {
+      "href": "https://aps2.senasa.gov.ar/adt_api/api/productosAgroquimicosFormulados/190758/tipoProducto{?projection}",
+      "templated": true
+    },
+    "nomenclador": {
+      "href": "https://aps2.senasa.gov.ar/adt_api/api/productosAgroquimicosFormulados/190758/nomenclador{?projection}",
+      "templated": true
+    },
+    "envases": {
+      "href": "https://aps2.senasa.gov.ar/adt_api/api/productosAgroquimicosFormulados/190758/envases{?projection}",
+      "templated": true
+    },
+    "sustanciasActivas": {
+      "href": "https://aps2.senasa.gov.ar/adt_api/api/productosAgroquimicosFormulados/190758/sustanciasActivas{?projection}",
+      "templated": true
+    },
+    "establecimientos": {
+      "href": "https://aps2.senasa.gov.ar/adt_api/api/productosAgroquimicosFormulados/190758/establecimientos{?projection}",
+      "templated": true
+    },
+    "toxicidadAbejas": {
+      "href": "https://aps2.senasa.gov.ar/adt_api/api/productosAgroquimicosFormulados/190758/toxicidadAbejas{?projection}",
+      "templated": true
+    },
+    "productoPaises": {
+      "href": "https://aps2.senasa.gov.ar/adt_api/api/productosAgroquimicosFormulados/190758/productoPaises{?projection}",
+      "templated": true
+    },
+    "toxicidadAves": {
+      "href": "https://aps2.senasa.gov.ar/adt_api/api/productosAgroquimicosFormulados/190758/toxicidadAves{?projection}",
+      "templated": true
+    },
+    "coordinacion": {
+      "href": "https://aps2.senasa.gov.ar/adt_api/api/productosAgroquimicosFormulados/190758/coordinacion"
+    },
+    "expedientesPorProducto": {
+      "href": "https://aps2.senasa.gov.ar/adt_api/api/productosAgroquimicosFormulados/190758/expedientesPorProducto{?projection}",
+      "templated": true
+    },
+    "tipoRegistro": {
+      "href": "https://aps2.senasa.gov.ar/adt_api/api/productosAgroquimicosFormulados/190758/tipoRegistro"
+    },
+    "productosFirmas": {
+      "href": "https://aps2.senasa.gov.ar/adt_api/api/productosAgroquimicosFormulados/190758/productosFirmas{?projection}",
+      "templated": true
+    }
+  }
+}

@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     gemini_api_key_1: str | None = None
     gemini_api_key_2: str | None = None
     gemini_api_key_3: str | None = None
+    gemini_api_key_4: str | None = None
+    gemini_api_key_5: str | None = None
     gemini_model: str = "gemini-3.5-flash-lite"
     groq_api_key: str | None = None
     groq_model: str = "llama-3.3-70b-versatile"
@@ -66,7 +68,13 @@ class Settings(BaseSettings):
         """Keys de Gemini configuradas, en orden de rotación ante 429."""
         return [
             key
-            for key in (self.gemini_api_key_1, self.gemini_api_key_2, self.gemini_api_key_3)
+            for key in (
+                self.gemini_api_key_1,
+                self.gemini_api_key_2,
+                self.gemini_api_key_3,
+                self.gemini_api_key_4,
+                self.gemini_api_key_5,
+            )
             if key
         ]
 

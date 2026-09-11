@@ -17,7 +17,7 @@ CREATE SCHEMA IF NOT EXISTS catalogo;
 
 CREATE TABLE IF NOT EXISTS catalogo.firma (
     id BIGSERIAL PRIMARY KEY,
-    nombre TEXT NOT NULL,
+    nombre TEXT NOT NULL UNIQUE,
     datos JSONB NOT NULL DEFAULT '{}'::jsonb
 );
 
@@ -74,7 +74,7 @@ CREATE INDEX IF NOT EXISTS ix_cultivo_embedding_hnsw
 
 CREATE TABLE IF NOT EXISTS catalogo.adversidad (
     id BIGSERIAL PRIMARY KEY,
-    nombre_comun TEXT NOT NULL,
+    nombre_comun TEXT NOT NULL UNIQUE,
     nombre_cientifico TEXT,
     sinonimos JSONB NOT NULL DEFAULT '[]'::jsonb,
     embedding vector(768) -- nombre común + científico, ej. "yuyo colorado" -> Amaranthus

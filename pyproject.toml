@@ -10,6 +10,10 @@ dependencies = [
     "groq>=0.11",
     "tenacity>=9.0",
     "sentence-transformers>=6.0.1",
+    "httpx>=0.28.1",
+    "rapidfuzz>=3.14.6",
+    "pdfplumber>=0.11.10",
+    "psycopg[binary]>=3.3.5",
 ]
 
 [dependency-groups]

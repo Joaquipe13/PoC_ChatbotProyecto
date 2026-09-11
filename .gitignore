@@ -23,6 +23,9 @@ data/insumos/**/*.geojson
 # Notebooks: mantener limpios de outputs pesados no es automático,
 # se revisa a mano antes de commitear (ver DECISIONES.md)
 
+# Estado interno de la herramienta (locks de sesión, etc.)
+.claude/scheduled_tasks.lock
+
 # Editor / SO
 .vscode/
 .idea/

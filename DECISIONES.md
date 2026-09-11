@@ -1,5 +1,49 @@
 # Decisiones
 
+## Fase 2 — Scraper SENASA y base de productos
+
+### Forma real de la API de SENASA (difiere de lo que asumía la skill)
+
+Verificado en vivo el 12/09/2026 (endpoints de listado y detalle, ~190 productos reales). Diferencias concretas con la descripción original de la skill:
+
+- `claseToxicologica` en el **detalle** es un objeto `{id, claseTox, precaucion, advertencia, color}` (ej. `{claseTox: "IV", color: "VERDE", advertencia: "PRODUCTO QUE NORMALMENTE NO OFRECE PELIGRO"}`), no el string concatenado `"III / LIGERAMENTE PELIGROSO / AZUL"` que describía la skill. La banda (`Ia|Ib|II|III|IV`) sale directo de `claseTox`; el color, de `color` (con la variante "AMAREILLO" documentada en la skill, no observada en esta muestra pero igual soportada). En el **listado**, `claseToxicologica` sigue siendo un string simple (`"IV"`, `"S/D"`).
+- `productoDocumentos[]` trae distintos **tipos de documento** identificados por el campo `nombre`: `"HDS"` (hoja de seguridad, sin dosis por cultivo) vs. `"Marbete"` (la etiqueta con la tabla de dosis, lo que realmente sirve para extracción). La skill no distinguía esto; el loader y `extraccion_marbete.py` filtran explícitamente por `nombre == "Marbete"` (ver `DocumentoProducto.es_marbete` en `cliente.py`).
+- El detalle real pesa más de lo esperado (57-90 KB incluso **sin** PDFs) por redundancia propia de Spring Data REST: el objeto `producto` completo viene reincrustado una vez por cada `principioActivo`, cada `envase`, cada `productoFirma`, etc. `DetalleProducto` (cliente.py) solo mapea los campos que el pipeline necesita y descarta el resto (pydantic `extra="ignore"`), en vez de intentar modelar la respuesta completa.
+- `totalElements` del listado a la fecha: 7.370 (la skill decía "≈ 7.374" al 11/09; la diferencia es esperable, el catálogo cambia).
+
+### Snapshot en JSON Lines, no `.parquet`
+
+El ejemplo original del plan (`data/senasa/snapshot/latest.parquet`) asumía un dump columnar. La estructura real por producto es profundamente anidada y de longitud variable (N principios activos, N usos registrados, N documentos por producto), lo que no mapea limpio a un esquema parquet plano sin aplanar antes. Se usa `.jsonl` (una línea por producto, `{"listado": {...}, "detalle": {...}|null}`) como snapshot versionado: el plan permitía "dump o parquet" explícitamente. `senasa/loader.py` (`construir_snapshot`/`leer_snapshot`) implementa esto.
+
+### Rotación de Gemini: 5 slots, no 3
+
+La skill y `plandefases.md` documentan `GEMINI_API_KEY_1..3`. El usuario cargó 5 keys reales en `.env` (con nombres `GEMINI_API_KEY`, `GEMINI_API_KEY2..5`, sin el guion bajo antes del número). Se renombraron a la convención documentada (`GEMINI_API_KEY_1..5`) y se extendió `config.py`/`.env.example` a 5 slots en vez de 3, ya que más keys de rotación es estrictamente mejor contra 429 y el usuario ya las tenía disponibles. Documentado acá porque se aparta del número exacto que fija la skill.
+
+### Extracción de marbete por LLM: verificada con un caso real
+
+Task 8 de la Fase 2 pide revisión manual de una muestra antes de dar la extracción por buena. Se probó `extraccion_marbete.py` con Gemini real contra la página 9 del marbete de SENASA reg. 36.515 ("DECIS 10 EC", Bayer) -- una tabla CULTIVO/PLAGA/DOSIS de 12 filas. Resultado: **12/12 filas extraídas correctamente** (cultivo, adversidad con nombre científico, dosis), revisadas a mano contra el texto original. Limitación encontrada: cuando la unidad de dosis está una sola vez en el encabezado de la tabla ("DOSIS (ml/hl)") y no se repite por fila, el LLM extrae la dosis como número pelado ("5", no "5 ml/hl"), que `parser_dosis.py` no puede parsear tal cual (le falta la unidad). Pendiente para cuando se generalice esta extracción: instruir al prompt para que propague la unidad del encabezado a cada fila, o post-procesar con el contexto de la tabla completa en vez de fila por fila.
+
+### Carga real verificada: catálogo completo (listado) + muestra de detalle
+
+Estado final de esta sesión, cargado en Postgres local (Docker) desde el snapshot `data/senasa/snapshot/productos_2026-09-12.jsonl`:
+
+| Tabla | Filas |
+|---|---|
+| `catalogo.producto` | 7.370 (el listado completo real) |
+| `catalogo.firma` | 435 |
+| `catalogo.principio_activo` | 105 |
+| `catalogo.cultivo` | 73 |
+| `catalogo.adversidad` | 185 |
+| `catalogo.uso_registrado` | 1.031 |
+
+Los 7.370 productos tienen datos del **listado** (marca, firma, clase toxicológica simple, principios activos en texto). Solo 187 de ellos (los crawleados con detalle en esta sesión) tienen además banda toxicológica normalizada, principios activos estructurados con concentración/unidad, y los 1.031 usos registrados (de esos 187, 28 tenían `aplicacionesPorProducto`, que es de donde salen los usos). **El detalle completo de los ~7.180 productos restantes no se bajó en esta sesión** por tiempo (a ~1 req/s son varias horas) -- queda como tarea de fondo, no bloquea el resto de las fases porque Fase 4-6 pueden avanzar con esto y datos stub, y la Fase 5 ya tiene casos reales (con y sin usos registrados) para probar contra.
+
+Ineficiencia encontrada y no resuelta en esta sesión: `loader.py` llama `modelo_embeddings.encode()` una vez por texto (marca, principio activo, cultivo, adversidad) en vez de acumular y embeber en lotes. La carga de 7.370 productos tardó ~15 minutos: aceptable para esta corrida, pero se recomienda batchear antes de correr el loader sobre un detalle completo (~7.370 x varios embeddings cada uno).
+
+### PDFs separados a disco durante el crawl, no después
+
+Hallazgo real: `crawl_detalle` guardaba el detalle completo con los PDFs en base64 embebidos (un snapshot combinado con solo ~190 productos con documentos llegó a pesar 88 MB). Se corrigió moviendo la separación de PDFs (`productoDocumentos[].contenido` -> archivo en `data/senasa/crudo/documentos/`, campo puesto en `null` en el JSON) al propio `crawl_detalle` (tarea 5 del plan), no a un paso posterior. Snapshot resultante de los mismos ~190 productos: 2,4 MB.
+
 Registro de qué se decidió y por qué. Una entrada por decisión relevante, en orden cronológico (más reciente arriba). Formato libre; como mínimo: qué se decidió, por qué, y qué alternativas se descartaron si las hubo.
 
 ## Fase 0 — Setup

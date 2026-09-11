@@ -1,0 +1,1393 @@
+{
+  "establecimientos": [
+    {
+      "establecimiento": {
+        "idEstab": 758692,
+        "nombre": "AGROFINA S.A. (PL. Zarate)",
+        "nroHabilitacion": "218",
+        "fechaInscripcion": "1999-05-15T00:00:00.000-0300",
+        "tipoEstab": "ESTABLECIMIENTO DE AGROQUIMICOS Y FERTILIZANTES",
+        "provincia": "BUENOS AIRES",
+        "partido": "ZARATE",
+        "localidad": "ZARATE",
+        "regional": "ZARATE",
+        "cuilPropietario": "30-59272454-1",
+        "nombrePropietario": "AGROFINA S A",
+        "latitud": null,
+        "longitud": null,
+        "estados": [
+          {
+            "id": 439049,
+            "fechaDesde": "1999-05-15T00:00:00.000-0300",
+            "fechaHasta": null,
+            "observaciones": null,
+            "activo": true,
+            "_links": {
+              "establecimiento": {
+                "href": "https://aps2.senasa.gov.ar/adt_api/api/establecimientoAgroquimicoADT/758692{?projection}",
+                "templated": true
+              },
+              "tipo": {
+                "href": "https://aps2.senasa.gov.ar/adt_api/api/tiposEstados/42"
+              }
+            }
+          },
+          {
+            "id": 439048,
+            "fechaDesde": "1999-05-15T00:00:00.000-0300",
+            "fechaHasta": "1999-05-15T00:00:00.000-0300",
+            "observaciones": null,
+            "activo": false,
+            "_links": {
+              "establecimiento": {
+                "href": "https://aps2.senasa.gov.ar/adt_api/api/establecimientoAgroquimicoADT/758692{?projection}",
+                "templated": true
+              },
+              "tipo": {
+                "href": "https://aps2.senasa.gov.ar/adt_api/api/tiposEstados/43"
+              }
+            }
+          }
+        ],
+        "domicilio": "CAMINO SANTA ANA S/N AREA INDUSTRIAL",
+        "activo": true
+      },
+      "producto": {
+        "id": 179979,
+        "numeroExpediente": "0068015/2015",
+        "numeroInscripcion": "38782",
+        "numeroOrden": "9606",
+        "nombreProducto": null,
+        "observaciones": null,
+        "nroRLM": null,
+        "numeroResolucion": "0693",
+        "fechaCreacion": "2020-08-28 16:21:51",
+        "fechaInscripcion": "2020-07-04 09:49:08",
+        "usuarioCreacion": "MIGRACION",
+        "fechaUltimaModificacion": "2025-11-12 09:49:26",
+        "fechaCambioEstado": null,
+        "usuarioUltimaModificacion": "abelyin",
+        "productoRegistrado": false,
+        "fechaVencimientoRegistro": null,
+        "fechaVencimientoTransitorio": null,
+        "motivoBaja": null,
+        "fechaInicioTramite": null,
+        "tiempoReingresoAreaTratada": null,
+        "naturaleza": null,
+        "sensibilizacion": false,
+        "ambitoAplicacion": null,
+        "fechaVencimientoCesion": null
+      },
+      "tipoProducto": {
+        "id": 1,
+        "descripcion": "Agroquímico - Formulados"
+      },
+      "plantaExtranjera": null,
+      "marca": null,
+      "denominacionComercial": null,
+      "propio": false,
+      "id": 85408,
+      "_links": {
+        "self": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/productosPorEstablecimiento/85408{?projection}",
+          "templated": true
+        },
+        "producto": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/productosPorEstablecimiento/85408/producto{?projection}",
+          "templated": true
+        },
+        "tipoProducto": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/productosPorEstablecimiento/85408/tipoProducto{?projection}",
+          "templated": true
+        },
+        "establecimiento": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/productosPorEstablecimiento/85408/establecimiento{?projection}",
+          "templated": true
+        },
+        "plantaExtranjera": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/productosPorEstablecimiento/85408/plantaExtranjera{?projection}",
+          "templated": true
+        }
+      }
+    }
+  ],
+  "toxicidadAves": {
+    "id": 14,
+    "claseTox": "PRACTICAMENTE NO TOXICO",
+    "precaucion": null,
+    "advertencia": null,
+    "color": null
+  },
+  "toxicidadPeces": {
+    "id": 10,
+    "claseTox": "LIGERAMENTE TOXICO",
+    "precaucion": null,
+    "advertencia": null,
+    "color": null
+  },
+  "naturaleza": null,
+  "irritacionDermal": {
+    "id": 81,
+    "claseTox": "NO IRRITANTE",
+    "precaucion": null,
+    "advertencia": null,
+    "color": null
+  },
+  "irritacionOcular": {
+    "id": 7,
+    "claseTox": "III",
+    "precaucion": "MODERADO",
+    "advertencia": "CUIDADO",
+    "color": null
+  },
+  "observaciones": null,
+  "tipoPresentacion": {
+    "id": 130,
+    "descripcion": "Concentrado emulsionable",
+    "abreviatura": "EC",
+    "enUso": true
+  },
+  "tipoRegistro": {
+    "id": 26,
+    "descripcion": "Definitivo - A"
+  },
+  "productosAptitudes": [
+    {
+      "producto": {
+        "id": 179979,
+        "numeroExpediente": "0068015/2015",
+        "numeroInscripcion": "38782",
+        "numeroOrden": "9606",
+        "nombreProducto": null,
+        "observaciones": null,
+        "nroRLM": null,
+        "numeroResolucion": "0693",
+        "fechaCreacion": "2020-08-28 16:21:51",
+        "fechaInscripcion": "2020-07-04 09:49:08",
+        "usuarioCreacion": "MIGRACION",
+        "fechaUltimaModificacion": "2025-11-12 09:49:26",
+        "fechaCambioEstado": null,
+        "usuarioUltimaModificacion": "abelyin",
+        "productoRegistrado": false,
+        "fechaVencimientoRegistro": null,
+        "fechaVencimientoTransitorio": null,
+        "motivoBaja": null,
+        "fechaInicioTramite": null,
+        "tiempoReingresoAreaTratada": null,
+        "naturaleza": null,
+        "sensibilizacion": false,
+        "ambitoAplicacion": null,
+        "fechaVencimientoCesion": null
+      },
+      "tipoProducto": {
+        "id": 1,
+        "descripcion": "Agroquímico - Formulados"
+      },
+      "nomenclador": {
+        "id": 170,
+        "descripcion": "Herbicida",
+        "enUso": true,
+        "codigoCodex": "HE"
+      },
+      "id": 3737,
+      "_links": {
+        "self": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/productosAptitudes/3737{?projection}",
+          "templated": true
+        },
+        "tipoProducto": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/productosAptitudes/3737/tipoProducto{?projection}",
+          "templated": true
+        },
+        "nomenclador": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/productosAptitudes/3737/nomenclador{?projection}",
+          "templated": true
+        },
+        "producto": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/productosAptitudes/3737/producto{?projection}",
+          "templated": true
+        }
+      }
+    }
+  ],
+  "aplicacionesPorProducto": [],
+  "principiosActivos": [
+    {
+      "producto": {
+        "id": 179979,
+        "numeroExpediente": "0068015/2015",
+        "numeroInscripcion": "38782",
+        "numeroOrden": "9606",
+        "nombreProducto": null,
+        "observaciones": null,
+        "nroRLM": null,
+        "numeroResolucion": "0693",
+        "fechaCreacion": "2020-08-28 16:21:51",
+        "fechaInscripcion": "2020-07-04 09:49:08",
+        "usuarioCreacion": "MIGRACION",
+        "fechaUltimaModificacion": "2025-11-12 09:49:26",
+        "fechaCambioEstado": null,
+        "usuarioUltimaModificacion": "abelyin",
+        "productoRegistrado": false,
+        "fechaVencimientoRegistro": null,
+        "fechaVencimientoTransitorio": null,
+        "motivoBaja": null,
+        "fechaInicioTramite": null,
+        "tiempoReingresoAreaTratada": null,
+        "naturaleza": null,
+        "sensibilizacion": false,
+        "ambitoAplicacion": null,
+        "fechaVencimientoCesion": null
+      },
+      "unidadMedida": {
+        "id": 66,
+        "descripcion": "Porciento",
+        "siglaEstandarizada": "%"
+      },
+      "nomenclador": {
+        "enUso": true,
+        "descripcion": "CLETODIM",
+        "padre": {
+          "enUso": true,
+          "descripcion": "Sustancias Activas",
+          "padre": {
+            "enUso": true,
+            "descripcion": "Agroquimicos",
+            "padre": null,
+            "codigoCodex": null,
+            "id": 90,
+            "_links": {
+              "self": {
+                "href": "https://aps2.senasa.gov.ar/adt_api/api/nomencladoresDeProductosRU/90{?projection}",
+                "templated": true
+              },
+              "padre": {
+                "href": "https://aps2.senasa.gov.ar/adt_api/api/nomencladoresDeProductosRU/90/padre{?projection}",
+                "templated": true
+              }
+            }
+          },
+          "codigoCodex": null,
+          "id": 95,
+          "_links": {
+            "self": {
+              "href": "https://aps2.senasa.gov.ar/adt_api/api/nomencladoresDeProductosRU/95{?projection}",
+              "templated": true
+            },
+            "padre": {
+              "href": "https://aps2.senasa.gov.ar/adt_api/api/nomencladoresDeProductosRU/95/padre{?projection}",
+              "templated": true
+            }
+          }
+        },
+        "codigoCodex": "187",
+        "id": 3287,
+        "_links": {
+          "self": {
+            "href": "https://aps2.senasa.gov.ar/adt_api/api/nomencladoresDeProductosRU/3287{?projection}",
+            "templated": true
+          },
+          "padre": {
+            "href": "https://aps2.senasa.gov.ar/adt_api/api/nomencladoresDeProductosRU/3287/padre{?projection}",
+            "templated": true
+          }
+        }
+      },
+      "concentracion": 24.0,
+      "equivalenteAcido": null,
+      "sustanciasActivas": [
+        {
+          "enUso": true,
+          "sustanciaActiva": {
+            "numeroInscripcion": "3109/1",
+            "concentracion": "94",
+            "nombreProducto": "CLETODIM",
+            "id": 175312,
+            "_links": {
+              "self": {
+                "href": "https://aps2.senasa.gov.ar/adt_api/api/productosSustanciasActivas/175312{?projection}",
+                "templated": true
+              },
+              "moleculaTransitoria": {
+                "href": "https://aps2.senasa.gov.ar/adt_api/api/productosSustanciasActivas/175312/moleculaTransitoria{?projection}",
+                "templated": true
+              },
+              "coordinacion": {
+                "href": "https://aps2.senasa.gov.ar/adt_api/api/productosSustanciasActivas/175312/coordinacion"
+              },
+              "expedientesPorProducto": {
+                "href": "https://aps2.senasa.gov.ar/adt_api/api/productosSustanciasActivas/175312/expedientesPorProducto{?projection}",
+                "templated": true
+              },
+              "pais": {
+                "href": "https://aps2.senasa.gov.ar/adt_api/api/productosSustanciasActivas/175312/pais"
+              },
+              "toxicidadProducto": {
+                "href": "https://aps2.senasa.gov.ar/adt_api/api/productosSustanciasActivas/175312/toxicidadProducto{?projection}",
+                "templated": true
+              },
+              "envases": {
+                "href": "https://aps2.senasa.gov.ar/adt_api/api/productosSustanciasActivas/175312/envases{?projection}",
+                "templated": true
+              },
+              "componentesPorProducto": {
+                "href": "https://aps2.senasa.gov.ar/adt_api/api/productosSustanciasActivas/175312/componentesPorProducto{?projection}",
+                "templated": true
+              },
+              "renspasProducto": {
+                "href": "https://aps2.senasa.gov.ar/adt_api/api/productosSustanciasActivas/175312/renspasProducto{?projection}",
+                "templated": true
+              },
+              "antecedentesProductos": {
+                "href": "https://aps2.senasa.gov.ar/adt_api/api/productosSustanciasActivas/175312/antecedentesProductos{?projection}",
+                "templated": true
+              },
+              "uso": {
+                "href": "https://aps2.senasa.gov.ar/adt_api/api/productosSustanciasActivas/175312/uso"
+              },
+              "productoPaises": {
+                "href": "https://aps2.senasa.gov.ar/adt_api/api/productosSustanciasActivas/175312/productoPaises{?projection}",
+                "templated": true
+              },
+              "recomendacionesDeUso": {
+                "href": "https://aps2.senasa.gov.ar/adt_api/api/productosSustanciasActivas/175312/recomendacionesDeUso{?projection}",
+                "templated": true
+              },
+              "aplicacionEspecie": {
+                "href": "https://aps2.senasa.gov.ar/adt_api/api/productosSustanciasActivas/175312/aplicacionEspecie{?projection}",
+                "templated": true
+              },
+              "tipoProducto": {
+                "href": "https://aps2.senasa.gov.ar/adt_api/api/productosSustanciasActivas/175312/tipoProducto{?projection}",
+                "templated": true
+              },
+              "productoDocumentos": {
+                "href": "https://aps2.senasa.gov.ar/adt_api/api/productosSustanciasActivas/175312/productoDocumentos{?projection}",
+                "templated": true
+              },
+              "productosFirmas": {
+                "href": "https://aps2.senasa.gov.ar/adt_api/api/productosSustanciasActivas/175312/productosFirmas{?projection}",
+                "templated": true
+              },
+              "nomenclador": {
+                "href": "https://aps2.senasa.gov.ar/adt_api/api/productosSustanciasActivas/175312/nomenclador{?projection}",
+                "templated": true
+              },
+              "productosHijos": {
+                "href": "https://aps2.senasa.gov.ar/adt_api/api/productosSustanciasActivas/175312/productosHijos{?projection}",
+                "templated": true
+              },
+              "estadoProducto": {
+                "href": "https://aps2.senasa.gov.ar/adt_api/api/productosSustanciasActivas/175312/estadoProducto"
+              },
+              "tipoPresentacion": {
+                "href": "https://aps2.senasa.gov.ar/adt_api/api/productosSustanciasActivas/175312/tipoPresentacion{?projection}",
+                "templated": true
+              },
+              "productosAptitudes": {
+                "href": "https://aps2.senasa.gov.ar/adt_api/api/productosSustanciasActivas/175312/productosAptitudes{?projection}",
+                "templated": true
+              },
+              "certificadoOrigen": {
+                "href": "https://aps2.senasa.gov.ar/adt_api/api/productosSustanciasActivas/175312/certificadoOrigen{?projection}",
+                "templated": true
+              },
+              "claseToxicologica": {
+                "href": "https://aps2.senasa.gov.ar/adt_api/api/productosSustanciasActivas/175312/claseToxicologica{?projection}",
+                "templated": true
+              },
+              "productosFirmasImportadores": {
+                "href": "https://aps2.senasa.gov.ar/adt_api/api/productosSustanciasActivas/175312/productosFirmasImportadores{?projection}",
+                "templated": true
+              },
+              "paises": {
+                "href": "https://aps2.senasa.gov.ar/adt_api/api/productosSustanciasActivas/175312/paises"
+              },
+              "establecimientos": {
+                "href": "https://aps2.senasa.gov.ar/adt_api/api/productosSustanciasActivas/175312/establecimientos{?projection}",
+                "templated": true
+              },
+              "tipoRegistro": {
+                "href": "https://aps2.senasa.gov.ar/adt_api/api/productosSustanciasActivas/175312/tipoRegistro"
+              },
+              "metodoRegistro": {
+                "href": "https://aps2.senasa.gov.ar/adt_api/api/productosSustanciasActivas/175312/metodoRegistro"
+              }
+            }
+          },
+          "id": 11011,
+          "_links": {
+            "self": {
+              "href": "https://aps2.senasa.gov.ar/adt_api/api/sustanciasActivasPorPrincipioActivo/11011{?projection}",
+              "templated": true
+            },
+            "principioActivo": {
+              "href": "https://aps2.senasa.gov.ar/adt_api/api/sustanciasActivasPorPrincipioActivo/11011/principioActivo{?projection}",
+              "templated": true
+            },
+            "sustanciaActiva": {
+              "href": "https://aps2.senasa.gov.ar/adt_api/api/sustanciasActivasPorPrincipioActivo/11011/sustanciaActiva{?projection}",
+              "templated": true
+            }
+          }
+        }
+      ],
+      "id": 34820,
+      "_links": {
+        "self": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/principiosActivosPorProducto/34820{?projection}",
+          "templated": true
+        },
+        "producto": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/principiosActivosPorProducto/34820/producto{?projection}",
+          "templated": true
+        },
+        "nomenclador": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/principiosActivosPorProducto/34820/nomenclador{?projection}",
+          "templated": true
+        },
+        "unidadMedida": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/principiosActivosPorProducto/34820/unidadMedida"
+        },
+        "sustanciasActivas": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/principiosActivosPorProducto/34820/sustanciasActivas{?projection}",
+          "templated": true
+        }
+      }
+    }
+  ],
+  "tiempoReingresoAreaTratada": null,
+  "ambitoAplicacion": null,
+  "claseInhalatoria": {
+    "id": 25,
+    "claseTox": "III",
+    "precaucion": null,
+    "advertencia": "CUIDADO",
+    "color": null
+  },
+  "claseToxicologica": {
+    "id": 30,
+    "claseTox": "III",
+    "precaucion": null,
+    "advertencia": "LIGERAMENTE PELIGROSO",
+    "color": "AZUL"
+  },
+  "toxicidadAbejas": {
+    "id": 22,
+    "claseTox": "VIRTUALMENTE NO TOXICO",
+    "precaucion": null,
+    "advertencia": null,
+    "color": null
+  },
+  "productosFirmas": [
+    {
+      "firma": {
+        "idFirma": 672783,
+        "nroInscripcion": "384",
+        "fechaInscripcion": "01-01-1810",
+        "cuit": "30-59272454-1",
+        "nombre": "AGROFINA S A",
+        "mail": "e.marchese@agrofina.com.ar",
+        "nombreFantasia": null,
+        "nroRLM": "RL-2018-50734402-APN-DAYB#SENASA",
+        "nroResolucion": null,
+        "nroHabilitacion": null,
+        "enteHabilitacion": null,
+        "nroExpediente": "2065/91"
+      },
+      "estadoProducto": {
+        "id": 8,
+        "descripcion": "BAJA"
+      },
+      "estadoRevision": {
+        "id": 1,
+        "descripcion": "SIN CORROBORAR"
+      },
+      "marca": "KYLIAN 24",
+      "propio": true,
+      "nombreComercial": null,
+      "fecha": "2025-11-12 00:51:51",
+      "numeroResolucion": null,
+      "fechaCreacion": "2020-09-01T12:40:27.000-0300",
+      "fechaUltMod": "2025-11-12T00:51:59.000-0300",
+      "usuarioUltMod": null,
+      "prodReferenciado": null,
+      "esPrivado": null,
+      "registrado": false,
+      "comercializacionActiva": true,
+      "lotes": [],
+      "id": 95566,
+      "_links": {
+        "self": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/productosFirmas/95566{?projection}",
+          "templated": true
+        },
+        "firmaOrigen": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/productosFirmas/95566/firmaOrigen{?projection}",
+          "templated": true
+        },
+        "lotes": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/productosFirmas/95566/lotes{?projection}",
+          "templated": true
+        },
+        "producto": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/productosFirmas/95566/producto{?projection}",
+          "templated": true
+        },
+        "prodReferenciado": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/productosFirmas/95566/prodReferenciado{?projection}",
+          "templated": true
+        },
+        "firma": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/productosFirmas/95566/firma{?projection}",
+          "templated": true
+        },
+        "estadoRevision": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/productosFirmas/95566/estadoRevision"
+        },
+        "estadoProducto": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/productosFirmas/95566/estadoProducto"
+        }
+      }
+    },
+    {
+      "firma": {
+        "idFirma": 672288,
+        "nroInscripcion": "1760",
+        "fechaInscripcion": "12-08-2023",
+        "cuit": "30-70936075-9",
+        "nombre": "CAMPO CROP S.A.",
+        "mail": "jburattini@campocrop.com.ar",
+        "nombreFantasia": null,
+        "nroRLM": "RL: 2019-21062291-APN-DAYB#SENASA",
+        "nroResolucion": null,
+        "nroHabilitacion": null,
+        "enteHabilitacion": null,
+        "nroExpediente": "265403/2006"
+      },
+      "estadoProducto": {
+        "id": 1,
+        "descripcion": "ACTIVO"
+      },
+      "estadoRevision": {
+        "id": 1,
+        "descripcion": "SIN CORROBORAR"
+      },
+      "marca": "KYLIAN 24",
+      "propio": true,
+      "nombreComercial": null,
+      "fecha": "2025-11-12 00:51:51",
+      "numeroResolucion": null,
+      "fechaCreacion": "2025-11-12T00:51:59.000-0300",
+      "fechaUltMod": "2025-11-12T09:49:28.000-0300",
+      "usuarioUltMod": "abelyin",
+      "prodReferenciado": null,
+      "esPrivado": null,
+      "registrado": false,
+      "comercializacionActiva": true,
+      "lotes": [],
+      "id": 136171,
+      "_links": {
+        "self": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/productosFirmas/136171{?projection}",
+          "templated": true
+        },
+        "firmaOrigen": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/productosFirmas/136171/firmaOrigen{?projection}",
+          "templated": true
+        },
+        "lotes": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/productosFirmas/136171/lotes{?projection}",
+          "templated": true
+        },
+        "producto": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/productosFirmas/136171/producto{?projection}",
+          "templated": true
+        },
+        "prodReferenciado": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/productosFirmas/136171/prodReferenciado{?projection}",
+          "templated": true
+        },
+        "firma": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/productosFirmas/136171/firma{?projection}",
+          "templated": true
+        },
+        "estadoRevision": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/productosFirmas/136171/estadoRevision"
+        },
+        "estadoProducto": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/productosFirmas/136171/estadoProducto"
+        }
+      }
+    }
+  ],
+  "tipoProducto": {
+    "id": 1,
+    "descripcion": "Agroquímico - Formulados"
+  },
+  "numeroInscripcion": "38782",
+  "productoDocumentos": [
+    {
+      "observaciones": null,
+      "producto": {
+        "id": 179979,
+        "numeroExpediente": "0068015/2015",
+        "numeroInscripcion": "38782",
+        "numeroOrden": "9606",
+        "nombreProducto": null,
+        "observaciones": null,
+        "nroRLM": null,
+        "numeroResolucion": "0693",
+        "fechaCreacion": "2020-08-28 16:21:51",
+        "fechaInscripcion": "2020-07-04 09:49:08",
+        "usuarioCreacion": "MIGRACION",
+        "fechaUltimaModificacion": "2025-11-12 09:49:26",
+        "fechaCambioEstado": null,
+        "usuarioUltimaModificacion": "abelyin",
+        "productoRegistrado": false,
+        "fechaVencimientoRegistro": null,
+        "fechaVencimientoTransitorio": null,
+        "motivoBaja": null,
+        "fechaInicioTramite": null,
+        "tiempoReingresoAreaTratada": null,
+        "naturaleza": null,
+        "sensibilizacion": false,
+        "ambitoAplicacion": null,
+        "fechaVencimientoCesion": null
+      },
+      "tipoProducto": {
+        "id": 1,
+        "descripcion": "Agroquímico - Formulados"
+      },
+      "nombre": "HDS",
+      "activo": true,
+      "productoFirma": null,
+      "tipoDocumento": {
+        "id": 1,
+        "extension": "PDF"
+      },
+      "fechaDocumento": "2022-12-06T16:32:46.000-0300",
+      "contenido": null,
+      "fechaCreacion": "2022-12-06T16:32:46.000-0300",
+      "usuarioCreacion": null,
+      "esPrivado": false,
+      "id": 5580,
+      "_links": {
+        "self": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/documentacionesProductos/5580{?projection}",
+          "templated": true
+        },
+        "tipoProducto": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/documentacionesProductos/5580/tipoProducto{?projection}",
+          "templated": true
+        },
+        "productoFirma": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/documentacionesProductos/5580/productoFirma{?projection}",
+          "templated": true
+        },
+        "tipoDocumento": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/documentacionesProductos/5580/tipoDocumento{?projection}",
+          "templated": true
+        },
+        "producto": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/documentacionesProductos/5580/producto{?projection}",
+          "templated": true
+        }
+      }
+    },
+    {
+      "observaciones": null,
+      "producto": {
+        "id": 179979,
+        "numeroExpediente": "0068015/2015",
+        "numeroInscripcion": "38782",
+        "numeroOrden": "9606",
+        "nombreProducto": null,
+        "observaciones": null,
+        "nroRLM": null,
+        "numeroResolucion": "0693",
+        "fechaCreacion": "2020-08-28 16:21:51",
+        "fechaInscripcion": "2020-07-04 09:49:08",
+        "usuarioCreacion": "MIGRACION",
+        "fechaUltimaModificacion": "2025-11-12 09:49:26",
+        "fechaCambioEstado": null,
+        "usuarioUltimaModificacion": "abelyin",
+        "productoRegistrado": false,
+        "fechaVencimientoRegistro": null,
+        "fechaVencimientoTransitorio": null,
+        "motivoBaja": null,
+        "fechaInicioTramite": null,
+        "tiempoReingresoAreaTratada": null,
+        "naturaleza": null,
+        "sensibilizacion": false,
+        "ambitoAplicacion": null,
+        "fechaVencimientoCesion": null
+      },
+      "tipoProducto": {
+        "id": 1,
+        "descripcion": "Agroquímico - Formulados"
+      },
+      "nombre": "Marbete",
+      "activo": true,
+      "productoFirma": null,
+      "tipoDocumento": {
+        "id": 1,
+        "extension": "PDF"
+      },
+      "fechaDocumento": "2023-06-02T11:57:35.000-0300",
+      "contenido": null,
+      "fechaCreacion": "2023-06-02T11:57:36.000-0300",
+      "usuarioCreacion": null,
+      "esPrivado": false,
+      "id": 11319,
+      "_links": {
+        "self": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/documentacionesProductos/11319{?projection}",
+          "templated": true
+        },
+        "tipoProducto": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/documentacionesProductos/11319/tipoProducto{?projection}",
+          "templated": true
+        },
+        "productoFirma": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/documentacionesProductos/11319/productoFirma{?projection}",
+          "templated": true
+        },
+        "tipoDocumento": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/documentacionesProductos/11319/tipoDocumento{?projection}",
+          "templated": true
+        },
+        "producto": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/documentacionesProductos/11319/producto{?projection}",
+          "templated": true
+        }
+      }
+    }
+  ],
+  "estadoProducto": {
+    "id": 1,
+    "descripcion": "ACTIVO"
+  },
+  "envases": [
+    {
+      "producto": {
+        "id": 179979,
+        "numeroExpediente": "0068015/2015",
+        "numeroInscripcion": "38782",
+        "numeroOrden": "9606",
+        "nombreProducto": null,
+        "observaciones": null,
+        "nroRLM": null,
+        "numeroResolucion": "0693",
+        "fechaCreacion": "2020-08-28 16:21:51",
+        "fechaInscripcion": "2020-07-04 09:49:08",
+        "usuarioCreacion": "MIGRACION",
+        "fechaUltimaModificacion": "2025-11-12 09:49:26",
+        "fechaCambioEstado": null,
+        "usuarioUltimaModificacion": "abelyin",
+        "productoRegistrado": false,
+        "fechaVencimientoRegistro": null,
+        "fechaVencimientoTransitorio": null,
+        "motivoBaja": null,
+        "fechaInicioTramite": null,
+        "tiempoReingresoAreaTratada": null,
+        "naturaleza": null,
+        "sensibilizacion": false,
+        "ambitoAplicacion": null,
+        "fechaVencimientoCesion": null
+      },
+      "tipoProducto": {
+        "id": 1,
+        "descripcion": "Agroquímico - Formulados"
+      },
+      "tipoEnvase": null,
+      "capacidadUsada": 0.0,
+      "capacidadTotal": 0.0,
+      "pesoEnvase": 0.0,
+      "categoriaResiduo": "R",
+      "gtin": null,
+      "envaseActivo": true,
+      "fechaCambioEstado": "2021-08-25 11:11:15",
+      "borradoLogico": false,
+      "resistencia": null,
+      "sistemaCierre": null,
+      "envase": {
+        "id": 1,
+        "nombre": "A granel",
+        "descripcion": "A granel"
+      },
+      "unidadMedidaUsada": {
+        "id": 47,
+        "descripcion": "NO CORRESPONDE",
+        "siglaEstandarizada": null
+      },
+      "unidadMedidaTotal": {
+        "id": 47,
+        "descripcion": "NO CORRESPONDE",
+        "siglaEstandarizada": null
+      },
+      "unidadMedidaPesoEnvase": null,
+      "envaseMaterial": {
+        "id": 52,
+        "descripcion": "NO ESPECIFICADO"
+      },
+      "materialLibre": null,
+      "id": 17900,
+      "_links": {
+        "self": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/envasesPorProducto/17900{?projection}",
+          "templated": true
+        },
+        "envase": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/envasesPorProducto/17900/envase"
+        },
+        "producto": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/envasesPorProducto/17900/producto{?projection}",
+          "templated": true
+        },
+        "unidadMedidaTotal": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/envasesPorProducto/17900/unidadMedidaTotal"
+        },
+        "unidadMedidaPesoEnvase": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/envasesPorProducto/17900/unidadMedidaPesoEnvase"
+        },
+        "tipoProducto": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/envasesPorProducto/17900/tipoProducto{?projection}",
+          "templated": true
+        },
+        "unidadMedidaUsada": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/envasesPorProducto/17900/unidadMedidaUsada"
+        },
+        "envaseMaterial": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/envasesPorProducto/17900/envaseMaterial"
+        },
+        "tipoEnvase": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/envasesPorProducto/17900/tipoEnvase"
+        }
+      }
+    },
+    {
+      "producto": {
+        "id": 179979,
+        "numeroExpediente": "0068015/2015",
+        "numeroInscripcion": "38782",
+        "numeroOrden": "9606",
+        "nombreProducto": null,
+        "observaciones": null,
+        "nroRLM": null,
+        "numeroResolucion": "0693",
+        "fechaCreacion": "2020-08-28 16:21:51",
+        "fechaInscripcion": "2020-07-04 09:49:08",
+        "usuarioCreacion": "MIGRACION",
+        "fechaUltimaModificacion": "2025-11-12 09:49:26",
+        "fechaCambioEstado": null,
+        "usuarioUltimaModificacion": "abelyin",
+        "productoRegistrado": false,
+        "fechaVencimientoRegistro": null,
+        "fechaVencimientoTransitorio": null,
+        "motivoBaja": null,
+        "fechaInicioTramite": null,
+        "tiempoReingresoAreaTratada": null,
+        "naturaleza": null,
+        "sensibilizacion": false,
+        "ambitoAplicacion": null,
+        "fechaVencimientoCesion": null
+      },
+      "tipoProducto": {
+        "id": 1,
+        "descripcion": "Agroquímico - Formulados"
+      },
+      "tipoEnvase": null,
+      "capacidadUsada": 10.0,
+      "capacidadTotal": 11.0,
+      "pesoEnvase": 0.65,
+      "categoriaResiduo": "A",
+      "gtin": null,
+      "envaseActivo": true,
+      "fechaCambioEstado": "2020-10-28 14:17:25",
+      "borradoLogico": false,
+      "resistencia": null,
+      "sistemaCierre": null,
+      "envase": {
+        "id": 4,
+        "nombre": "Bidon",
+        "descripcion": null
+      },
+      "unidadMedidaUsada": {
+        "id": 27,
+        "descripcion": "LITRO",
+        "siglaEstandarizada": "l"
+      },
+      "unidadMedidaTotal": {
+        "id": 27,
+        "descripcion": "LITRO",
+        "siglaEstandarizada": "l"
+      },
+      "unidadMedidaPesoEnvase": null,
+      "envaseMaterial": {
+        "id": 55,
+        "descripcion": "COEX (polietileno co-extrusado)"
+      },
+      "materialLibre": null,
+      "id": 9019,
+      "_links": {
+        "self": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/envasesPorProducto/9019{?projection}",
+          "templated": true
+        },
+        "envase": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/envasesPorProducto/9019/envase"
+        },
+        "producto": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/envasesPorProducto/9019/producto{?projection}",
+          "templated": true
+        },
+        "unidadMedidaTotal": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/envasesPorProducto/9019/unidadMedidaTotal"
+        },
+        "unidadMedidaPesoEnvase": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/envasesPorProducto/9019/unidadMedidaPesoEnvase"
+        },
+        "tipoProducto": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/envasesPorProducto/9019/tipoProducto{?projection}",
+          "templated": true
+        },
+        "unidadMedidaUsada": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/envasesPorProducto/9019/unidadMedidaUsada"
+        },
+        "envaseMaterial": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/envasesPorProducto/9019/envaseMaterial"
+        },
+        "tipoEnvase": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/envasesPorProducto/9019/tipoEnvase"
+        }
+      }
+    },
+    {
+      "producto": {
+        "id": 179979,
+        "numeroExpediente": "0068015/2015",
+        "numeroInscripcion": "38782",
+        "numeroOrden": "9606",
+        "nombreProducto": null,
+        "observaciones": null,
+        "nroRLM": null,
+        "numeroResolucion": "0693",
+        "fechaCreacion": "2020-08-28 16:21:51",
+        "fechaInscripcion": "2020-07-04 09:49:08",
+        "usuarioCreacion": "MIGRACION",
+        "fechaUltimaModificacion": "2025-11-12 09:49:26",
+        "fechaCambioEstado": null,
+        "usuarioUltimaModificacion": "abelyin",
+        "productoRegistrado": false,
+        "fechaVencimientoRegistro": null,
+        "fechaVencimientoTransitorio": null,
+        "motivoBaja": null,
+        "fechaInicioTramite": null,
+        "tiempoReingresoAreaTratada": null,
+        "naturaleza": null,
+        "sensibilizacion": false,
+        "ambitoAplicacion": null,
+        "fechaVencimientoCesion": null
+      },
+      "tipoProducto": {
+        "id": 1,
+        "descripcion": "Agroquímico - Formulados"
+      },
+      "tipoEnvase": null,
+      "capacidadUsada": 20.0,
+      "capacidadTotal": 20.0,
+      "pesoEnvase": null,
+      "categoriaResiduo": "A",
+      "gtin": null,
+      "envaseActivo": true,
+      "fechaCambioEstado": "2020-11-02 12:37:25",
+      "borradoLogico": false,
+      "resistencia": null,
+      "sistemaCierre": null,
+      "envase": {
+        "id": 4,
+        "nombre": "Bidon",
+        "descripcion": null
+      },
+      "unidadMedidaUsada": {
+        "id": 27,
+        "descripcion": "LITRO",
+        "siglaEstandarizada": "l"
+      },
+      "unidadMedidaTotal": {
+        "id": 27,
+        "descripcion": "LITRO",
+        "siglaEstandarizada": "l"
+      },
+      "unidadMedidaPesoEnvase": null,
+      "envaseMaterial": {
+        "id": 55,
+        "descripcion": "COEX (polietileno co-extrusado)"
+      },
+      "materialLibre": null,
+      "id": 13520,
+      "_links": {
+        "self": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/envasesPorProducto/13520{?projection}",
+          "templated": true
+        },
+        "envase": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/envasesPorProducto/13520/envase"
+        },
+        "producto": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/envasesPorProducto/13520/producto{?projection}",
+          "templated": true
+        },
+        "unidadMedidaTotal": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/envasesPorProducto/13520/unidadMedidaTotal"
+        },
+        "unidadMedidaPesoEnvase": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/envasesPorProducto/13520/unidadMedidaPesoEnvase"
+        },
+        "tipoProducto": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/envasesPorProducto/13520/tipoProducto{?projection}",
+          "templated": true
+        },
+        "unidadMedidaUsada": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/envasesPorProducto/13520/unidadMedidaUsada"
+        },
+        "envaseMaterial": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/envasesPorProducto/13520/envaseMaterial"
+        },
+        "tipoEnvase": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/envasesPorProducto/13520/tipoEnvase"
+        }
+      }
+    },
+    {
+      "producto": {
+        "id": 179979,
+        "numeroExpediente": "0068015/2015",
+        "numeroInscripcion": "38782",
+        "numeroOrden": "9606",
+        "nombreProducto": null,
+        "observaciones": null,
+        "nroRLM": null,
+        "numeroResolucion": "0693",
+        "fechaCreacion": "2020-08-28 16:21:51",
+        "fechaInscripcion": "2020-07-04 09:49:08",
+        "usuarioCreacion": "MIGRACION",
+        "fechaUltimaModificacion": "2025-11-12 09:49:26",
+        "fechaCambioEstado": null,
+        "usuarioUltimaModificacion": "abelyin",
+        "productoRegistrado": false,
+        "fechaVencimientoRegistro": null,
+        "fechaVencimientoTransitorio": null,
+        "motivoBaja": null,
+        "fechaInicioTramite": null,
+        "tiempoReingresoAreaTratada": null,
+        "naturaleza": null,
+        "sensibilizacion": false,
+        "ambitoAplicacion": null,
+        "fechaVencimientoCesion": null
+      },
+      "tipoProducto": {
+        "id": 1,
+        "descripcion": "Agroquímico - Formulados"
+      },
+      "tipoEnvase": null,
+      "capacidadUsada": 5.0,
+      "capacidadTotal": 5.0,
+      "pesoEnvase": null,
+      "categoriaResiduo": "A",
+      "gtin": null,
+      "envaseActivo": true,
+      "fechaCambioEstado": "2020-11-02 12:32:34",
+      "borradoLogico": false,
+      "resistencia": null,
+      "sistemaCierre": null,
+      "envase": {
+        "id": 4,
+        "nombre": "Bidon",
+        "descripcion": null
+      },
+      "unidadMedidaUsada": {
+        "id": 27,
+        "descripcion": "LITRO",
+        "siglaEstandarizada": "l"
+      },
+      "unidadMedidaTotal": {
+        "id": 27,
+        "descripcion": "LITRO",
+        "siglaEstandarizada": "l"
+      },
+      "unidadMedidaPesoEnvase": null,
+      "envaseMaterial": {
+        "id": 55,
+        "descripcion": "COEX (polietileno co-extrusado)"
+      },
+      "materialLibre": null,
+      "id": 13507,
+      "_links": {
+        "self": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/envasesPorProducto/13507{?projection}",
+          "templated": true
+        },
+        "envase": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/envasesPorProducto/13507/envase"
+        },
+        "producto": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/envasesPorProducto/13507/producto{?projection}",
+          "templated": true
+        },
+        "unidadMedidaTotal": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/envasesPorProducto/13507/unidadMedidaTotal"
+        },
+        "unidadMedidaPesoEnvase": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/envasesPorProducto/13507/unidadMedidaPesoEnvase"
+        },
+        "tipoProducto": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/envasesPorProducto/13507/tipoProducto{?projection}",
+          "templated": true
+        },
+        "unidadMedidaUsada": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/envasesPorProducto/13507/unidadMedidaUsada"
+        },
+        "envaseMaterial": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/envasesPorProducto/13507/envaseMaterial"
+        },
+        "tipoEnvase": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/envasesPorProducto/13507/tipoEnvase"
+        }
+      }
+    },
+    {
+      "producto": {
+        "id": 179979,
+        "numeroExpediente": "0068015/2015",
+        "numeroInscripcion": "38782",
+        "numeroOrden": "9606",
+        "nombreProducto": null,
+        "observaciones": null,
+        "nroRLM": null,
+        "numeroResolucion": "0693",
+        "fechaCreacion": "2020-08-28 16:21:51",
+        "fechaInscripcion": "2020-07-04 09:49:08",
+        "usuarioCreacion": "MIGRACION",
+        "fechaUltimaModificacion": "2025-11-12 09:49:26",
+        "fechaCambioEstado": null,
+        "usuarioUltimaModificacion": "abelyin",
+        "productoRegistrado": false,
+        "fechaVencimientoRegistro": null,
+        "fechaVencimientoTransitorio": null,
+        "motivoBaja": null,
+        "fechaInicioTramite": null,
+        "tiempoReingresoAreaTratada": null,
+        "naturaleza": null,
+        "sensibilizacion": false,
+        "ambitoAplicacion": null,
+        "fechaVencimientoCesion": null
+      },
+      "tipoProducto": {
+        "id": 1,
+        "descripcion": "Agroquímico - Formulados"
+      },
+      "tipoEnvase": null,
+      "capacidadUsada": 1.0,
+      "capacidadTotal": 1.0,
+      "pesoEnvase": null,
+      "categoriaResiduo": "A",
+      "gtin": null,
+      "envaseActivo": true,
+      "fechaCambioEstado": "2020-11-02 12:27:27",
+      "borradoLogico": false,
+      "resistencia": null,
+      "sistemaCierre": null,
+      "envase": {
+        "id": 27,
+        "nombre": "Botella/Botellón",
+        "descripcion": null
+      },
+      "unidadMedidaUsada": {
+        "id": 27,
+        "descripcion": "LITRO",
+        "siglaEstandarizada": "l"
+      },
+      "unidadMedidaTotal": {
+        "id": 27,
+        "descripcion": "LITRO",
+        "siglaEstandarizada": "l"
+      },
+      "unidadMedidaPesoEnvase": null,
+      "envaseMaterial": {
+        "id": 55,
+        "descripcion": "COEX (polietileno co-extrusado)"
+      },
+      "materialLibre": null,
+      "id": 13477,
+      "_links": {
+        "self": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/envasesPorProducto/13477{?projection}",
+          "templated": true
+        },
+        "envase": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/envasesPorProducto/13477/envase"
+        },
+        "producto": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/envasesPorProducto/13477/producto{?projection}",
+          "templated": true
+        },
+        "unidadMedidaTotal": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/envasesPorProducto/13477/unidadMedidaTotal"
+        },
+        "unidadMedidaPesoEnvase": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/envasesPorProducto/13477/unidadMedidaPesoEnvase"
+        },
+        "tipoProducto": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/envasesPorProducto/13477/tipoProducto{?projection}",
+          "templated": true
+        },
+        "unidadMedidaUsada": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/envasesPorProducto/13477/unidadMedidaUsada"
+        },
+        "envaseMaterial": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/envasesPorProducto/13477/envaseMaterial"
+        },
+        "tipoEnvase": {
+          "href": "https://aps2.senasa.gov.ar/adt_api/api/envasesPorProducto/13477/tipoEnvase"
+        }
+      }
+    }
+  ],
+  "fechaVencimientoCesion": null,
+  "numeroExpediente": "0068015/2015",
+  "nombreProducto": null,
+  "coordinacion": {
+    "id": 1,
+    "fechaLimiteBaja": "2007-07-09 00:00:00",
+    "nombre": "Agroquímicos y Biologicos",
+    "activo": 1
+  },
+  "fechaInscripcion": "2020-07-04 09:49:08",
+  "fechaVencimientoTransitorio": null,
+  "motivoBaja": null,
+  "numeroResolucion": "0693",
+  "pais": null,
+  "productoRegistrado": false,
+  "sensibilizacion": false,
+  "id": 179979,
+  "_links": {
+    "self": {
+      "href": "https://aps2.senasa.gov.ar/adt_api/api/productosAgroquimicosFormulados/179979"
+    },
+    "productoAgroquimicoFormulado": {
+      "href": "https://aps2.senasa.gov.ar/adt_api/api/productosAgroquimicosFormulados/179979{?projection}",
+      "templated": true
+    },
+    "principiosActivos": {
+      "href": "https://aps2.senasa.gov.ar/adt_api/api/productosAgroquimicosFormulados/179979/principiosActivos{?projection}",
+      "templated": true
+    },
+    "productosAptitudes": {
+      "href": "https://aps2.senasa.gov.ar/adt_api/api/productosAgroquimicosFormulados/179979/productosAptitudes{?projection}",
+      "templated": true
+    },
+    "toxicidadPeces": {
+      "href": "https://aps2.senasa.gov.ar/adt_api/api/productosAgroquimicosFormulados/179979/toxicidadPeces{?projection}",
+      "templated": true
+    },
+    "aplicacionesPorProducto": {
+      "href": "https://aps2.senasa.gov.ar/adt_api/api/productosAgroquimicosFormulados/179979/aplicacionesPorProducto{?projection}",
+      "templated": true
+    },
+    "productoDocumentos": {
+      "href": "https://aps2.senasa.gov.ar/adt_api/api/productosAgroquimicosFormulados/179979/productoDocumentos{?projection}",
+      "templated": true
+    },
+    "claseToxicologica": {
+      "href": "https://aps2.senasa.gov.ar/adt_api/api/productosAgroquimicosFormulados/179979/claseToxicologica{?projection}",
+      "templated": true
+    },
+    "productosHijos": {
+      "href": "https://aps2.senasa.gov.ar/adt_api/api/productosAgroquimicosFormulados/179979/productosHijos{?projection}",
+      "templated": true
+    },
+    "claseInhalatoria": {
+      "href": "https://aps2.senasa.gov.ar/adt_api/api/productosAgroquimicosFormulados/179979/claseInhalatoria{?projection}",
+      "templated": true
+    },
+    "pais": {
+      "href": "https://aps2.senasa.gov.ar/adt_api/api/productosAgroquimicosFormulados/179979/pais"
+    },
+    "estadoProducto": {
+      "href": "https://aps2.senasa.gov.ar/adt_api/api/productosAgroquimicosFormulados/179979/estadoProducto"
+    },
+    "irritacionOcular": {
+      "href": "https://aps2.senasa.gov.ar/adt_api/api/productosAgroquimicosFormulados/179979/irritacionOcular{?projection}",
+      "templated": true
+    },
+    "paises": {
+      "href": "https://aps2.senasa.gov.ar/adt_api/api/productosAgroquimicosFormulados/179979/paises"
+    },
+    "vinculaciones": {
+      "href": "https://aps2.senasa.gov.ar/adt_api/api/productosAgroquimicosFormulados/179979/vinculaciones{?projection}",
+      "templated": true
+    },
+    "metodoRegistro": {
+      "href": "https://aps2.senasa.gov.ar/adt_api/api/productosAgroquimicosFormulados/179979/metodoRegistro"
+    },
+    "uso": {
+      "href": "https://aps2.senasa.gov.ar/adt_api/api/productosAgroquimicosFormulados/179979/uso"
+    },
+    "irritacionDermal": {
+      "href": "https://aps2.senasa.gov.ar/adt_api/api/productosAgroquimicosFormulados/179979/irritacionDermal{?projection}",
+      "templated": true
+    },
+    "tipoPresentacion": {
+      "href": "https://aps2.senasa.gov.ar/adt_api/api/productosAgroquimicosFormulados/179979/tipoPresentacion{?projection}",
+      "templated": true
+    },
+    "tipoProducto": {
+      "href": "https://aps2.senasa.gov.ar/adt_api/api/productosAgroquimicosFormulados/179979/tipoProducto{?projection}",
+      "templated": true
+    },
+    "nomenclador": {
+      "href": "https://aps2.senasa.gov.ar/adt_api/api/productosAgroquimicosFormulados/179979/nomenclador{?projection}",
+      "templated": true
+    },
+    "envases": {
+      "href": "https://aps2.senasa.gov.ar/adt_api/api/productosAgroquimicosFormulados/179979/envases{?projection}",
+      "templated": true
+    },
+    "sustanciasActivas": {
+      "href": "https://aps2.senasa.gov.ar/adt_api/api/productosAgroquimicosFormulados/179979/sustanciasActivas{?projection}",
+      "templated": true
+    },
+    "establecimientos": {
+      "href": "https://aps2.senasa.gov.ar/adt_api/api/productosAgroquimicosFormulados/179979/establecimientos{?projection}",
+      "templated": true
+    },
+    "toxicidadAbejas": {
+      "href": "https://aps2.senasa.gov.ar/adt_api/api/productosAgroquimicosFormulados/179979/toxicidadAbejas{?projection}",
+      "templated": true
+    },
+    "productoPaises": {
+      "href": "https://aps2.senasa.gov.ar/adt_api/api/productosAgroquimicosFormulados/179979/productoPaises{?projection}",
+      "templated": true
+    },
+    "toxicidadAves": {
+      "href": "https://aps2.senasa.gov.ar/adt_api/api/productosAgroquimicosFormulados/179979/toxicidadAves{?projection}",
+      "templated": true
+    },
+    "coordinacion": {
+      "href": "https://aps2.senasa.gov.ar/adt_api/api/productosAgroquimicosFormulados/179979/coordinacion"
+    },
+    "expedientesPorProducto": {
+      "href": "https://aps2.senasa.gov.ar/adt_api/api/productosAgroquimicosFormulados/179979/expedientesPorProducto{?projection}",
+      "templated": true
+    },
+    "tipoRegistro": {
+      "href": "https://aps2.senasa.gov.ar/adt_api/api/productosAgroquimicosFormulados/179979/tipoRegistro"
+    },
+    "productosFirmas": {
+      "href": "https://aps2.senasa.gov.ar/adt_api/api/productosAgroquimicosFormulados/179979/productosFirmas{?projection}",
+      "templated": true
+    }
+  }
+}

@@ -1,0 +1,66 @@
+{
+  "_embedded": {
+    "productosAgroquimicosFormulados": [
+      {
+        "id": 239970,
+        "numeroInscripcion": "42770",
+        "marca": "CORE OPTIMUS",
+        "nombreFirma": "PRODINSA ARGENTINA S A",
+        "claseToxicologica": "IV",
+        "sustanciasActivas": "ALCOHOL GRASO ETOXILADO <b>48%</b>, ALCOHOL LAURICO ETOXILADO <b>48%</b>, ALCOHOL LINEAL ETOXILADO <b>48%</b>"
+      },
+      {
+        "id": 239971,
+        "numeroInscripcion": "42769",
+        "marca": "SISTEM ACA MSO",
+        "nombreFirma": "NOVA  S. A. U.",
+        "claseToxicologica": "IV",
+        "sustanciasActivas": "ALCOHOL GRASO ETOXILADO <b>1,5%</b>, ESTERES METILICOS DE ACIDOS GRASOS DE ACEITE DE SOJA <b>74%</b>, ESTERES METILICOS DE ACIDOS GRASOS DE ACEITE VEGETAL <b>74%</b>"
+      },
+      {
+        "id": 239969,
+        "numeroInscripcion": "42768 BIO",
+        "marca": "ECOSWING",
+        "nombreFirma": "GOWAN ARGENTINA S.R.L.",
+        "claseToxicologica": "S/D",
+        "sustanciasActivas": "Extracto de Swinglea glutinosa <b>88,5%</b>"
+      },
+      {
+        "id": 239968,
+        "numeroInscripcion": "42767",
+        "marca": "SOMICS FENIX",
+        "nombreFirma": "GRUPO OMICS S.A.",
+        "claseToxicologica": "S/D",
+        "sustanciasActivas": "ALCOHOL GRASO ETOXILADO <b>12,5%</b>"
+      },
+      {
+        "id": 239967,
+        "numeroInscripcion": "42766",
+        "marca": "SUPERQUAT 20 SL",
+        "nombreFirma": "AGROBEATS ARGENTINA S.A.U.",
+        "claseToxicologica": "S/D",
+        "sustanciasActivas": "DIQUAT DIBROMURO <b>37,4%</b>"
+      }
+    ]
+  },
+  "_links": {
+    "first": {
+      "href": "https://aps2.senasa.gov.ar/adt_api/api/productosAgroquimicosFormulados/search/publicSearchProductosFormuladosDTO?page=0&size=5&sort=numeroInscripcion,desc"
+    },
+    "self": {
+      "href": "https://aps2.senasa.gov.ar/adt_api/api/productosAgroquimicosFormulados/search/publicSearchProductosFormuladosDTO?page=0&size=5&sort=numeroInscripcion,desc"
+    },
+    "next": {
+      "href": "https://aps2.senasa.gov.ar/adt_api/api/productosAgroquimicosFormulados/search/publicSearchProductosFormuladosDTO?page=1&size=5&sort=numeroInscripcion,desc"
+    },
+    "last": {
+      "href": "https://aps2.senasa.gov.ar/adt_api/api/productosAgroquimicosFormulados/search/publicSearchProductosFormuladosDTO?page=1473&size=5&sort=numeroInscripcion,desc"
+    }
+  },
+  "page": {
+    "size": 5,
+    "totalElements": 7370,
+    "totalPages": 1474,
+    "number": 0
+  }
+}
