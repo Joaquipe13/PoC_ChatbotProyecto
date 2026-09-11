@@ -16,9 +16,9 @@ Imagen oficial del proyecto pgvector (no `ankane/pgvector`, deprecada desde pgve
 
 Se usa el paquete `google-genai` (`from google import genai`), no el más viejo `google-generativeai`. Alcanzó disponibilidad general en mayo de 2025 y es el recomendado por Google para funciones nuevas (multimodal, structured output) que se van a necesitar en la Fase 4. Verificado por búsqueda web el 11/09/2026; **verificar** que siga siendo la recomendación vigente antes de la Fase 2/4, que son las primeras que lo usan de verdad.
 
-### `GEMINI_MODEL` por defecto: `gemini-flash-latest`
+### `GEMINI_MODEL` por defecto: `gemini-3.5-flash-lite`
 
-Se usa el alias `-latest` en vez de fijar una versión con fecha (p. ej. `gemini-2.5-flash`), para no depender de un modelo que Google puede discontinuar durante las ~3 semanas de desarrollo (hay precedente: `gemini-2.5-flash` tiene fecha de baja anunciada para octubre de 2026 según fuentes de baja confiabilidad relevadas). **Verificar** en la consola de Google AI Studio el modelo vigente antes de cada fase que llame al LLM real (Fase 2 en adelante), y fijar una versión concreta recién antes de la demo si el alias resulta inestable.
+Se probó primero con el alias `-latest`, pero se reemplazó por `gemini-3.5-flash-lite` (fijado directamente por el usuario en `.env.example` y `config.py` el 11/09/2026, presumiblemente confirmado en la consola de Google AI Studio). Un alias `-latest` es más resistente a que Google discontinúe una versión puntual, pero una versión fija es más reproducible para tests y demo. **Verificar** antes de la Fase 2 en adelante que este modelo siga vigente y soporte entrada multimodal (necesaria para `leer_receta`, Fase 4); si Google lo discontinúa antes del 30/09, reemplazar acá y en `.env.example`.
 
 ### `WHATSAPP_GRAPH_VERSION` por defecto: `v23.0`
 
