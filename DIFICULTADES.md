@@ -2,6 +2,16 @@
 
 Registro de qué falló y cómo se resolvió. Una entrada por dificultad relevante, en orden cronológico (más reciente arriba).
 
+## Fase 3 — Ingesta SIG y normativa
+
+### Regex de artículos no reconocía "Articulo" sin tilde
+
+Primera versión de `_PATRON_ARTICULO` en `loader_normativa.py` usaba `í?culo` (í acentuada opcional + "culo" literal), pensado para "Artículo". Al probarlo contra el PDF real generado para la fixture de San Carlos Centro (texto "Articulo 8.-", sin tilde porque así se generó el PDF de prueba), no matcheó ningún artículo -- `chunkear_articulos` devolvía `[]`. Causa: el patrón no contemplaba la "i" simple entre "art" y "culo", solo la "í" acentuada opcional. Corregido a `[ií]culo` (acepta cualquiera de las dos). Se detectó de inmediato al probar contra el PDF real en vez de solo con texto sintético en memoria.
+
+### `fpdf2`: `multi_cell` sin resetear X entre llamadas
+
+El script que genera las fixtures de normativa (PDFs de prueba) fallaba con `FPDFException: Not enough horizontal space to render a single character` al segundo `multi_cell()`. Causa: `multi_cell` deja el cursor X desplazado después de escribir, y la siguiente llamada heredaba una posición X reducida (menos ancho disponible) hasta que llegaba a cero. Se corrigió llamando `pdf.set_x(pdf.l_margin)` antes de cada `multi_cell`.
+
 ## Fase 2 — Scraper SENASA y base de productos
 
 ### `sustanciasActivas` (y otros campos) llegan como `null`, no ausentes

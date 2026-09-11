@@ -14,6 +14,11 @@ dependencies = [
     "rapidfuzz>=3.14.6",
     "pdfplumber>=0.11.10",
     "psycopg[binary]>=3.3.5",
+    "geopandas>=1.1.4",
+    "shapely>=2.1.2",
+    "pyproj>=3.8.0",
+    "pytesseract>=0.3.13",
+    "fpdf2>=2.8.8",
 ]
 
 [dependency-groups]

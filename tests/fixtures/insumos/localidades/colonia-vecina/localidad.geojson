@@ -1,0 +1,54 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "tipo": "limite",
+        "nombre": "Colonia Vecina",
+        "provincia": "santa-fe"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -60.63,
+              -32.93
+            ],
+            [
+              -60.61,
+              -32.93
+            ],
+            [
+              -60.61,
+              -32.91
+            ],
+            [
+              -60.63,
+              -32.91
+            ],
+            [
+              -60.63,
+              -32.93
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "tipo": "escuela",
+        "nombre": "Escuela Rural N 3"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -60.6295,
+          -32.9205
+        ]
+      }
+    }
+  ]
+}

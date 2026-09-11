@@ -1,5 +1,19 @@
 # Decisiones
 
+## Fase 3 — Ingesta SIG y normativa
+
+### Idempotencia de `loader_normativa.py`/`loader_reglas.py`: borrar y reinsertar por alcance, no `ON CONFLICT`
+
+`territorio.norma.archivo` no es único globalmente (el mismo nombre de PDF puede repetirse en distintas carpetas de localidades distintas), así que un `ON CONFLICT` compuesto sería más complejo que el beneficio que da acá. En cambio, antes de cargar una localidad/provincia/ámbito nacional, se borran sus normas existentes (`DELETE ... WHERE localidad_id = %s`, con cascada a `articulo` y `regla_distancia` por las FK `ON DELETE CASCADE`) y se reinsertan desde cero. Mismo patrón que ya usaba `zona_protegida` en `loader_geo.py` (Fase 1). Consecuencia: los archivos de insumos son la fuente de la verdad, no un merge incremental -- correr el loader dos veces da el mismo resultado, pero un cambio manual directo en la base se pierde en la siguiente carga.
+
+### Regex de artículos: soporta "Art.", "Artículo"/"Articulo" (con o sin tilde) y "N°/Nº" antes del número
+
+Diseñado y verificado contra un PDF real generado con fpdf2 (sin biblioteca de renderizado con tildes especiales, así que el texto de las fixtures usa "Articulo" sin tilde). Encontrado en el camino: la primera versión del regex solo aceptaba "í" acentuada, no "i" simple -- fallaba en "Articulo 8.-" real. Corregido a `[ií]culo`. No soporta numeración romana (caso borde mencionado en el plan); un PDF así no matchea ningún artículo y `chunkear_articulos` devuelve `[]` (no se inventa un artículo "1" con todo el texto adentro).
+
+### Tesseract no probado con OCR real
+
+Tesseract OCR no está instalado en esta máquina de desarrollo (`tesseract --version` → command not found). `pytesseract` sí está instalado como dependencia Python, pero `extraer_texto_o_ocr()` nunca llegó a ejecutar una imagen real por Tesseract en esta sesión: todos los PDF de las fixtures tienen capa de texto (generados con fpdf2, no son escaneos). El código captura cualquier excepción del bloque de OCR (incluido "Tesseract no está instalado") y sigue marcando `requiere_revision=True` sin rompar la carga -- pero el resultado real de OCR sobre un PDF escaneado de verdad queda sin validar hasta que se instale Tesseract (`https://github.com/UB-Mannheim/tesseract/wiki` para Windows) y se pruebe con un PDF escaneado real o una fixture generada a partir de una imagen.
+
 ## Fase 2 — Scraper SENASA y base de productos
 
 ### Forma real de la API de SENASA (difiere de lo que asumía la skill)

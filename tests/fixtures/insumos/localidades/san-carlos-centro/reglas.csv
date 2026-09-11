@@ -1,0 +1,4 @@
+tipo_zona,tipo_aplicacion,bandas,distancia_min_m,norma,articulo,observaciones
+escuela,terrestre,todas,100,ordenanza-914-2018,8,
+escuela,aerea,todas,200,ordenanza-914-2018,9,Aviso previo a la direccion de la escuela
+curso_agua,todas,todas,50,ordenanza-914-2018,10,

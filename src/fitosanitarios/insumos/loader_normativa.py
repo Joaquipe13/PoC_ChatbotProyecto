@@ -1,0 +1,223 @@
+"""Carga la normativa (PDFs) a `territorio.norma` y `territorio.articulo`,
+chunkeada por artículo con embedding (ver skill, "RAG de normativa").
+
+Si un PDF no tiene capa de texto, intenta OCR con Tesseract (pytesseract). Si
+Tesseract no está instalado en la máquina no falla: marca los artículos para
+revisión manual (`requiere_revision=True`) y sigue con el resto -- ver
+DIFICULTADES.md, Tesseract no está instalado en la máquina de desarrollo de
+esta sesión, no se pudo probar el camino de OCR real todavía.
+
+Idempotente por localidad/ámbito: antes de cargar, borra las normas
+existentes de ese alcance y las vuelve a insertar (mismo patrón que
+`zona_protegida` en loader_geo.py) -- más simple que un `ON CONFLICT`
+compuesto, dado que `archivo` solo es único dentro de su carpeta, no global.
+"""
+
+import argparse
+import logging
+import re
+from pathlib import Path
+
+import pdfplumber
+import psycopg
+
+from fitosanitarios.config import get_settings
+
+logger = logging.getLogger(__name__)
+
+_PATRON_ARTICULO = re.compile(
+    r"(?im)^\s*art(?:\.|[ií]culo)?\s*(?:n[°º]?\.?)?\s*(\d+)\s*[°º]?\s*[:.\-]*\s*"
+)
+_PATRON_NOMBRE_PDF = re.compile(r"^(ordenanza|decreto|resolucion|ley)-([a-z0-9]+)-(\d{4})\.pdf$")
+
+
+def chunkear_articulos(texto: str) -> list[tuple[str, str]]:
+    """Divide el texto de una norma en artículos: [(numero, cuerpo), ...].
+    Si no encuentra ningún encabezado reconocible, devuelve `[]` -- no se
+    inventa un artículo "1" con todo el texto adentro (ver caso borde de
+    PDFs con formato de artículo no estándar)."""
+    matches = list(_PATRON_ARTICULO.finditer(texto))
+    articulos = []
+    for i, m in enumerate(matches):
+        numero = m.group(1)
+        inicio = m.end()
+        fin = matches[i + 1].start() if i + 1 < len(matches) else len(texto)
+        cuerpo = texto[inicio:fin].strip()
+        if cuerpo:
+            articulos.append((numero, cuerpo))
+    return articulos
+
+
+def extraer_texto_o_ocr(ruta_pdf: Path) -> tuple[str, bool]:
+    """Devuelve (texto, requiere_revision). `requiere_revision=True` si no
+    había capa de texto (con o sin OCR exitoso después)."""
+    with pdfplumber.open(ruta_pdf) as pdf:
+        texto = "\n".join(pagina.extract_text() or "" for pagina in pdf.pages).strip()
+    if texto:
+        return texto, False
+
+    try:
+        import pytesseract
+
+        with pdfplumber.open(ruta_pdf) as pdf:
+            textos_ocr = [
+                pytesseract.image_to_string(pagina.to_image(resolution=300).original, lang="spa")
+                for pagina in pdf.pages
+            ]
+        return "\n".join(textos_ocr).strip(), True
+    except Exception:
+        logger.warning(
+            "No se pudo hacer OCR de %s (¿Tesseract instalado?)", ruta_pdf, exc_info=True
+        )
+        return "", True
+
+
+def _parsear_nombre_pdf(ruta_pdf: Path) -> tuple[str, str, int]:
+    m = _PATRON_NOMBRE_PDF.match(ruta_pdf.name)
+    if not m:
+        raise ValueError(f"{ruta_pdf.name} no respeta <tipo>-<numero>-<anio>.pdf")
+    tipo, numero, anio = m.groups()
+    return tipo, numero, int(anio)
+
+
+def cargar_normas_de_carpeta(
+    cur,
+    carpeta: Path,
+    ambito: str,
+    localidad_id: int | None,
+    provincia_id: int | None,
+    modelo_embeddings,
+) -> dict[str, int]:
+    if ambito == "municipal":
+        cur.execute("DELETE FROM territorio.norma WHERE localidad_id = %s", (localidad_id,))
+    elif ambito == "provincial":
+        cur.execute(
+            "DELETE FROM territorio.norma WHERE ambito = 'provincial' AND provincia_id = %s",
+            (provincia_id,),
+        )
+    else:
+        cur.execute("DELETE FROM territorio.norma WHERE ambito = 'nacional'")
+
+    resumen = {"normas": 0, "articulos": 0, "pdfs_requieren_revision": 0}
+    for pdf in sorted(carpeta.glob("*.pdf")):
+        tipo, numero, anio = _parsear_nombre_pdf(pdf)
+        archivo = pdf.stem
+        texto, requiere_revision = extraer_texto_o_ocr(pdf)
+        if requiere_revision:
+            resumen["pdfs_requieren_revision"] += 1
+
+        cur.execute(
+            """
+            INSERT INTO territorio.norma
+                (ambito, localidad_id, provincia_id, tipo, numero, anio, archivo, metadatos)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING id
+            """,
+            (
+                ambito, localidad_id, provincia_id, tipo, numero, anio, archivo,
+                '{"paginas_sin_texto": %s}' % ("true" if requiere_revision else "false"),
+            ),
+        )
+        norma_id = cur.fetchone()[0]
+        resumen["normas"] += 1
+
+        articulos = chunkear_articulos(texto)
+        if not articulos:
+            logger.warning(
+                "No se encontraron artículos en %s (¿formato de encabezado no estándar?)", pdf
+            )
+        for numero_articulo, cuerpo in articulos:
+            embedding = modelo_embeddings.encode(cuerpo[:2000]).tolist()
+            vector_literal = "[" + ",".join(repr(float(x)) for x in embedding) + "]"
+            cur.execute(
+                """
+                INSERT INTO territorio.articulo
+                    (norma_id, numero, texto, requiere_revision, embedding)
+                VALUES (%s, %s, %s, %s, %s::vector)
+                """,
+                (norma_id, numero_articulo, cuerpo, requiere_revision, vector_literal),
+            )
+            resumen["articulos"] += 1
+
+    return resumen
+
+
+def cargar_normativa(conn: psycopg.Connection, data_dir: Path, modelo_embeddings) -> dict:
+    resumen_total: dict[str, int] = {"normas": 0, "articulos": 0, "pdfs_requieren_revision": 0}
+
+    with conn.cursor() as cur:
+        localidades_dir = data_dir / "localidades"
+        if localidades_dir.exists():
+            for carpeta in sorted(localidades_dir.iterdir()):
+                if not carpeta.is_dir():
+                    continue
+                cur.execute(
+                    "SELECT id FROM territorio.localidad WHERE jurisdiccion_id = %s",
+                    (carpeta.name,),
+                )
+                row = cur.fetchone()
+                if row is None:
+                    logger.warning(
+                        "%s no tiene localidad cargada todavía (correr loader_geo primero)",
+                        carpeta.name,
+                    )
+                    continue
+                localidad_id = row[0]
+                r = cargar_normas_de_carpeta(
+                    cur, carpeta, "municipal", localidad_id, None, modelo_embeddings
+                )
+                for k in resumen_total:
+                    resumen_total[k] += r[k]
+
+        provincial_dir = data_dir / "normativa-general" / "provincial"
+        if provincial_dir.exists():
+            for carpeta in sorted(provincial_dir.iterdir()):
+                if not carpeta.is_dir():
+                    continue
+                cur.execute(
+                    """
+                    INSERT INTO territorio.provincia (nombre) VALUES (%s)
+                    ON CONFLICT (nombre) DO UPDATE SET nombre = EXCLUDED.nombre
+                    RETURNING id
+                    """,
+                    (carpeta.name,),
+                )
+                provincia_id = cur.fetchone()[0]
+                r = cargar_normas_de_carpeta(
+                    cur, carpeta, "provincial", None, provincia_id, modelo_embeddings
+                )
+                for k in resumen_total:
+                    resumen_total[k] += r[k]
+
+        nacional_dir = data_dir / "normativa-general" / "nacional"
+        if nacional_dir.exists():
+            r = cargar_normas_de_carpeta(
+                cur, nacional_dir, "nacional", None, None, modelo_embeddings
+            )
+            for k in resumen_total:
+                resumen_total[k] += r[k]
+
+        conn.commit()
+    return resumen_total
+
+
+def main() -> None:
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--data", type=Path, required=True)
+    parser.add_argument("--database-url", type=str, default=None)
+    args = parser.parse_args()
+
+    from sentence_transformers import SentenceTransformer
+
+    settings = get_settings()
+    db_url = args.database_url or settings.database_url
+    modelo = SentenceTransformer(settings.embeddings_model)
+
+    with psycopg.connect(db_url) as conn:
+        resumen = cargar_normativa(conn, args.data, modelo)
+    logger.info("Carga de normativa terminada: %s", resumen)
+
+
+if __name__ == "__main__":
+    main()

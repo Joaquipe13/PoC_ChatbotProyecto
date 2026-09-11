@@ -1,0 +1,108 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "tipo": "limite",
+        "nombre": "San Carlos Centro",
+        "provincia": "santa-fe"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -60.66,
+              -32.93
+            ],
+            [
+              -60.64,
+              -32.93
+            ],
+            [
+              -60.64,
+              -32.91
+            ],
+            [
+              -60.66,
+              -32.91
+            ],
+            [
+              -60.66,
+              -32.93
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "tipo": "escuela",
+        "nombre": "Escuela N 12"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -60.6505,
+          -32.9295
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "tipo": "curso_agua",
+        "nombre": "Arroyo del Medio (ficticio)"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -60.66,
+            -32.92
+          ],
+          [
+            -60.64,
+            -32.918
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "tipo": "zona_urbana",
+        "nombre": "Casco urbano"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -60.652,
+              -32.922
+            ],
+            [
+              -60.648,
+              -32.922
+            ],
+            [
+              -60.648,
+              -32.918
+            ],
+            [
+              -60.652,
+              -32.918
+            ],
+            [
+              -60.652,
+              -32.922
+            ]
+          ]
+        ]
+      }
+    }
+  ]
+}

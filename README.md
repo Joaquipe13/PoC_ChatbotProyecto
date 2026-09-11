@@ -34,8 +34,10 @@ Los tests nunca salen a la red: con `USE_FIXTURES=true` (default) el LLM es un f
 
 ## Estado del proyecto
 
-Fases 0 (Setup), 1 (Dominio y contratos) y 2 (Scraper SENASA y base de productos) completadas. Próxima: **Fase 3 — Ingesta SIG y normativa**, pendiente de confirmación del usuario (ver `plandefases.md`).
+Fases 0 (Setup), 1 (Dominio y contratos), 2 (Scraper SENASA) y 3 (Ingesta SIG y normativa) completadas. Próxima: **Fase 4 — `leer_receta`**, pendiente de confirmación del usuario (ver `plandefases.md`).
 
 Documentos de la Fase 1: [`docs/modelo-datos.md`](docs/modelo-datos.md) (diagrama ER + consultas SQL de las tools RAG), [`docs/matriz-parametros.md`](docs/matriz-parametros.md), [`docs/especificacion-plantillas.md`](docs/especificacion-plantillas.md), [`docs/contrato-insumos.md`](docs/contrato-insumos.md).
 
 Catálogo SENASA (Fase 2): listado completo real cargado (7.370 productos), detalle completo de una muestra de 187 (el resto queda como corrida de fondo pendiente, ver `DECISIONES.md`). Snapshot versionado en `data/senasa/snapshot/` (fuera de git; fixtures de ~50 productos reales en `tests/fixtures/senasa/` sí están versionadas).
+
+Insumos SIG/normativa (Fase 3): pipeline completo (`validador.py`, `loader_geo.py`, `loader_normativa.py`, `loader_reglas.py`) probado de punta a punta contra Postgres real con fixtures sintéticas (2 localidades, normativa provincial y nacional) — ver `docs/validacion-insumos.md`. Los insumos reales de las 10 localidades del caso de estudio todavía no los subió el equipo.
