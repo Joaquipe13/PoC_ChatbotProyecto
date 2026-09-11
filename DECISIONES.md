@@ -20,9 +20,17 @@ Se usa el paquete `google-genai` (`from google import genai`), no el más viejo 
 
 Se probó primero con el alias `-latest`, pero se reemplazó por `gemini-3.5-flash-lite` (fijado directamente por el usuario en `.env.example` y `config.py` el 11/09/2026, presumiblemente confirmado en la consola de Google AI Studio). Un alias `-latest` es más resistente a que Google discontinúe una versión puntual, pero una versión fija es más reproducible para tests y demo. **Verificar** antes de la Fase 2 en adelante que este modelo siga vigente y soporte entrada multimodal (necesaria para `leer_receta`, Fase 4); si Google lo discontinúa antes del 30/09, reemplazar acá y en `.env.example`.
 
-### `WHATSAPP_GRAPH_VERSION` por defecto: `v23.0`
+### `WHATSAPP_GRAPH_VERSION`: confirmado `v26.0`
 
-No se pudo confirmar con una fuente oficial (los resultados de búsqueda disponibles eran de blogs, no de developers.facebook.com) cuál es la versión vigente de Graph API al 11/09/2026. Se deja `v23.0` como placeholder explícitamente marcado **(verificar)** en `.env.example` y acá; hay que confirmarlo contra `https://developers.facebook.com/docs/graph-api/changelog` antes de la Fase 8.
+El 11/09/2026 no se pudo confirmar con una fuente oficial la versión vigente y se dejó `v23.0` como placeholder marcado `(verificar)`. El 12/09/2026, con credenciales reales cargadas en `.env` (token de System User + `WHATSAPP_PHONE_NUMBER_ID` del número de prueba), se hizo una llamada real de lectura:
+
+```
+GET https://graph.facebook.com/v26.0/{WHATSAPP_PHONE_NUMBER_ID}?fields=verified_name,display_phone_number,quality_rating,code_verification_status
+```
+
+Respuesta `HTTP 200` con los datos del número de prueba (`verified_name: "Test Number"`, `display_phone_number: "+1 555-604-4720"`). Confirma tres cosas a la vez: `v26.0` es una versión vigente de Graph API, el `WHATSAPP_ACCESS_TOKEN` configurado es válido, y `WHATSAPP_PHONE_NUMBER_ID` es correcto. `.env.example` actualizado a `v26.0`.
+
+**Pendiente para la Fase 8** (no cubierto por este chequeo, que fue de solo lectura): envío real de un mensaje a un destinatario verificado, y el handshake + validación de firma del webhook, que requieren el código de `canales/whatsapp/` y un túnel HTTPS.
 
 ### Modelo de embeddings: `sentence-transformers/paraphrase-multilingual-mpnet-base-v2` (confirmado con benchmark)
 
