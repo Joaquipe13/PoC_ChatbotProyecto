@@ -34,7 +34,7 @@ Los tests nunca salen a la red: con `USE_FIXTURES=true` (default) el LLM es un f
 
 ## Estado del proyecto
 
-Fases 0 (Setup), 1 (Dominio y contratos), 2 (Scraper SENASA), 3 (Ingesta SIG y normativa), 4 (`leer_receta`) y 5 (Tools de validación y dictamen) completadas. Próxima: **Fase 6 — `responder_consulta_normativa`**, pendiente de confirmación del usuario (ver `plandefases.md`).
+Fases 0 a 6 completadas (Setup; Dominio y contratos; Scraper SENASA; Ingesta SIG y normativa; `leer_receta`; Tools de validación y dictamen; `responder_consulta_normativa`). El núcleo experto (RF1-RF5, RF10, RF11) queda con todas sus tools implementadas y probadas contra datos reales. Próxima: **Fase 7 — Orquestador**, pendiente de confirmación del usuario (ver `plandefases.md`).
 
 Documentos de la Fase 1: [`docs/modelo-datos.md`](docs/modelo-datos.md) (diagrama ER + consultas SQL de las tools RAG), [`docs/matriz-parametros.md`](docs/matriz-parametros.md), [`docs/especificacion-plantillas.md`](docs/especificacion-plantillas.md), [`docs/contrato-insumos.md`](docs/contrato-insumos.md).
 
@@ -45,3 +45,5 @@ Insumos SIG/normativa (Fase 3): pipeline completo (`validador.py`, `loader_geo.p
 `leer_receta` (Fase 4): extracción multimodal (Gemini real) verificada contra 3 imágenes sintéticas con 3/3 aciertos — ver `docs/casos-leer-receta.md`.
 
 Tools de validación y dictamen (Fase 5): `validar_producto_registro`, `consultar_productos`, `evaluar_riesgo` y `evaluar_viabilidad_legal` probadas de punta a punta contra Postgres real (catálogo SENASA + San Carlos Centro), incluidos los 3 resultados del dictamen (APTA, OBSERVADA, NO_EVALUABLE) y el caso exacto del plan (lote a 80 m de una escuela con regla de 100 m).
+
+`responder_consulta_normativa` (Fase 6): RAG con verificación de citas en código (una cita alucinada por el LLM se descarta y queda como advertencia, nunca pasa). `RAG_UMBRAL_SIMILITUD` recalibrado de 0,75 a 0,35 con scores reales — ver `DECISIONES.md`. En el camino se encontró y corrigió un bug real: tests de integración con un modelo de embeddings fake estaban corrompiendo silenciosamente los embeddings reales de la base de desarrollo cada vez que corría la suite completa.

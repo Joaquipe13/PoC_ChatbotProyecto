@@ -2,6 +2,22 @@
 
 Registro de qué falló y cómo se resolvió. Una entrada por dificultad relevante, en orden cronológico (más reciente arriba).
 
+## Fase 6 — `responder_consulta_normativa`
+
+### Scores de similitud casi nulos: embeddings fake pisando embeddings reales en la base de desarrollo
+
+Al probar `articulos_por_similitud` con una pregunta real contra la normativa real de San Carlos Centro, todos los scores salían casi en cero (el máximo 0,029), y el artículo más relevante (distancia a escuela, aplicación terrestre) scoreaba peor que uno completamente irrelevante. Se armó un script de diagnóstico que comparó el embedding guardado en la base contra uno recién calculado para el mismo texto: los primeros 5 valores guardados eran `[0.72, 0.73, 0.74, 0.75, 0.76]` -- una secuencia incrementando de a 0,01, imposible como salida real de un modelo de embeddings, pero exactamente el patrón de la clase `_ModeloEmbeddingsFake` que usan los tests de integración de la Fase 3 (`(semilla + i) % 100 / 100.0`).
+
+Causa raíz: `tests/insumos/test_loaders_integracion.py` conecta contra `DATABASE_URL` (la misma base de desarrollo que uso para cargar y verificar datos reales, no una base de test aislada) y hace un `DELETE` + recarga completa de `territorio.*` en cada corrida, usando ese modelo fake para no pagar el costo de cargar `sentence-transformers` en el test. Cada vez que corrí la suite completa (`pytest -q`) desde que existe ese test (Fase 3 en adelante), quedaban pisados con valores dummy los embeddings reales de `territorio.articulo` que había cargado a mano. `tests/senasa/test_loader.py` tenía el mismo patrón contra `catalogo.producto` (parcialmente enmascarado ahí porque el score de matching combina trigram + embedding, y trigram por sí solo ya acierta en nombres casi exactos).
+
+Se corrigió reemplazando el modelo fake por el modelo real (`modelo_embeddings`, fixture compartida de `tests/conftest.py`) en ambos archivos, y recargando `territorio.articulo` con `loader_normativa.py` real para dejar la base en estado correcto. Con embeddings reales, el artículo 8 (el más relevante) pasó a scorear 0,498 -- razonable, y consistente con lo que daba un script de comparación en Python puro fuera de la base. Esto también llevó a bajar `RAG_UMBRAL_SIMILITUD` de 0,75 a 0,35 (ver DECISIONES.md), porque el valor viejo estaba calibrado sin haber visto un score real todavía.
+
+No se resolvió la causa de fondo (tests de integración compartiendo la base de desarrollo en vez de una base de test aislada) -- ver DECISIONES.md, queda como deuda técnica documentada.
+
+### Al recargar solo `loader_normativa.py` para arreglar lo anterior, se perdieron las reglas por el `ON DELETE CASCADE`
+
+Al corregir el hallazgo de arriba, recargué manualmente `territorio.articulo` corriendo `loader_normativa.py` (con el modelo real) para restaurar los embeddings -- pero no corrí `loader_reglas.py` a continuación. `cargar_normas_de_carpeta` borra (`DELETE FROM territorio.norma WHERE ...`) antes de reinsertar, y `regla_distancia.norma_id` tiene `ON DELETE CASCADE`, así que ese `DELETE` se llevó puestas las 5 filas de `regla_distancia` sin que el loader de normativa supiera nada de eso. Se detectó porque `pytest -q` completo (corrida de regresión después del fix) hizo fallar `test_reglas_candidatas_de_san_carlos_incluye_la_ordenanza` con un conjunto vacío. Se corrigió corriendo también `loader_reglas.py`. Lección concreta: los tres loaders de insumos (`loader_geo`, `loader_normativa`, `loader_reglas`) son interdependientes por FK con cascada; recargar uno solo a mano puede dejar huérfanas las tablas que dependen de él -- conviene correr los tres en secuencia siempre, no uno suelto, salvo que se sepa explícitamente que no hay reglas afectadas.
+
 ## Fase 5 — Tools de validación y dictamen
 
 ### Test de `evaluar_riesgo` fallaba por asumir una sola zona "escuela" en el resultado

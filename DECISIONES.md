@@ -1,5 +1,17 @@
 # Decisiones
 
+## Fase 6 — `responder_consulta_normativa`
+
+### `RAG_UMBRAL_SIMILITUD` recalibrado de 0,75 a 0,35 con scores reales
+
+El default de la Fase 0 (0,75) se fijó sin datos reales, como placeholder razonable "a ojo". Al testear el retriever de artículos contra la normativa real cargada en la Fase 3, el artículo genuinamente más relevante a una pregunta bien formulada scoreó 0,50-0,58 de similitud coseno con `sentence-transformers/paraphrase-multilingual-mpnet-base-v2` -- muy por debajo de 0,75. Con el default viejo, **toda** consulta normativa hubiera devuelto `NORMATIVA_SIN_RESPALDO`, sin importar qué tan bien cargada estuviera la normativa. Se bajó a 0,35 (ver `config.py` y `.env.example`), calibrado contra el corpus sintético de 9 artículos de la Fase 3. **Sigue siendo una calibración chica** (9 artículos, no las decenas/cientos que va a haber con las 10 localidades reales); hay que revalidar cuando se cargue normativa real, y considerar si hace falta un umbral distinto por ámbito (municipal/provincial/nacional) si la mezcla de escalas resulta un problema.
+
+### Hallazgo real y su causa raíz: `paraphrase-multilingual-mpnet-base-v2` da scores razonables para retrieval asimétrico pregunta-vs-artículo, PERO se estuvo probando contra datos corrompidos
+
+Al testear por primera vez el retriever con una pregunta real, los scores salían casi en cero (0,03 el mejor, el artículo más relevante scoreaba peor que uno irrelevante). Se investigó a fondo (ver DIFICULTADES.md) y la causa **no** era el modelo de embeddings: era que `tests/insumos/test_loaders_integracion.py` (Fase 3) recargaba `territorio.articulo` con un modelo de embeddings **fake** cada vez que corría contra la base real de desarrollo -- la misma que se usa para verificación manual -- pisando los embeddings reales cargados en la Fase 3 con valores dummy secuenciales. Cada corrida de `pytest -q` completo desde la Fase 3 en adelante corrompía silenciosamente esos 9 embeddings. Se corrigió usando el modelo de embeddings real (la fixture compartida `modelo_embeddings` de `tests/conftest.py`) en `tests/insumos/test_loaders_integracion.py` y en `tests/senasa/test_loader.py` (que tenía el mismo problema sobre `catalogo.producto`, aunque ahí quedaba parcialmente enmascarado porque el score combinado también usa trigram). Costo: esos tests tardan más (cargan el modelo real), pero son correctos.
+
+**Limitación de diseño que queda pendiente, no resuelta en esta sesión**: los tests de integración de `senasa/loader.py` e `insumos/loader_*.py` escriben contra la MISMA base de datos que se usa para desarrollo manual (`DATABASE_URL`), en vez de una base de test aislada. Esto ya causó un bug real (arriba). La corrección aplicada (dejar de usar embeddings fake) resuelve el síntoma, no la causa de fondo: cualquier test de integración que haga `DELETE`/`UPDATE` contra `DATABASE_URL` sigue pudiendo pisar datos reales de otra forma. Una base de test separada (`TEST_DATABASE_URL`, o un schema/DB con sufijo `_test`) sería la solución de fondo; no se implementó por tiempo. Documentado acá para que quede explícito, no oculto.
+
 ## Fase 5 — Tools de validación y dictamen
 
 ### Servicios probados con la geometría y las reglas reales de San Carlos Centro

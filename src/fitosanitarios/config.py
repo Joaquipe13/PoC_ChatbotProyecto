@@ -43,7 +43,11 @@ class Settings(BaseSettings):
 
     # Umbrales del núcleo experto
     dosis_tolerancia_pct: float = 10.0
-    rag_umbral_similitud: float = 0.75
+    # 0.35, no 0.75: calibrado en la Fase 6 contra scores reales de
+    # sentence-transformers/paraphrase-multilingual-mpnet-base-v2 (un
+    # artículo genuinamente relevante scoreó 0.50-0.58 en el corpus de
+    # prueba; 0.75 dejaba todo por debajo del umbral). Ver DECISIONES.md.
+    rag_umbral_similitud: float = 0.35
     radio_busqueda_zonas_m: float = 2000.0
 
     # Tests y desarrollo

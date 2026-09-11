@@ -6,6 +6,14 @@ plandefases.md Fase 5, que sí lo exige para los retrievers). Para correrlo:
 
     docker compose up -d db
     uv run pytest tests/senasa/test_loader.py -q
+
+Usa el modelo de embeddings REAL (fixture compartida `modelo_embeddings` de
+tests/conftest.py): este test hace upsert sobre `catalogo.producto` por
+`numero_inscripcion`, así que si alguno de los 50 productos de la fixture ya
+existe en la base (cargado de verdad en la Fase 2), un modelo fake le
+pisaría el embedding real con uno dummy cada vez que corre la suite
+completa -- exactamente lo que pasó con `territorio.articulo` en la Fase 6
+(ver DIFICULTADES.md).
 """
 
 from pathlib import Path
@@ -32,27 +40,11 @@ def conexion():
     conn.close()
 
 
-@pytest.fixture
-def modelo_embeddings_fake():
-    """Evita bajar/correr sentence-transformers en este test: alcanza con
-    vectores fake de la dimensión correcta para probar la carga a la base.
-    Devuelve un array numpy, como el `SentenceTransformer.encode()` real
-    (el loader llama `.tolist()` sobre el resultado)."""
-    import numpy as np
-
-    class _ModeloFake:
-        def encode(self, texto):
-            semilla = abs(hash(texto)) % 1000
-            return np.array([((semilla + i) % 100) / 100.0 for i in range(768)])
-
-    return _ModeloFake()
-
-
-def test_cargar_catalogo_puebla_producto(conexion, modelo_embeddings_fake):
+def test_cargar_catalogo_puebla_producto(conexion, modelo_embeddings):
     productos = leer_snapshot(FIXTURE)
     assert len(productos) == 50
 
-    resumen = cargar_catalogo(conexion, productos, modelo_embeddings_fake)
+    resumen = cargar_catalogo(conexion, productos, modelo_embeddings)
 
     assert resumen["productos"] == 50
     with conexion.cursor() as cur:
@@ -60,15 +52,15 @@ def test_cargar_catalogo_puebla_producto(conexion, modelo_embeddings_fake):
         assert cur.fetchone()[0] >= 50
 
 
-def test_cargar_catalogo_es_idempotente(conexion, modelo_embeddings_fake):
+def test_cargar_catalogo_es_idempotente(conexion, modelo_embeddings):
     productos = leer_snapshot(FIXTURE)[:10]
 
-    resumen_1 = cargar_catalogo(conexion, productos, modelo_embeddings_fake)
+    resumen_1 = cargar_catalogo(conexion, productos, modelo_embeddings)
     with conexion.cursor() as cur:
         cur.execute("SELECT count(*) FROM catalogo.producto")
         despues_de_primera_carga = cur.fetchone()[0]
 
-    resumen_2 = cargar_catalogo(conexion, productos, modelo_embeddings_fake)
+    resumen_2 = cargar_catalogo(conexion, productos, modelo_embeddings)
     with conexion.cursor() as cur:
         cur.execute("SELECT count(*) FROM catalogo.producto")
         despues_de_segunda_carga = cur.fetchone()[0]
@@ -78,7 +70,7 @@ def test_cargar_catalogo_es_idempotente(conexion, modelo_embeddings_fake):
 
 
 def test_cargar_catalogo_pobla_usos_registrados_con_aplicaciones_reales(
-    conexion, modelo_embeddings_fake
+    conexion, modelo_embeddings
 ):
     productos = leer_snapshot(FIXTURE)
     con_aplicaciones = [
@@ -88,7 +80,7 @@ def test_cargar_catalogo_pobla_usos_registrados_con_aplicaciones_reales(
     ]
     assert con_aplicaciones, "la fixture debería tener al menos un producto con aplicaciones"
 
-    cargar_catalogo(conexion, con_aplicaciones, modelo_embeddings_fake)
+    cargar_catalogo(conexion, con_aplicaciones, modelo_embeddings)
 
     with conexion.cursor() as cur:
         cur.execute("SELECT count(*) FROM catalogo.uso_registrado")
