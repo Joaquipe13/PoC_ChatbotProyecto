@@ -14,6 +14,15 @@ _FAMILIAS_UNIDAD = {
     "L": (1.0, "volumen"),
     "ml": (0.001, "volumen"),
     "cm³": (0.001, "volumen"),
+    # Alias sin el superíndice unicode: el LLM orquestador recibe el texto
+    # tal cual lo escribió el operario (típicamente desde el teclado de un
+    # celular, sin "³") y lo pasa como argumento de tool sin normalizar --
+    # ver skill, "Dosis": la normalización de unidades es del núcleo, no del
+    # LLM. Hallazgo real de la Fase 10: "170 cm3/ha" (como typea cualquier
+    # operario) daba "unidad no reconocida" -> NO_EVALUABLE, reproducido en
+    # los evals (Fase 7) y en la demo (Fase 8/9), mal catalogado como
+    # limitación aceptada en vez de bug. Ver DECISIONES.md.
+    "cm3": (0.001, "volumen"),
     "kg": (1.0, "masa"),
     "g": (0.001, "masa"),
 }

@@ -574,6 +574,8 @@ No avanzar a la fase siguiente sin confirmación del usuario.
 
 **Estimación:** 10–16 h.
 
+**Resultado:** `docs/guion-demo.md` con los 6 casos obligatorios + 3 adicionales, todos ensayados contra datos reales; `notebooks/demo_e2e.ipynb` corrido de punta a punta con kernel limpio (dos veces, para verificar reproducibilidad). Al armar el guion se encontró y corrigió un bug real arrastrado desde la Fase 7 (`"cm3"` sin el superíndice unicode no se reconocía como unidad de dosis) y un hallazgo operativo sobre repetir demos con el mismo `thread_id` contra un checkpointer real (ver `DIFICULTADES.md`). `pytest` completo en verde; `evals/run_evals.py` da 79 % de exactitud de ruteo (23/29, reproducible en dos corridas), por debajo del objetivo de 90 % -- reportado sin inflar el número, con el análisis de por qué en `DECISIONES.md` (ninguna de las causas es una regresión de esta fase).
+
 No avanzar a la fase siguiente sin confirmación del usuario. (Es la última fase del núcleo; al cerrarla, el proyecto queda listo para entrega.)
 
 ---

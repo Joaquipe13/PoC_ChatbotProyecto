@@ -2,6 +2,20 @@
 
 Registro de qué falló y cómo se resolvió. Una entrada por dificultad relevante, en orden cronológico (más reciente arriba).
 
+## Fase 10 — Demo, documentación y defensa
+
+### Repetir una demo con el mismo thread_id contra el checkpointer real degrada la respuesta
+
+Al correr `notebooks/demo_e2e.ipynb` una segunda vez (para verificar el ajuste del caso 6) con los mismos `thread_id` fijos (`"demo-e2e-1"`, etc.), el caso 1 (que en la primera corrida dio un `APTA` completo con observaciones y fuentes) esta vez devolvió un `*Dictamen* *Resultado:* ⚠️ NO_EVALUABLE` vacío, sin citas ni observaciones. Causa: `checkpointer_postgres` persiste de verdad en Postgres entre corridas de la notebook (no es un checkpointer en memoria); al reusar el mismo `thread_id`, el LLM ve la conversación anterior ya completa en su historial y a veces responde desde su "recuerdo" de esa conversación en vez de volver a llamar la tool -- como el formateador arma el dictamen a partir de los artifacts de las tools ejecutadas *en el turno actual* (ver skill, "Contratos"), si no se llamó ninguna tool ese turno el dictamen sale vacío aunque el `tipo` declarado siga siendo "dictamen". No es un bug del núcleo (el contrato "nunca fabricar un dictamen sin evidencia" se sostiene: sale vacío, no inventado), pero sí hace que repetir un ensayo de la demo antes de la defensa dé resultados degradados si no se limpia el estado. Se corrigió generando un `SESION = uuid.uuid4().hex[:8]` al principio de `demo_e2e.ipynb` y `demo_sin_whatsapp.ipynb`, y sufijando todos los `thread_id` con esa sesión -- cada corrida arranca conversaciones nuevas.
+
+### El caso APTA del propio plan venía fallando desde la Fase 7 por una unidad no reconocida, mal catalogado como "limitación aceptada"
+
+Al armar `docs/guion-demo.md` con el caso exacto del plan (Flyer 10 Ec, soja, 170 cm³/ha, lejos de zonas protegidas) usando lenguaje natural, el dictamen daba `NO_EVALUABLE` con "Dosis 170.0 cm3/ha: unidad no reconocida" -- el mismo resultado que ya había aparecido en los evals de la Fase 7 y en las dos corridas de la demo de las Fases 8 y 9, sin que se investigara la causa raíz (se documentó como limitación general del parser de dosis). Al revisar `servicios/dosis.py::_FAMILIAS_UNIDAD` se encontró que solo tenía la clave `"cm³"` (con el superíndice unicode), nunca `"cm3"` (como lo escribe cualquiera desde el teclado de un celular, sin ese carácter). El caso de prueba directo (`tests/tools/test_evaluar_viabilidad_legal.py`) nunca lo detectó porque pasa `dosis_unidad="cm³/ha"` como argumento estructurado ya "correcto", sin pasar por lo que un LLM realmente extrae de una frase en español. Se corrigió agregando `"cm3"` como alias -- ver DECISIONES.md.
+
+### Evals: la exactitud de ruteo bajó de 89 % a 79 % entre la Fase 7 y la Fase 10 sin que hubiera una regresión real
+
+Al recorrer `evals/run_evals.py` como parte del checklist final de esta fase, el número reportado (79 %, 23/29) es más bajo que el 89 % (24/27) documentado en la Fase 7. Investigado caso por caso (ver DECISIONES.md, Fase 10): no es una regresión de comportamiento -- es que la corrección de la Fase 7 (capturar la excepción no controlada de una tool) hace que casos que antes rompían y quedaban afuera del denominador de la métrica ahora se cuenten, y algunos de esos casos ya eran ruteos imperfectos preexistentes que simplemente no se habían visto reflejados en el número hasta ahora. Documentado tal cual, no se ocultó ni se buscó una corrida que diera mejor número.
+
 ## Fase 9 — Extensiones
 
 ### Un test de guardia de la Fase 1 asumía que `MotivoNoResuelto` nunca crecería

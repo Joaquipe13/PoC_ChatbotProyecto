@@ -1,5 +1,20 @@
 # Decisiones
 
+## Fase 10 — Demo, documentación y defensa
+
+### "cm3" sin el superíndice unicode: un bug real, no una limitación aceptada
+
+Al armar el guion de la demo se encontró la causa raíz de un resultado que venía apareciendo desde la Fase 7 (documentado hasta ahora como "limitación conocida"): `Dosis 170.0 cm3/ha: unidad no reconocida` en el caso exacto del plan (Flyer 10 Ec, soja, 170 cm³/ha). `servicios/dosis.py::_FAMILIAS_UNIDAD` solo reconocía la clave `"cm³"` (con el superíndice unicode "³"), nunca `"cm3"` (ASCII, "3" normal) -- y el operario (o el LLM que transcribe lo que escribió) casi nunca usa el superíndice, que ni siquiera está en un teclado de celular estándar. Se corrigió agregando `"cm3"` como alias en `_FAMILIAS_UNIDAD`, sin tocar `parser_dosis.py` (que normaliza el texto de SENASA, un problema distinto). Esto abre camino a que el caso APTA del guion de demo (`docs/guion-demo.md`) funcione con la redacción natural que cualquier persona escribiría, no solo con el argumento estructurado exacto que usaban los tests de `evaluar_viabilidad_legal_logica`.
+
+### Resultado de evals antes de la entrega: 79 % (23/29), por debajo del objetivo de 90 %
+
+Se corrió `evals/run_evals.py` dos veces seguidas contra Gemini real al cerrar esta fase; ambas corridas dieron el mismo resultado exacto (79 %, 23/29, los mismos 6 casos incorrectos) -- no es ruido de muestreo, es reproducible. Se investigó cada caso incorrecto contra el detalle de `evals/ultima_corrida.json` en vez de reportar el número a secas:
+
+- **3 casos (`repregunta_04`, `repregunta_05`, `repregunta_08`)**: la métrica de ruteo los marca "incorrectos" porque el LLM invocó alguna tool (`validar_producto_registro`/`responder_consulta_normativa`) antes de repreguntar, cuando lo esperado era no llamar ninguna. Pero el `tipo_obtenido` final de los tres es `repregunta`, con una pregunta sensata (pide el cultivo o la localidad faltante) -- la conversación termina bien para el operario. Es una limitación de la métrica ("qué tool se llamó primero"), no un error de comportamiento observable.
+- **3 casos (`ambiguedad_01`, `ruteo_13`, `ruteo_16`)**: preguntan por UN producto puntual sin mencionar el cultivo ("¿el producto X está autorizado para algún cultivo en particular?"). El LLM a veces llama `consultar_productos` en vez de `validar_producto_registro` + repregunta -- pese a que la propia descripción de la tool ya dice explícitamente "no para preguntar por un producto puntual". `consultar_productos` ni siquiera acepta un nombre de producto como filtro, así que la llamada es un error categórico del LLM en esos casos, no una elección defendible. Antes de la Fase 7 esto directamente hacía `raise ValueError` sin capturar (`consultar_productos` llamada sin ningún filtro); con la excepción ya capturada, ahora se ve el resultado real en vez de un "error" que quedaba afuera del denominador de la métrica -- por eso el número bajó de 89 % (24/27, Fase 7) a 79 % (23/29): son más casos *visibles*, no más casos *rotos*.
+
+No se hizo más ingeniería de prompt para forzar el número a 90 %: la guía de la propia tool ya es explícita y el LLM la ignora en un puñado de frases límite -- es variabilidad inherente de un LLM con temperatura no nula, no un bug determinístico corregible. Documentado tal cual, sin inflar el número (ver "qué recortar" en `plandefases.md`, que pide exactamente esto para la meta de evals).
+
 ## Fase 9 — Extensiones (resolver_vehiculo, registrar_evento, consultar_agenda)
 
 ### Alcance definido por el usuario, no inferido de la skill

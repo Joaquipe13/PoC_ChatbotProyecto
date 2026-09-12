@@ -6,7 +6,7 @@
     "tool_esperada": "validar_producto_registro",
     "tool_obtenida": "validar_producto_registro",
     "tipo_obtenido": "consulta_producto",
-    "mensaje_final": "El producto Flyer 10 EC se encuentra registrado y autorizado para su uso en el cultivo de soja ante SENASA.\n\n*Flyer 10 Ec* · Reg. SENASA 41881 · Banda II · ✅\n\n*Fuentes*\n- SENASA, Reg. 41881 (detalle A",
+    "mensaje_final": "El producto Flyer 10 EC se encuentra registrado y autorizado para su uso en el cultivo de soja en SENASA.\n\n*Flyer 10 Ec* · Reg. SENASA 41881 · Banda II · ✅\n\n*Fuentes*\n- SENASA, Reg. 41881 (detalle API",
     "ruteo_correcto": true
   },
   {
@@ -16,7 +16,7 @@
     "tool_esperada": "validar_producto_registro",
     "tool_obtenida": "validar_producto_registro",
     "tipo_obtenido": "repregunta",
-    "mensaje_final": "Para poder verificar el producto en SENASA, necesito algunos datos adicionales.\n\nPara continuar necesito 2 datos:\n1. *adversidad*: ¿Qué maleza, plaga o enfermedad querés controlar con el producto?\n2. ",
+    "mensaje_final": "Para verificar si podés usar Glifosato Full 48 SL en maíz, necesito la ubicación del lote.\n\nPara continuar necesito 1 dato:\n1. *lat*: ¿Podrías compartirme la ubicación de tu lote?",
     "ruteo_correcto": true
   },
   {
@@ -36,7 +36,7 @@
     "tool_esperada": "consultar_productos",
     "tool_obtenida": "consultar_productos",
     "tipo_obtenido": "consulta_producto",
-    "mensaje_final": "Aquí tenés los insecticidas registrados en SENASA para maíz.\n\n*Productos registrados* (20 de 20)\n1. Abril 50 Curasemilla · Reg. SENASA 38052 · Banda III · \n2. Abril 50 Curasemilla · Reg. SENASA 38052 ",
+    "mensaje_final": "Se encontraron los siguientes insecticidas registrados para maíz.\n\n*Productos registrados* (20 de 20)\n1. Abril 50 Curasemilla · Reg. SENASA 38052 · Banda III · \n2. Abril 50 Curasemilla · Reg. SENASA 3",
     "ruteo_correcto": true
   },
   {
@@ -46,7 +46,7 @@
     "tool_esperada": "evaluar_riesgo",
     "tool_obtenida": "evaluar_riesgo",
     "tipo_obtenido": "dictamen",
-    "mensaje_final": "Evalué el riesgo geográfico y de dosis para tu lote.\n\n*Dictamen* — san-carlos-centro\n*Resultado:* ⚠️ NO_EVALUABLE",
+    "mensaje_final": "Aquí tienes la evaluación de riesgo para la aplicación solicitada.\n\n*Dictamen* — san-carlos-centro\n*Resultado:* ⚠️ NO_EVALUABLE",
     "ruteo_correcto": true
   },
   {
@@ -55,8 +55,8 @@
     "mensaje": "¿A cuántos metros de una escuela puedo aplicar por tierra en San Carlos Centro?",
     "tool_esperada": "responder_consulta_normativa",
     "tool_obtenida": "responder_consulta_normativa",
-    "tipo_obtenido": "repregunta",
-    "mensaje_final": "No encontré la normativa para esa localidad en el sistema.\n\nPara continuar necesito 1 dato:\n1. *jurisdiccion_id*: ¿Para qué localidad o municipio necesitás consultar la normativa?",
+    "tipo_obtenido": "consulta_normativa",
+    "mensaje_final": "No dispongo de información normativa para San Carlos Centro.\n\n*Depende.* ",
     "ruteo_correcto": true
   },
   {
@@ -66,7 +66,7 @@
     "tool_esperada": "responder_consulta_normativa",
     "tool_obtenida": "responder_consulta_normativa",
     "tipo_obtenido": "repregunta",
-    "mensaje_final": "No tengo información específica sobre la normativa para cursos de agua en San Carlos Centro.\n\nPara continuar necesito 1 dato:\n1. *jurisdiccion_id*: ¿En qué localidad o zona querés consultar la normati",
+    "mensaje_final": "Para consultar la normativa sobre aplicación cerca de cursos de agua, necesito confirmar la localidad.\n\nPara continuar necesito 1 dato:\n1. *jurisdiccion_id*: ¿Podrías confirmarme la localidad exacta p",
     "ruteo_correcto": true
   },
   {
@@ -76,7 +76,7 @@
     "tool_esperada": "consultar_productos",
     "tool_obtenida": "consultar_productos",
     "tipo_obtenido": "consulta_producto",
-    "mensaje_final": "No se encontraron productos registrados con principio activo glifosato para soja en la base de datos de SENASA.\n\nNo encontré productos registrados con esos filtros.",
+    "mensaje_final": "No se encontraron productos registrados con principio activo glifosato para el cultivo de soja.\n\nNo encontré productos registrados con esos filtros.",
     "ruteo_correcto": true
   },
   {
@@ -86,7 +86,7 @@
     "tool_esperada": "validar_producto_registro",
     "tool_obtenida": "validar_producto_registro",
     "tipo_obtenido": "consulta_producto",
-    "mensaje_final": "El producto Abril 50 Curasemilla se encuentra registrado en SENASA para su uso en trigo.\n\n*Abril 50 Curasemilla* · Reg. SENASA 38052 · Banda III · ✅\n\n*Fuentes*\n- SENASA, Reg. 38052 (detalle API)",
+    "mensaje_final": "El producto Abril 50 Curasemilla está registrado y autorizado para su uso en trigo según SENASA.\n\n*Abril 50 Curasemilla* · Reg. SENASA 38052 · Banda III · ✅\n\n*Fuentes*\n- SENASA, Reg. 38052 (detalle AP",
     "ruteo_correcto": true
   },
   {
@@ -96,7 +96,7 @@
     "tool_esperada": "evaluar_viabilidad_legal",
     "tool_obtenida": "evaluar_viabilidad_legal",
     "tipo_obtenido": "dictamen",
-    "mensaje_final": "No se pudo evaluar la viabilidad legal de la receta completa.\n\n*Dictamen* — san-carlos-centro\n*Resultado:* ⚠️ NO_EVALUABLE\n\n*No se pudo verificar*\n- Dosis 170.0 cm3/ha: unidad no reconocida\n\n*Fuentes*",
+    "mensaje_final": "*Dictamen* — san-carlos-centro\n*Resultado:* ✅ APTA\n\n*Fuentes*\n- SENASA, Reg. 41881 (detalle API)\n- ordenanza-914-2018, art. 8 (san-carlos-centro)\n- ordenanza-914-2018, art. 10 (san-carlos-centro)\n- le",
     "ruteo_correcto": true
   },
   {
@@ -105,8 +105,8 @@
     "mensaje": "En Colonia Vecina, ¿cuál es la distancia mínima a una escuela para aplicación terrestre?",
     "tool_esperada": "responder_consulta_normativa",
     "tool_obtenida": "responder_consulta_normativa",
-    "tipo_obtenido": "no_resuelto",
-    "mensaje_final": "No encontré la normativa específica para escuelas en Colonia Vecina con los datos provistos.\n\n⚠️ *No pude completar la consulta*\n*Por qué:* El punto del lote no cae en ningún polígono de localidad car",
+    "tipo_obtenido": "repregunta",
+    "mensaje_final": "No tengo registrada la normativa para Colonia Vecina.\n\nPara continuar necesito 1 dato:\n1. *jurisdiccion_id*: ¿Podrías indicarme otra localidad cercana o el municipio al que pertenece el lote?",
     "ruteo_correcto": true
   },
   {
@@ -116,7 +116,7 @@
     "tool_esperada": "consultar_productos",
     "tool_obtenida": "consultar_productos",
     "tipo_obtenido": "consulta_producto",
-    "mensaje_final": "Encontré los siguientes fungicidas registrados en SENASA para trigo:\n\n*Productos registrados* (20 de 20)\n1. Abril 50 Curasemilla · Reg. SENASA 38052 · Banda III · \n2. Abril 50 Curasemilla · Reg. SENAS",
+    "mensaje_final": "Aquí tenés los fungicidas registrados en SENASA para trigo:\n\n*Productos registrados* (20 de 20)\n1. Abril 50 Curasemilla · Reg. SENASA 38052 · Banda III · \n2. Abril 50 Curasemilla · Reg. SENASA 38052 ·",
     "ruteo_correcto": true
   },
   {
@@ -126,7 +126,7 @@
     "tool_esperada": null,
     "tool_obtenida": null,
     "tipo_obtenido": "repregunta",
-    "mensaje_final": "Para evaluar la viabilidad de la aplicación, necesito algunos datos adicionales.\n\nPara continuar necesito 3 datos:\n1. *cultivo*: ¿Para qué cultivo es la aplicación?\n2. *productos*: ¿Qué productos y a ",
+    "mensaje_final": "Para poder evaluar la viabilidad de la aplicación, me faltan algunos datos.\n\nPara continuar necesito 4 datos:\n1. *cultivo*: ¿Qué cultivo tenés en el lote?\n2. *productos*: ¿Qué productos y dosis vas a ",
     "ruteo_correcto": true
   },
   {
@@ -136,7 +136,7 @@
     "tool_esperada": null,
     "tool_obtenida": null,
     "tipo_obtenido": "repregunta",
-    "mensaje_final": "Para saber si la dosis es correcta, necesito algunos datos adicionales sobre tu aplicación.\n\nPara continuar necesito 3 datos:\n1. *productos*: ¿Qué productos y dosis querés usar?\n2. *cultivo*: ¿Para qu",
+    "mensaje_final": "Para evaluar la dosis, necesito algunos datos adicionales.\n\nPara continuar necesito 2 datos:\n1. *cultivo*: ¿Para qué cultivo es la aplicación?\n2. *producto*: ¿Qué producto y qué dosis querés utilizar?",
     "ruteo_correcto": true
   },
   {
@@ -146,7 +146,7 @@
     "tool_esperada": null,
     "tool_obtenida": null,
     "tipo_obtenido": "repregunta",
-    "mensaje_final": "Para darte el dictamen completo de la receta, necesito algunos datos que aún no tengo.\n\nPara continuar necesito 3 datos:\n1. *productos*: ¿Qué productos y dosis vas a aplicar?\n2. *cultivo*: ¿Para qué c",
+    "mensaje_final": "Para darte el dictamen de tu receta, necesito algunos datos adicionales.\n\nPara continuar necesito 4 datos:\n1. *productos*: ¿Qué productos vas a aplicar y en qué dosis?\n2. *cultivo*: ¿Para qué cultivo ",
     "ruteo_correcto": true
   },
   {
@@ -154,10 +154,10 @@
     "categoria": "repregunta",
     "mensaje": "Voy a aplicar Flyer 10 Ec",
     "tool_esperada": null,
-    "tool_obtenida": null,
+    "tool_obtenida": "validar_producto_registro",
     "tipo_obtenido": "repregunta",
-    "mensaje_final": "Para poder ayudarte con el producto, necesito algunos datos más.\n\nPara continuar necesito 1 dato:\n1. *cultivo*: ¿Para qué cultivo vas a usar Flyer 10 EC?",
-    "ruteo_correcto": true
+    "mensaje_final": "Para validar el producto Flyer 10 EC, necesito conocer el cultivo.\n\nPara continuar necesito 1 dato:\n1. *cultivo*: ¿En qué cultivo vas a aplicar Flyer 10 EC?",
+    "ruteo_correcto": false
   },
   {
     "id": "repregunta_05",
@@ -166,7 +166,7 @@
     "tool_esperada": null,
     "tool_obtenida": "responder_consulta_normativa",
     "tipo_obtenido": "repregunta",
-    "mensaje_final": "Para informarte sobre las distancias permitidas a escuelas, necesito conocer la localidad.\n\nPara continuar necesito 1 dato:\n1. *jurisdiccion_id*: ¿En qué localidad o zona querés realizar la aplicación",
+    "mensaje_final": "Para responderte sobre la distancia a escuelas necesito un dato más.\n\nPara continuar necesito 1 dato:\n1. *jurisdiccion_id*: ¿En qué localidad o municipio querés hacer la aplicación?",
     "ruteo_correcto": false
   },
   {
@@ -176,7 +176,7 @@
     "tool_esperada": null,
     "tool_obtenida": null,
     "tipo_obtenido": "repregunta",
-    "mensaje_final": "Para consultarte la normativa exacta necesito saber la localidad.\n\nPara continuar necesito 1 dato:\n1. *jurisdiccion_id*: ¿Para qué localidad o zona querés consultar la normativa?",
+    "mensaje_final": "Para poder ayudarte con la normativa, necesito que me des más detalles.\n\nPara continuar necesito 1 dato:\n1. *pregunta*: ¿Qué consulta querés hacer sobre la normativa (por ejemplo, distancia a centros ",
     "ruteo_correcto": true
   },
   {
@@ -186,7 +186,7 @@
     "tool_esperada": null,
     "tool_obtenida": null,
     "tipo_obtenido": "fuera_de_dominio",
-    "mensaje_final": "Solo puedo ayudarte con recetas de fitosanitarios: leer y validar recetas, verificar productos registrados en SENASA y responder dudas sobre la normativa de aplicación de las localidades cargadas. ¿Me"
+    "mensaje_final": "Solo puedo ayudarte con recetas de fitosanitarios: leer y validar recetas, verificar productos registrados en SENASA, responder dudas sobre la normativa de aplicación de las localidades cargadas, y re"
   },
   {
     "id": "fuera_de_dominio_02",
@@ -195,7 +195,7 @@
     "tool_esperada": null,
     "tool_obtenida": null,
     "tipo_obtenido": "fuera_de_dominio",
-    "mensaje_final": "Solo puedo ayudarte con recetas de fitosanitarios: leer y validar recetas, verificar productos registrados en SENASA y responder dudas sobre la normativa de aplicación de las localidades cargadas. ¿Me"
+    "mensaje_final": "Solo puedo ayudarte con recetas de fitosanitarios: leer y validar recetas, verificar productos registrados en SENASA, responder dudas sobre la normativa de aplicación de las localidades cargadas, y re"
   },
   {
     "id": "fuera_de_dominio_03",
@@ -204,7 +204,7 @@
     "tool_esperada": null,
     "tool_obtenida": null,
     "tipo_obtenido": "fuera_de_dominio",
-    "mensaje_final": "Solo puedo ayudarte con recetas de fitosanitarios: leer y validar recetas, verificar productos registrados en SENASA y responder dudas sobre la normativa de aplicación de las localidades cargadas. ¿Me"
+    "mensaje_final": "Solo puedo ayudarte con recetas de fitosanitarios: leer y validar recetas, verificar productos registrados en SENASA, responder dudas sobre la normativa de aplicación de las localidades cargadas, y re"
   },
   {
     "id": "fuera_de_dominio_04",
@@ -213,7 +213,7 @@
     "tool_esperada": null,
     "tool_obtenida": null,
     "tipo_obtenido": "fuera_de_dominio",
-    "mensaje_final": "Solo puedo ayudarte con recetas de fitosanitarios: leer y validar recetas, verificar productos registrados en SENASA y responder dudas sobre la normativa de aplicación de las localidades cargadas. ¿Me"
+    "mensaje_final": "Solo puedo ayudarte con recetas de fitosanitarios: leer y validar recetas, verificar productos registrados en SENASA, responder dudas sobre la normativa de aplicación de las localidades cargadas, y re"
   },
   {
     "id": "fuera_de_dominio_05",
@@ -222,7 +222,7 @@
     "tool_esperada": null,
     "tool_obtenida": null,
     "tipo_obtenido": "fuera_de_dominio",
-    "mensaje_final": "Solo puedo ayudarte con recetas de fitosanitarios: leer y validar recetas, verificar productos registrados en SENASA y responder dudas sobre la normativa de aplicación de las localidades cargadas. ¿Me"
+    "mensaje_final": "Solo puedo ayudarte con recetas de fitosanitarios: leer y validar recetas, verificar productos registrados en SENASA, responder dudas sobre la normativa de aplicación de las localidades cargadas, y re"
   },
   {
     "id": "fuera_de_dominio_06",
@@ -231,7 +231,7 @@
     "tool_esperada": null,
     "tool_obtenida": null,
     "tipo_obtenido": "fuera_de_dominio",
-    "mensaje_final": "Solo puedo ayudarte con recetas de fitosanitarios: leer y validar recetas, verificar productos registrados en SENASA y responder dudas sobre la normativa de aplicación de las localidades cargadas. ¿Me"
+    "mensaje_final": "Solo puedo ayudarte con recetas de fitosanitarios: leer y validar recetas, verificar productos registrados en SENASA, responder dudas sobre la normativa de aplicación de las localidades cargadas, y re"
   },
   {
     "id": "ambiguedad_01",
@@ -241,7 +241,7 @@
     "notas": "nombre generico, no una marca puntual: puede repreguntar o buscar igual",
     "tool_obtenida": "consultar_productos",
     "tipo_obtenido": "consulta_producto",
-    "mensaje_final": "No encontré registros exactos para glifosato en soja con esos parámetros, por favor especificá el nombre comercial del producto.\n\nNo encontré productos registrados con esos filtros.",
+    "mensaje_final": "No encontré productos con el principio activo 'glifosato' registrados específicamente para el cultivo de soja en la base de datos de SENASA.\n\nNo encontré productos registrados con esos filtros.",
     "ruteo_correcto": false
   },
   {
@@ -252,7 +252,7 @@
     "notas": "no identifica el producto, debería repreguntar",
     "tool_obtenida": null,
     "tipo_obtenido": "repregunta",
-    "mensaje_final": "Para evaluar la aplicación en el lote 4, necesito algunos datos adicionales que no tengo registrados.\n\nPara continuar necesito 3 datos:\n1. *productos*: ¿Qué producto específico querés aplicar?\n2. *cul",
+    "mensaje_final": "Para el lote 4, necesito que me indiques qué productos y dosis vas a aplicar.\n\nPara continuar necesito 1 dato:\n1. *productos*: ¿Qué productos querés aplicar y en qué dosis?",
     "ruteo_correcto": true
   },
   {
@@ -263,7 +263,7 @@
     "notas": "producto inexistente -> PRODUCTO_NO_ENCONTRADO",
     "tool_obtenida": "validar_producto_registro",
     "tipo_obtenido": "consulta_producto",
-    "mensaje_final": "No se encontró ningún registro para 'Xyzzynoexisteregistro123' en soja en la base de datos de SENASA.\n\n*(sin nombre)* · Reg. SENASA - · Banda S/D · ⚠️ no autorizado para ese cultivo",
+    "mensaje_final": "El producto Xyzzynoexisteregistro123 no figura registrado en SENASA para soja.\n\n*(sin nombre)* · Reg. SENASA - · Banda S/D · ⚠️ no autorizado para ese cultivo",
     "ruteo_correcto": true
   },
   {
@@ -273,8 +273,8 @@
     "tool_esperada": "responder_consulta_normativa",
     "notas": "jurisdiccion no cargada",
     "tool_obtenida": "responder_consulta_normativa",
-    "tipo_obtenido": "no_resuelto",
-    "mensaje_final": "No tengo una normativa específica cargada para esa localidad.\n\n⚠️ *No pude completar la consulta*\n*Por qué:* El punto del lote no cae en ningún polígono de localidad cargado.\n*Qué podés hacer:* revisá",
+    "tipo_obtenido": "consulta_normativa",
+    "mensaje_final": "No tengo registrada esa localidad en el sistema para consultar la normativa de distancia a escuelas.\n\n*Depende.* ",
     "ruteo_correcto": true
   },
   {
@@ -284,8 +284,8 @@
     "tool_esperada": "evaluar_riesgo",
     "notas": "fuera de las localidades cargadas -> JURISDICCION_NO_CUBIERTA",
     "tool_obtenida": "evaluar_riesgo",
-    "tipo_obtenido": "no_resuelto",
-    "mensaje_final": "No se pudo determinar el riesgo geográfico para la ubicación y los parámetros indicados.\n\n⚠️ *No pude completar la consulta*\n*Por qué:* El punto del lote no cae en ningún polígono de localidad cargado",
+    "tipo_obtenido": "repregunta",
+    "mensaje_final": "Para evaluar el riesgo, necesito saber qué adversidad vas a tratar.\n\nPara continuar necesito 1 dato:\n1. *adversidad*: ¿Qué adversidad (plaga, maleza o enfermedad) vas a tratar con Flyer 10 Ec?",
     "ruteo_correcto": true
   },
   {
@@ -294,8 +294,8 @@
     "mensaje": "nueva receta",
     "tool_esperada": null,
     "tool_obtenida": null,
-    "tipo_obtenido": "repregunta",
-    "mensaje_final": "Entendido, reiniciamos la receta. ¿Qué deseas hacer ahora?\n\nNecesito un dato más para continuar, pero no pude identificar cuál. ¿Podés repetir el mensaje?"
+    "tipo_obtenido": "confirmacion_receta",
+    "mensaje_final": "Comenzamos una nueva receta. Por favor, enviame la foto o los datos de la receta fitosanitaria.\n\n*Leí la receta*. Confirmá los datos:\n- *Cultivo:* no figura ⚠️\n- *Lote:* no figura ⚠️\n- *Producto:* no "
   },
   {
     "id": "comando_02",
@@ -304,7 +304,7 @@
     "tool_esperada": null,
     "tool_obtenida": null,
     "tipo_obtenido": "repregunta",
-    "mensaje_final": "Receta cancelada. ¿En qué te puedo ayudar?\n\nNecesito un dato más para continuar, pero no pude identificar cuál. ¿Podés repetir el mensaje?"
+    "mensaje_final": "Receta anterior cancelada. ¿En qué te puedo ayudar?\n\nNecesito un dato más para continuar, pero no pude identificar cuál. ¿Podés repetir el mensaje?"
   },
   {
     "id": "comando_03",
@@ -313,7 +313,7 @@
     "tool_esperada": null,
     "tool_obtenida": null,
     "tipo_obtenido": "repregunta",
-    "mensaje_final": "Entendido, cancelamos la receta anterior. ¿En qué te puedo ayudar?\n\nNecesito un dato más para continuar, pero no pude identificar cuál. ¿Podés repetir el mensaje?"
+    "mensaje_final": "Receta cancelada. ¿En qué te puedo ayudar?\n\nNecesito un dato más para continuar, pero no pude identificar cuál. ¿Podés repetir el mensaje?"
   },
   {
     "id": "ayuda_01",
@@ -347,7 +347,10 @@
     "categoria": "ruteo",
     "mensaje": "¿El producto Bac Hm 36 está autorizado para algún cultivo en particular?",
     "tool_esperada": "validar_producto_registro",
-    "error": "ValueError: listar_productos_por_filtro requiere al menos un filtro"
+    "tool_obtenida": "consultar_productos",
+    "tipo_obtenido": "error",
+    "mensaje_final": "⚠️ Tuve un problema técnico y no pude procesar tu mensaje. Probá de nuevo en unos minutos; si sigue fallando, contactá a soporte.",
+    "ruteo_correcto": false
   },
   {
     "id": "ruteo_14",
@@ -356,7 +359,7 @@
     "tool_esperada": "consultar_productos",
     "tool_obtenida": "consultar_productos",
     "tipo_obtenido": "consulta_producto",
-    "mensaje_final": "Encontré los siguientes productos registrados para soja con banda toxicológica hasta III.\n\n*Productos registrados* (20 de 20)\n1. Alfamax · Reg. SENASA 32845 · Banda II · 100- 120\n2. Alfamax · Reg. SEN",
+    "mensaje_final": "Aquí tenés los productos registrados para soja con banda toxicológica hasta III.\n\n*Productos registrados* (20 de 20)\n1. Alfamax · Reg. SENASA 32845 · Banda II · 100- 120\n2. Alfamax · Reg. SENASA 32845",
     "ruteo_correcto": true
   },
   {
@@ -365,8 +368,8 @@
     "mensaje": "En San Carlos Centro, ¿puedo aplicar por avión cerca de una escuela?",
     "tool_esperada": "responder_consulta_normativa",
     "tool_obtenida": "responder_consulta_normativa",
-    "tipo_obtenido": "repregunta",
-    "mensaje_final": "Para consultar la normativa aplicable, necesito confirmar la localidad exacta.\n\nPara continuar necesito 1 dato:\n1. *jurisdiccion_id*: ¿Podrías indicarme la localidad o municipio exacto del lote?",
+    "tipo_obtenido": "consulta_normativa",
+    "mensaje_final": "No encontré normativa específica para aplicaciones aéreas cerca de escuelas en San Carlos Centro.\n\n*Depende.* ",
     "ruteo_correcto": true
   },
   {
@@ -374,7 +377,10 @@
     "categoria": "ruteo",
     "mensaje": "Che, ¿me confirmás si el Check Mate Ofm-f sirve para algo en particular?",
     "tool_esperada": "validar_producto_registro",
-    "error": "ValueError: listar_productos_por_filtro requiere al menos un filtro"
+    "tool_obtenida": "consultar_productos",
+    "tipo_obtenido": "error",
+    "mensaje_final": "⚠️ Tuve un problema técnico y no pude procesar tu mensaje. Probá de nuevo en unos minutos; si sigue fallando, contactá a soporte.",
+    "ruteo_correcto": false
   },
   {
     "id": "repregunta_07",
@@ -383,7 +389,7 @@
     "tool_esperada": null,
     "tool_obtenida": null,
     "tipo_obtenido": "repregunta",
-    "mensaje_final": "Para evaluar si una aplicación está bien, necesito conocer los detalles de la receta o que me envíes la foto.\n\nPara continuar necesito 1 dato:\n1. *receta*: ¿Podés enviarme la foto de la receta o detal",
+    "mensaje_final": "Para evaluar la viabilidad de la aplicación, necesito algunos datos adicionales.\n\nPara continuar necesito 3 datos:\n1. *lote*: ¿A qué lote te referís? Indicame el nombre o ubicación del lote.\n2. *produ",
     "ruteo_correcto": true
   },
   {
@@ -393,7 +399,7 @@
     "tool_esperada": null,
     "tool_obtenida": "responder_consulta_normativa",
     "tipo_obtenido": "repregunta",
-    "mensaje_final": "Para informarte la distancia de exclusión exacta, necesito saber la localidad o zona del lote.\n\nPara continuar necesito 1 dato:\n1. *jurisdiccion_id*: ¿Para qué localidad o zona necesitás consultar la ",
+    "mensaje_final": "Para decirte la distancia, necesito saber la localidad.\n\nPara continuar necesito 1 dato:\n1. *jurisdiccion_id*: ¿En qué localidad o zona es la aplicación?",
     "ruteo_correcto": false
   }
 ]

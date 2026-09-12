@@ -59,6 +59,16 @@ def test_conversion_cm3_a_litro_es_comparable():
     assert resultado.cumple is True
 
 
+def test_conversion_cm3_sin_superindice_unicode_es_comparable():
+    # Hallazgo real (Fase 10): el operario escribe "cm3/ha" (ASCII, sin el
+    # "³") desde el teclado del celular, y el LLM lo pasa tal cual como
+    # argumento de tool -- antes de este alias daba "unidad no reconocida"
+    # (reproducido en evals/ y en la demo). Ver DECISIONES.md.
+    resultado = comparar_dosis(170, "cm3/ha", 160.0, 180.0, "cm³/ha", tolerancia_pct=10.0)
+    assert resultado.comparable is True
+    assert resultado.cumple is True
+
+
 def test_conversion_gramos_a_kg_es_comparable():
     resultado = comparar_dosis(2500, "g/ha", 2.0, 3.0, "kg/ha", tolerancia_pct=10.0)
     assert resultado.comparable is True
