@@ -26,7 +26,7 @@ from fitosanitarios.orquestador.prompt_sistema import PROMPT_SISTEMA
 from fitosanitarios.tools.consultar_productos import consultar_productos
 from fitosanitarios.tools.evaluar_riesgo import evaluar_riesgo
 from fitosanitarios.tools.evaluar_viabilidad_legal import evaluar_viabilidad_legal
-from fitosanitarios.tools.leer_receta import leer_receta
+from fitosanitarios.tools.leer_receta import crear_tool_leer_receta_ligada, leer_receta
 from fitosanitarios.tools.responder_consulta_normativa import responder_consulta_normativa
 from fitosanitarios.tools.validar_producto_registro import validar_producto_registro
 
@@ -58,13 +58,28 @@ def crear_modelo_chat_gemini(settings: Settings) -> BaseChatModel:
     )
 
 
-def crear_agente(model: BaseChatModel, checkpointer=None):
+def construir_tools(imagen_base64: str | None = None) -> list:
+    """`TOOLS` con `leer_receta` reemplazada por la variante ligada a la
+    imagen del turno cuando el canal (WhatsApp, Fase 8) ya la descargó -- ver
+    `tools/leer_receta.py::crear_tool_leer_receta_ligada`. Sin imagen (turnos
+    de solo texto, y todos los tests existentes) se usa la `leer_receta`
+    original."""
+    if imagen_base64 is None:
+        return TOOLS
+    return [
+        crear_tool_leer_receta_ligada(imagen_base64) if t is leer_receta else t for t in TOOLS
+    ]
+
+
+def crear_agente(model: BaseChatModel, checkpointer=None, imagen_base64: str | None = None):
     """`checkpointer=None` es válido (sin memoria entre invocaciones, útil
     para tests); en producción pasar un `PostgresSaver` (ver
-    `checkpointer_postgres` acá abajo)."""
+    `checkpointer_postgres` acá abajo). `imagen_base64`: ver `construir_tools`
+    -- arma un agente nuevo (barato, no reabre el checkpointer) con la tool
+    de lectura de receta ligada a esta imagen puntual."""
     return create_agent(
         model=model,
-        tools=TOOLS,
+        tools=construir_tools(imagen_base64),
         system_prompt=PROMPT_SISTEMA,
         response_format=ToolStrategy(RespuestaAgente),
         checkpointer=checkpointer,

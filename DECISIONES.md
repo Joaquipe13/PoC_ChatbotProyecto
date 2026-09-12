@@ -1,5 +1,29 @@
 # Decisiones
 
+## Fase 8 — Canal WhatsApp
+
+### `leer_receta` no puede recibir una foto real como argumento de tool (límite de tokens de salida)
+
+El contrato de `leer_receta` desde la Fase 4 (`imagen_base64: str` como argumento de la tool, ver `tools/leer_receta.py`) asume que el LLM orquestador recibe la imagen y la "pasa" como argumento del tool call. Funciona en los tests de la Fase 7 porque usan imágenes sintéticas de pocos bytes (`b"fake"`), pero al diseñar el canal real se encontró que es inviable para una foto real: una imagen JPEG de WhatsApp de, por ejemplo, 300 KB pesa ~400 KB en base64 (~100 000 tokens en texto), muy por encima del límite de tokens de salida de un tool call de un LLM (unos pocos miles en la mayoría de los modelos); y aunque el límite alcanzara, un LLM no reproduce un string tan largo carácter a carácter de forma confiable -- un solo carácter alterado invalida el base64.
+
+Se resolvió sin tocar el contrato de `leer_receta` (que sigue tal cual para los tests existentes) agregando `tools/leer_receta.py::crear_tool_leer_receta_ligada(imagen_base64)`: una variante de la misma tool, sin parámetros, con la imagen ya "ligada" por clausura de Python. `orquestador/agente.py::construir_tools(imagen_base64=None)` arma la lista de tools reemplazando `leer_receta` por esta variante solo cuando el canal (el webhook) ya descargó una imagen para ese turno puntual; `crear_agente(..., imagen_base64=...)` arma un agente nuevo con esa lista para ese turno. El LLM solo tiene que *decidir* llamar a `leer_receta` (sin argumentos que inventar), nunca transportar los bytes de la imagen. Reconstruir el agente por turno es barato (no reabre el checkpointer de Postgres, que se sigue pasando por referencia) y no afecta el historial de conversación del `thread_id`, que vive en el checkpointer, no en el objeto `agente` en sí.
+
+### Deduplicación de mensajes en Postgres, no en memoria como el contador de repreguntas
+
+A diferencia de `ContadorRepreguntas` (Fase 7, en memoria de proceso, aceptado como simplificación porque solo afecta al flujo de una conversación en curso), la deduplicación de `message.id` de WhatsApp (`canales/whatsapp/dedup.py`) se persiste en una tabla nueva (`operacion.mensaje_whatsapp`, migración 003). Motivo: Meta puede reintentar la entrega de un mensaje después de que el proceso del webhook se haya reiniciado (deploy, crash, restart manual); si la deduplicación fuera solo en memoria, un reinicio en el momento exacto de un reintento causaría un doble procesamiento (dos dictámenes, dos mensajes de WhatsApp duplicados al operario) -- un efecto visible y molesto para el usuario, a diferencia de perder el contador de repreguntas (que como mucho hace repreguntar una vez de más). El `INSERT ... ON CONFLICT DO NOTHING` es atómico, evita necesitar un `SELECT` previo que dejaría una ventana de carrera entre dos entregas casi simultáneas.
+
+### `procesar_mensaje` inyectado en `crear_app`, no construido adentro del módulo del webhook
+
+`canales/whatsapp/webhook.py::crear_app(settings, procesar_mensaje)` recibe la función de procesamiento real como parámetro en vez de construirla ella misma (agente + Gemini + checkpointer de Postgres). Así los tests de protocolo del webhook (`tests/canales/test_webhook.py`: handshake, firma, dedup, `statuses` ignorados) no necesitan credenciales de Gemini ni levantar un checkpointer real -- inyectan un `procesar_mensaje` de prueba que solo registra las llamadas. `canales/whatsapp/app_produccion.py` es el único módulo que arma la versión real (`crear_app_produccion`) y es el entrypoint de `uvicorn`; no lo importa ningún test.
+
+### `WHATSAPP_GRAPH_VERSION` corregido a `v26.0`
+
+El default en `config.py` había quedado en `v23.0` desde una fase anterior mientras `.env.example` ya documentaba `v26.0` como la versión verificada en vivo contra el número de prueba (12/09/2026). Se corrigió el default de `config.py` para que coincida (tarea 11 del plan: "verificar versión vigente y dejarla configurable" -- configurable ya lo era, pero el default estaba desactualizado).
+
+### Notebook de demo: dos observaciones reales del recorrido de punta a punta (no son bugs de esta fase)
+
+Al ejecutar `notebooks/demo_sin_whatsapp.ipynb` con kernel limpio contra Gemini real y Postgres real (criterio de aceptación de esta fase), aparecieron dos comportamientos que ya eran limitaciones conocidas de fases anteriores, no regresiones de la Fase 8: (1) la dosis "170 cm3/ha" del caso de ejemplo del plan sigue dando "unidad no reconocida" en `evaluar_viabilidad_legal" (mismo hallazgo que en los evals de la Fase 7, `ruteo_10`); (2) una pregunta de normativa sobre distancia a escuela en San Carlos Centro, con una redacción distinta a la usada al calibrar `RAG_UMBRAL_SIMILITUD` en la Fase 6, no superó el umbral y devolvió `no_resuelto` en vez de citar el artículo 8 (que sí es el relevante). Ambas quedan documentadas para una futura fase de ajuste fino del núcleo experto (parser de dosis y/o umbral RAG dependiente de la redacción), fuera del alcance de "conectar el canal" de esta fase.
+
 ## Fase 7 — Orquestador
 
 ### `response_format` necesita `ToolStrategy(RespuestaAgente)` explícito, no la clase pydantic pelada

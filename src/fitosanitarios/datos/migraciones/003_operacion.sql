@@ -63,3 +63,12 @@ CREATE TABLE IF NOT EXISTS operacion.turno (
     creado_en TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS ix_turno_thread ON operacion.turno (thread_id);
+
+-- Deduplicación de mensajes de WhatsApp por message.id (Fase 8: Meta
+-- reintenta entregas). Persistida en Postgres (no en memoria de proceso)
+-- porque un reintento puede llegar después de un reinicio del proceso del
+-- webhook; ver DECISIONES.md.
+CREATE TABLE IF NOT EXISTS operacion.mensaje_whatsapp (
+    message_id TEXT PRIMARY KEY,
+    procesado_en TIMESTAMPTZ NOT NULL DEFAULT now()
+);

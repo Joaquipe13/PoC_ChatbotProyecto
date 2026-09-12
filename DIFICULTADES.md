@@ -2,6 +2,20 @@
 
 Registro de qué falló y cómo se resolvió. Una entrada por dificultad relevante, en orden cronológico (más reciente arriba).
 
+## Fase 8 — Canal WhatsApp
+
+### Tests de dedup con `message_id` fijo: pasaban solos, fallaban en la segunda corrida de la suite completa
+
+`tests/canales/test_dedup.py` y dos tests de `tests/canales/test_webhook.py` usaban strings fijos (`"wamid.test-dedup-nuevo-001"`, etc.) como `message_id`. Corridos solos (`pytest tests/canales -q`) pasaban los 31; corridos como parte de la suite completa (`pytest -q`, dos veces seguidas para verificar cero regresiones) fallaron 4: `operacion.mensaje_whatsapp` es una tabla real sin rollback entre tests (a propósito, ver DECISIONES.md: la deduplicación tiene que sobrevivir un reinicio del proceso), así que la fila que insertó la primera corrida seguía ahí en la segunda, y `ya_procesado` devolvía `True` para un mensaje que el test esperaba que fuera nuevo. Se corrigió generando un `message_id` único por invocación (`uuid.uuid4()`) en los tres tests afectados -- los que fallan por firma inválida antes de llegar al chequeo de dedup no necesitaron el cambio, nunca insertan una fila. Mismo tipo de hallazgo que las Fases 6/7 (un efecto persistente de un test contra la base compartida de desarrollo), esta vez detectado corriendo la suite completa dos veces en la misma sesión en vez de examinar datos ya cargados.
+
+### Mismo patrón de drift de migraciones que en la Fase 7: la tabla de dedup nueva no existía en la base real
+
+Al agregar `operacion.mensaje_whatsapp` a `003_operacion.sql` para la deduplicación de mensajes, hubo que aplicar el `CREATE TABLE IF NOT EXISTS` a mano contra la base de Docker en desarrollo (`docker compose exec db psql ...`) antes de poder correr `tests/canales/test_dedup.py` -- editar el archivo de migración no alcanza, igual que se documentó en la Fase 7 con la columna `adversidad` de `operacion.receta`. Sigue pendiente como deuda técnica una herramienta de migraciones real (Alembic u otra) que aplique diffs de esquema automáticamente.
+
+### `config.py` tenía `WHATSAPP_GRAPH_VERSION` desactualizado respecto de `.env.example`
+
+`.env.example` ya documentaba `v26.0` como la versión de Graph API verificada en vivo, pero el default en `config.py` seguía en `v23.0` (quedó así desde que se agregaron las variables de WhatsApp, antes de esa verificación). Se detectó al revisar la configuración completa del canal para esta fase, no por un test que fallara -- ningún test cubre que el default de `config.py` coincida con lo documentado en `.env.example`. Se corrigió el default; queda como recordatorio de revisar ambos archivos juntos cuando se actualice una versión de API externa.
+
 ## Fase 7 — Orquestador
 
 ### `operacion.receta` en la base real no tenía la columna `adversidad`

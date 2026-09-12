@@ -71,3 +71,42 @@ def leer_receta(imagen_base64: str) -> tuple[str, ResultadoTool]:
     cliente_llm = crear_cliente_llm(get_settings())
     resultado = leer_receta_logica(imagen, cliente_llm)
     return _resumen_para_llm(resultado), resultado
+
+
+def crear_tool_leer_receta_ligada(imagen_base64: str):
+    """Variante de `leer_receta` sin argumentos, con la imagen del turno ya
+    "ligada" por clausura (usada por el canal de WhatsApp real, Fase 8; ver
+    DECISIONES.md).
+
+    `leer_receta` (arriba) le pide al LLM que reciba la imagen como argumento
+    de la tool -- funciona en los tests (Fase 4/7) porque usan imágenes
+    sintéticas de pocos bytes, pero es inviable para una foto real: una
+    imagen JPEG de WhatsApp de, por ejemplo, 300 KB pesa ~400 KB en base64
+    (~100 000 tokens), muy por encima del límite de tokens de salida de un
+    tool call de un LLM (unos pocos miles); y aunque entrara, un LLM no
+    reproduce un string tan largo carácter a carácter de forma confiable. La
+    imagen ya la tiene el webhook (la descargó de la Graph API) antes de
+    invocar al agente, así que no hace falta que el LLM la transporte: se
+    construye una tool sin parámetros que usa la imagen del cierre (clausura)
+    de esta función, y el agente solo tiene que decidir *si* llamarla."""
+
+    @tool("leer_receta", response_format="content_and_artifact")
+    def leer_receta_ligada() -> tuple[str, ResultadoTool]:
+        """Lee la foto de la receta agronómica que el operario acaba de
+        enviar y extrae sus datos estructurados.
+
+        Usar cuando el operario mandó una foto de una receta fitosanitaria
+        nueva en este mensaje. No usar para preguntas de texto sobre
+        productos o normativa, ni para confirmar/corregir una receta ya
+        leída (eso lo maneja el orquestador sobre el estado, no esta tool
+        de nuevo).
+        """
+        from fitosanitarios.config import get_settings
+        from fitosanitarios.llm.client import crear_cliente_llm
+
+        imagen = base64.b64decode(imagen_base64)
+        cliente_llm = crear_cliente_llm(get_settings())
+        resultado = leer_receta_logica(imagen, cliente_llm)
+        return _resumen_para_llm(resultado), resultado
+
+    return leer_receta_ligada

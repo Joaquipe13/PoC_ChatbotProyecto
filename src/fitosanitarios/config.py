@@ -34,7 +34,8 @@ class Settings(BaseSettings):
     whatsapp_phone_number_id: str | None = None
     whatsapp_app_secret: str | None = None
     whatsapp_verify_token: str | None = None
-    whatsapp_graph_version: str = "v23.0"
+    # v26.0 verificada en vivo el 12/09/2026 contra el número de prueba (ver DECISIONES.md).
+    whatsapp_graph_version: str = "v26.0"
     whatsapp_ar_quitar_9: bool = True
 
     # SENASA (Fase 2)
