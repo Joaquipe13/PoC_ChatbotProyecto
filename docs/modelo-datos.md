@@ -29,6 +29,9 @@ erDiagram
     RECETA ||--o{ DICTAMEN : produce
     PRODUCTO ||--o{ RECETA_ITEM : resuelve
 
+    RECETA ||--o{ EVENTO_APLICACION : ejecuta
+    VEHICULO ||--o{ EVENTO_APLICACION : usa
+
     FIRMA {
         bigint id PK
         text nombre
@@ -137,6 +140,23 @@ erDiagram
         text resultado
         jsonb chequeos
         jsonb citas
+    }
+
+    VEHICULO {
+        bigint id PK
+        text nombre UK
+        text tipo_aplicacion
+        jsonb sinonimos
+    }
+    EVENTO_APLICACION {
+        bigint id PK
+        text thread_id
+        bigint receta_id FK
+        bigint vehiculo_id FK
+        text lote
+        timestamptz fecha_inicio
+        timestamptz fecha_fin
+        text estado
     }
 ```
 

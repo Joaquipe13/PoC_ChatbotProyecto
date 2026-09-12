@@ -72,3 +72,22 @@ CREATE TABLE IF NOT EXISTS operacion.mensaje_whatsapp (
     message_id TEXT PRIMARY KEY,
     procesado_en TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Eventos de aplicación real (Fase 9, RF7 registrar_evento): inicio y fin
+-- de una aplicación en el campo, asociada a receta, vehículo y lote.
+-- Distinto del dictamen (que evalúa si es viable ANTES de aplicar): esto
+-- registra que efectivamente se aplicó.
+CREATE TABLE IF NOT EXISTS operacion.evento_aplicacion (
+    id BIGSERIAL PRIMARY KEY,
+    thread_id TEXT NOT NULL, -- número de WhatsApp normalizado, dueño del evento
+    receta_id BIGINT REFERENCES operacion.receta (id),
+    vehiculo_id BIGINT REFERENCES catalogo.vehiculo (id),
+    lote TEXT,
+    fecha_inicio TIMESTAMPTZ NOT NULL DEFAULT now(),
+    fecha_fin TIMESTAMPTZ,
+    estado TEXT NOT NULL DEFAULT 'en_curso'
+        CHECK (estado IN ('en_curso', 'finalizado', 'cancelado')),
+    creado_en TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS ix_evento_aplicacion_thread ON operacion.evento_aplicacion (thread_id);
+CREATE INDEX IF NOT EXISTS ix_evento_aplicacion_receta ON operacion.evento_aplicacion (receta_id);

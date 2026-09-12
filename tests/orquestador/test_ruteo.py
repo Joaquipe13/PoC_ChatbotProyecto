@@ -6,6 +6,8 @@ llaman servicios y devuelven ResultadoTool", eso es justo lo que se está
 probando acá, no solo que el LLM "decida" llamar una.
 """
 
+import uuid
+
 from fitosanitarios.orquestador.agente import crear_agente
 from fitosanitarios.orquestador.estado import ContadorRepreguntas
 from fitosanitarios.orquestador.turno import ejecutar_turno
@@ -99,6 +101,58 @@ def test_ruteo_leer_receta(conexion):
     # devolvió texto formateado según el tipo que declaró el agente.
     assert respuesta.tipo == "confirmacion_receta"
     assert mensajes
+
+
+def test_ruteo_registrar_evento_usa_el_thread_id_del_turno(conexion):
+    # Verificación empírica de la decisión de diseño de la Fase 9: la tool
+    # lee el thread_id de un `config: RunnableConfig` inyectado por
+    # LangGraph, no de un argumento que arme el LLM. Si esto no propagara
+    # como se espera, el evento quedaría con un thread_id vacío/erróneo o
+    # la tool ni se ejecutaría.
+    thread_id = f"t-evento-{uuid.uuid4()}"
+    respuesta, mensajes, _ = _turno_con_respuestas(
+        [
+            mensaje_llama_tool(
+                "registrar_evento",
+                {"accion": "iniciar", "vehiculo": "la mosquito", "lote": "4"},
+            ),
+            mensaje_respuesta_estructurada({"tipo": "evento_registrado"}),
+        ],
+        thread_id=thread_id,
+    )
+    assert respuesta.tipo == "evento_registrado"
+    with conexion.cursor() as cur:
+        cur.execute(
+            "SELECT thread_id, lote FROM operacion.evento_aplicacion WHERE thread_id = %s",
+            (thread_id,),
+        )
+        fila = cur.fetchone()
+    assert fila is not None
+    assert fila == (thread_id, "4")
+
+
+def test_ruteo_resolver_vehiculo(conexion):
+    respuesta, mensajes, _ = _turno_con_respuestas(
+        [
+            mensaje_llama_tool("resolver_vehiculo", {"descripcion": "el avión"}),
+            mensaje_respuesta_estructurada({"tipo": "consulta_vehiculo"}),
+        ]
+    )
+    assert respuesta.tipo == "consulta_vehiculo"
+    assert "avión fumigador" in mensajes[0]
+
+
+def test_ruteo_consultar_agenda_usa_el_thread_id_del_turno(conexion):
+    thread_id = f"t-agenda-{uuid.uuid4()}"
+    respuesta, mensajes, _ = _turno_con_respuestas(
+        [
+            mensaje_llama_tool("consultar_agenda", {}),
+            mensaje_respuesta_estructurada({"tipo": "agenda"}),
+        ],
+        thread_id=thread_id,
+    )
+    assert respuesta.tipo == "agenda"
+    assert "No tenés tareas agendadas" in mensajes[0]
 
 
 def test_excepcion_al_ejecutar_una_tool_no_rompe_el_turno():

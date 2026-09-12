@@ -1,0 +1,59 @@
+"""Tool `resolver_vehiculo` (Fase 9, RF6): interpreta en lenguaje natural
+qué vehículo/equipo de aplicación menciona el operario, contra
+`catalogo.vehiculo` (ver skill, "Arquitectura": la tool valida entrada,
+llama al servicio y devuelve `ResultadoTool`)."""
+
+from langchain_core.tools import tool
+from pydantic import BaseModel
+
+from fitosanitarios.dominio.modelos import CampoFaltante, ResultadoTool
+from fitosanitarios.servicios.resolucion_vehiculo import resolver_vehiculo as resolver_vehiculo_srv
+
+
+class ResolverVehiculoArgs(BaseModel):
+    descripcion: str
+
+
+def resolver_vehiculo_logica(args: ResolverVehiculoArgs, conn) -> ResultadoTool:
+    resolucion = resolver_vehiculo_srv(conn, args.descripcion)
+
+    if resolucion.motivo_no_resuelto is not None:
+        return ResultadoTool(estado="no_resuelto", motivo=resolucion.motivo_no_resuelto)
+
+    if resolucion.opciones_ambiguas is not None:
+        return ResultadoTool(
+            estado="faltan_datos",
+            faltantes=[
+                CampoFaltante(
+                    campo="vehiculo",
+                    motivo="la descripción no coincide con ningún vehículo del catálogo",
+                    pregunta_sugerida="¿Cuál de estos vehículos es?",
+                    tipo_entrada="lista",
+                    opciones=resolucion.opciones_ambiguas,
+                )
+            ],
+        )
+
+    v = resolucion.vehiculo
+    return ResultadoTool(
+        estado="ok", datos={"vehiculo": v.nombre, "tipo_aplicacion": v.tipo_aplicacion}
+    )
+
+
+@tool("resolver_vehiculo", args_schema=ResolverVehiculoArgs, response_format="content_and_artifact")
+def resolver_vehiculo(descripcion: str) -> tuple[str, ResultadoTool]:
+    """Identifica qué vehículo/equipo de aplicación menciona el operario a
+    partir de una descripción informal ("la mosquito", "el dron", "la de
+    arrastre"). Usar cuando el operario nombra el equipo y hace falta saber
+    cuál es exactamente, por ejemplo antes de `registrar_evento`. No hace
+    falta llamarla por separado si el operario ya da un nombre exacto del
+    catálogo: `registrar_evento` la resuelve internamente.
+
+    Args:
+        descripcion: cómo nombró el operario el vehículo, tal cual lo escribió.
+    """
+    from fitosanitarios.tools._recursos import con_conexion
+
+    args = ResolverVehiculoArgs(descripcion=descripcion)
+    resultado = con_conexion(lambda conn: resolver_vehiculo_logica(args, conn))
+    return f"resolver_vehiculo: estado={resultado.estado}", resultado

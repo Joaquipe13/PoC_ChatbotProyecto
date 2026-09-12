@@ -21,3 +21,16 @@ def con_conexion_y_modelo[T](funcion: Callable[..., T]) -> T:
     modelo = SentenceTransformer(settings.embeddings_model)
     with psycopg.connect(settings.database_url) as conn:
         return funcion(conn, modelo)
+
+
+def con_conexion[T](funcion: Callable[..., T]) -> T:
+    """Como `con_conexion_y_modelo`, sin cargar el modelo de embeddings --
+    para tools que no hacen matching semántico (Fase 9: `resolver_vehiculo`,
+    `registrar_evento`, `consultar_agenda` resuelven contra un catálogo
+    chico con trigram, ver DECISIONES.md)."""
+    import psycopg
+
+    from fitosanitarios.config import get_settings
+
+    with psycopg.connect(get_settings().database_url) as conn:
+        return funcion(conn)

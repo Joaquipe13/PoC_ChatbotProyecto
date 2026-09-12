@@ -1,5 +1,31 @@
 # Decisiones
 
+## Fase 9 — Extensiones (resolver_vehiculo, registrar_evento, consultar_agenda)
+
+### Alcance definido por el usuario, no inferido de la skill
+
+La skill `agente-fitosanitarios` no menciona vehículo/evento/agenda en ningún lado (confirmado por grep contra `SKILL.md`, cero resultados): RF6-RF9 solo estaban nombrados en `plandefases.md`, sin especificar. Antes de escribir código se le preguntó al usuario, por chat, qué es "un vehículo", "un evento" y "una agenda" en este dominio y cuáles de las 4 extensiones abordar. Definiciones y alcance confirmados: `resolver_vehiculo` (interpretar en lenguaje natural el vehículo a partir de una descripción informal), `registrar_evento` (inicio/fin de una aplicación, asociada a receta+vehículo+lote), y una tercera (`consultar_agenda`: agenda/plan del día con tareas y su estado). Se excluyó explícitamente la identificación automática de un operario recurrente por su número -- el `thread_id` que usan las otras dos tools para scopear datos es infraestructura ya existente desde la Fase 7/8, no esa RF.
+
+### `config: RunnableConfig` inyectado en la tool para saber "de quién" es el turno
+
+`registrar_evento` ("finalizar" necesita encontrar el evento en curso del operario correcto) y `consultar_agenda` ("mi agenda") necesitan `thread_id`, que ninguna tool anterior recibía -- siempre fue puro texto/args del LLM. Se verificó en el código que `orquestador/turno.py::ejecutar_turno` ya arma `config={"configurable": {"thread_id": ...}}` en *todos* los casos (producción y los tests de `test_ruteo.py`), y se confirmó leyendo `langchain_core/tools/base.py` (función `_find_config_param`) que LangChain soporta inyectar un parámetro `config: RunnableConfig` en la función de una `@tool` sin exponerlo en el schema que ve el LLM. Se implementó así en `registrar_evento`/`consultar_agenda`, y se verificó empíricamente con un test de ruteo (`test_ruteo_registrar_evento_usa_el_thread_id_del_turno`) antes de construir el resto de la fase encima -- funcionó al primer intento. Alternativa descartada: repetir el patrón de tool "ligada" por clausura de `crear_tool_leer_receta_ligada` (Fase 8), que hubiera obligado a reconstruir el agente en cada turno de texto (no solo con imagen) para bindear el `thread_id`; se deja documentada como plan B si en algún momento la inyección de config dejara de funcionar (p. ej. un cambio de versión de LangChain).
+
+### Matching de vehículo sin embeddings
+
+A diferencia de `catalogo.producto` (7370 filas, necesita trigram+embedding), `catalogo.vehiculo` es un puñado de categorías fijas ("pulverizador autopropulsado", "pulverizador de arrastre", "mochila", "avión fumigador", "dron"), sembradas directamente en la migración (no hay un crawler ni un loader para esto, es contenido de referencia curado a mano). Se resuelve con sinónimos (JSONB) chequeados como substring de la descripción del operario (case-insensitive, vía `ILIKE`) y similitud de trigram como fallback de typos -- sin columna `vector` ni cargar `sentence-transformers` para esto. Se agregó `tools/_recursos.py::con_conexion` (sin el modelo de embeddings) para no pagar ese costo en las 3 tools nuevas.
+
+### `MotivoNoResuelto` extendido para RFs fuera del alcance de la skill
+
+Se agregaron `VEHICULO_NO_ENCONTRADO` y `SIN_EVENTO_EN_CURSO` al catálogo de `dominio/motivos.py`, que el propio módulo documenta como "reproducidos tal cual" de la skill. Esto no contradice esa fuente de verdad: la skill nunca definió motivos para RF6/RF7 porque no los cubre; extender el catálogo para una funcionalidad fuera de su alcance es una decisión de esta fase, no una desviación de lo que la skill sí especifica para el núcleo.
+
+### Un evento sin receta asociada no aparece en la agenda (verificado en la demo real)
+
+Al correr `notebooks/demo_sin_whatsapp.ipynb` de punta a punta contra Gemini y Postgres reales, "Empecé a aplicar con la mosquito en el lote 4" -> "Terminé de aplicar" -> "¿qué tengo para hoy?" registró correctamente el evento pero la agenda respondió "No tenés tareas agendadas": `registrar_evento` se llamó sin `receta_id` (el operario no tenía una receta confirmada previa en esa conversación) y `consultar_agenda_logica` arma la lista a partir de `operacion.receta`, no de `operacion.evento_aplicacion` de forma independiente. Es el comportamiento esperado según el diseño (ver "Agenda reusa `fecha_prevista`" abajo), no un bug -- pero es una limitación real para un operario que aplica sin una receta cargada de antemano. Documentado para una futura iteración si hiciera falta que la agenda también liste eventos sueltos.
+
+### Agenda reusa `fecha_prevista`, no inventa un concepto de "asignación"
+
+No hay en este dominio un sistema donde un ingeniero agrónomo "asigna" tareas a un operario -- eso hubiera sido una funcionalidad nueva por completo. `consultar_agenda` reusa `operacion.receta.fecha_prevista` (columna que existe desde la Fase 1) como la fecha de la "tarea", combinada con el último `operacion.evento_aplicacion` de esa receta para el estado (pendiente/en_curso/finalizada). Simplificación aceptada para no expandir el alcance más allá de lo confirmado.
+
 ## Fase 8 — Canal WhatsApp
 
 ### `leer_receta` no puede recibir una foto real como argumento de tool (límite de tokens de salida)

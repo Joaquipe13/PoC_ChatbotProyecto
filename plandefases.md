@@ -503,19 +503,37 @@ No avanzar a la fase siguiente sin confirmación del usuario.
 
 ---
 
-## Fase 9 — Extensiones (opcional, recortable)
+## Fase 9 — Extensiones: resolver_vehiculo, registrar_evento, consultar_agenda
 
-**Objetivo:** agregar funcionalidades adicionales (RF6–RF9) sin romper el núcleo, solo si el tiempo lo permite. **RF que cubre:** RF6 (`resolver_vehiculo`), RF7 (`registrar_evento`), RF8 (`consultar_agenda`), RF9 (identificación por número).
+**Sub-planificación confirmada por el usuario (12/09/2026)**, reemplazando el placeholder original: la propuesta del TP2 no está en el repo y la skill no cubre estos RF (cero menciones de vehículo/evento/agenda en `SKILL.md`, verificado por grep). El usuario definió el alcance real de cada RF y cuáles abordar en esta iteración.
 
-**Depende de:** Fase 8 (canal funcionando) y el núcleo (Fases 0–8) cerrado y estable. **Qué habilita:** nada bloquea en esta fase; es la primera candidata a recortar si el tiempo apremia (ver decisión abierta #2 y "qué recortar" al final).
+**Objetivo:** agregar 3 extensiones sin romper el núcleo (Fases 0–8). **RF que cubre (definición del usuario, no necesariamente la numeración original del material fuente):** RF6 `resolver_vehiculo` (interpretar en lenguaje natural qué vehículo se usa a partir de una descripción informal), RF7 `registrar_evento` (registrar inicio y fin de una aplicación, asociada a receta, vehículo y lote), y un tercer RF (etiquetado RF9 por el usuario) `consultar_agenda` (el operario pide su agenda/plan del día y recibe la lista de tareas con su estado). **Excluido explícitamente:** identificación automática de un operario recurrente por su número (perfil, campo habitual) — no seleccionado por el usuario; el uso de `thread_id` para *scopear* datos es infraestructura ya existente desde la Fase 7/8, no esa RF.
 
-**Entregables:** a definir con el usuario según cuánto de esta fase entra en el alcance; como mínimo, si se recorta del todo, un `docs/extensiones-pendientes.md` que documente qué quedó afuera y por qué, para no perder el contexto de cara a una futura iteración.
+**Depende de:** Fase 8 (canal funcionando) y el núcleo (Fases 0–8) cerrado y estable (294 tests en verde al momento de empezar esta fase). **Qué habilita:** nada bloquea en esta fase.
 
-Dado que su alcance depende de decisiones de producto no cerradas en el material fuente (qué es "un vehículo", "un evento", "una agenda" en este dominio), **no se detallan tareas ni criterios de aceptación específicos en este documento**. Antes de iniciar esta fase, si se decide abordarla, hace falta una sub-planificación con el mismo formato de las fases anteriores (objetivo, entregables, tareas, criterios de aceptación, casos borde, riesgos, estimación), que el usuario debe confirmar por separado.
+**Decisión de diseño clave — cómo las tools saben "de quién" es el turno:** `registrar_evento` (para "finalizar") y `consultar_agenda` ("mi agenda") necesitan el `thread_id` del turno. Se usa la inyección de un parámetro `config: RunnableConfig` en la función de la `@tool`, que LangChain no expone en el schema que ve el LLM (confirmado leyendo `langchain_core/tools/base.py::_find_config_param`, y empíricamente con un test de ruteo). Plan B si no propagara como se espera: el patrón de tool "ligada" por clausura de `tools/leer_receta.py::crear_tool_leer_receta_ligada` (Fase 8).
 
-**Riesgos y mitigación:** ambigüedad de alcance sin la propuesta original (RF6–RF9 solo están nombrados, no especificados) → no diseñar en el vacío; esperar a tener `docs/propuesta-tp2-fitosanitarios.md` (decisión abierta #1) o una definición explícita del usuario antes de planificar el detalle.
+**Decisión de diseño — matching de vehículo sin embeddings:** catálogo chico y fijo (`catalogo.vehiculo`, 5 filas sembradas en la migración), resuelto por sinónimo/nombre como substring de la descripción + trigram como fallback de typos, sin columna `vector` ni modelo de embeddings (ver DECISIONES.md).
 
-**Estimación:** 20–30 h (gruesa, sujeta a la sub-planificación; puede ser 0 si se recorta por completo).
+**Entregables:**
+- Esquema: `catalogo.vehiculo` (001) y `operacion.evento_aplicacion` (003), editados in-place como las fases anteriores.
+- `dominio/motivos.py`: `VEHICULO_NO_ENCONTRADO`, `SIN_EVENTO_EN_CURSO`. `dominio/modelos.py`: tipos `consulta_vehiculo`, `evento_registrado`, `agenda` en `RespuestaAgente`.
+- `servicios/resolucion_vehiculo.py`, `servicios/eventos.py`.
+- `tools/resolver_vehiculo.py`, `tools/registrar_evento.py`, `tools/consultar_agenda.py`, registradas en `orquestador/agente.py::TOOLS`.
+- `orquestador/prompt_sistema.py` (alcance de dominio ampliado + 3 tipos nuevos) y `orquestador/formateador.py` (3 plantillas nuevas + `ayuda`/`fuera_de_dominio` actualizados).
+- `docs/modelo-datos.md` (ER actualizado), `DECISIONES.md`, `DIFICULTADES.md`, `README.md`.
+
+**Criterios de aceptación:**
+- Suite completa (`uv run pytest -q`) en verde, corrida dos veces seguidas (mismo chequeo de contaminación de datos que en la Fase 8).
+- `uv run ruff check .` limpio.
+- Caso de punta a punta manual: iniciar una aplicación, finalizarla, y consultar la agenda del día, verificado contra Postgres real.
+- La inyección de `config: RunnableConfig` confirmada empíricamente (no solo en teoría) con un test de ruteo real.
+
+**Casos borde:** iniciar con un evento ya en curso (no duplica, avisa `observado`); finalizar sin haber iniciado (`no_resuelto`/`SIN_EVENTO_EN_CURSO`); vehículo sin match con catálogo no vacío (ofrece la lista completa, nunca `no_resuelto`); catálogo de vehículos vacío (`no_resuelto`/`VEHICULO_NO_ENCONTRADO`); agenda sin tareas para la fecha (`ok` con lista vacía, no `no_resuelto`).
+
+**Riesgos y mitigación:** ver decisión de diseño clave arriba (plan B ya probado). Presupuesto de tokens del prompt de sistema: se dejó el detalle de "cuándo usar" en las tool descriptions, no en el prompt (patrón ya establecido).
+
+**Estimación real:** completada en una sesión, reusando en su totalidad los patrones de las Fases 5–8 (no ameritó las 20–30 h estimadas originalmente para un alcance sin acotar).
 
 No avanzar a la fase siguiente sin confirmación del usuario.
 

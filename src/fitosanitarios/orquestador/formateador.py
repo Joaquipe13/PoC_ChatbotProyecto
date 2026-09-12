@@ -210,9 +210,9 @@ def _plantilla_repregunta(respuesta: RespuestaAgente, resultados: list[Resultado
 def _plantilla_fuera_de_dominio(respuesta: RespuestaAgente, resultados: list[ResultadoTool]) -> str:
     return (
         "Solo puedo ayudarte con recetas de fitosanitarios: leer y validar recetas, "
-        "verificar productos registrados en SENASA y responder dudas sobre la normativa "
-        "de aplicación de las localidades cargadas. ¿Me mandás una receta o una consulta "
-        "sobre eso?"
+        "verificar productos registrados en SENASA, responder dudas sobre la normativa "
+        "de aplicación de las localidades cargadas, y registrar/consultar tus "
+        "aplicaciones en el campo. ¿Me mandás una receta o una consulta sobre eso?"
     )
 
 
@@ -234,6 +234,72 @@ def _plantilla_no_resuelto(respuesta: RespuestaAgente, resultados: list[Resultad
     return "\n".join(lineas)
 
 
+# --- consulta_vehiculo (Fase 9) ---
+
+
+def _plantilla_consulta_vehiculo(
+    respuesta: RespuestaAgente, resultados: list[ResultadoTool]
+) -> str:
+    datos = _primer_dato(resultados) or {}
+    vehiculo = datos.get("vehiculo", "(sin identificar)")
+    tipo_aplic = datos.get("tipo_aplicacion", "")
+    return f"*Vehículo:* {vehiculo}" + (f" ({tipo_aplic})" if tipo_aplic else "")
+
+
+# --- evento_registrado (Fase 9) ---
+
+
+def _plantilla_evento_registrado(
+    respuesta: RespuestaAgente, resultados: list[ResultadoTool]
+) -> str:
+    datos = _primer_dato(resultados) or {}
+    resultado = resultados[0] if resultados else None
+
+    if resultado is not None and resultado.estado == "observado":
+        lineas = ["⚠️ *Ya hay una aplicación en curso*"]
+        lineas.extend(f"- {a}" for a in resultado.advertencias)
+        return "\n".join(lineas)
+
+    if datos.get("fecha_fin"):
+        lineas = ["✅ *Aplicación finalizada*"]
+        if datos.get("lote"):
+            lineas.append(f"- *Lote:* {datos['lote']}")
+        lineas.append(f"- *Inicio:* {datos.get('fecha_inicio', 'no figura')}")
+        lineas.append(f"- *Fin:* {datos['fecha_fin']}")
+        return "\n".join(lineas)
+
+    lineas = ["✅ *Aplicación iniciada*"]
+    if datos.get("vehiculo"):
+        lineas.append(f"- *Vehículo:* {datos['vehiculo']}")
+    if datos.get("lote"):
+        lineas.append(f"- *Lote:* {datos['lote']}")
+    lineas.append(f"- *Inicio:* {datos.get('fecha_inicio', 'no figura')}")
+    return "\n".join(lineas)
+
+
+# --- agenda (Fase 9) ---
+
+
+def _plantilla_agenda(respuesta: RespuestaAgente, resultados: list[ResultadoTool]) -> str:
+    datos = _primer_dato(resultados) or {}
+    fecha = datos.get("fecha", "")
+    tareas = datos.get("tareas", [])
+
+    if not tareas:
+        if fecha:
+            return f"No tenés tareas agendadas para el {fecha}."
+        return "No tenés tareas agendadas."
+
+    _ICONO_TAREA = {"pendiente": "⏳", "en_curso": "🚜", "finalizada": "✅"}
+    lineas = [f"*Agenda del {fecha}* ({len(tareas)})"]
+    for i, t in enumerate(tareas, start=1):
+        icono = _ICONO_TAREA.get(t.get("estado_tarea"), "⚠️")
+        cultivo = t.get("cultivo") or "sin cultivo"
+        lote = t.get("lote") or "sin lote"
+        lineas.append(f"{i}. {icono} {cultivo} — lote {lote} ({t.get('estado_tarea')})")
+    return "\n".join(lineas)
+
+
 # --- ayuda ---
 
 
@@ -243,6 +309,8 @@ def _plantilla_ayuda(respuesta: RespuestaAgente, resultados: list[ResultadoTool]
         "- Leer una foto de tu receta y decirte si es apta para aplicar.\n"
         "- Buscar si un producto está registrado en SENASA.\n"
         "- Responder dudas sobre la normativa de aplicación de tu localidad.\n"
+        "- Registrar cuando empezás y terminás de aplicar.\n"
+        "- Contarte tu agenda del día.\n"
         "Mandame una foto de receta o contame qué necesitás."
     )
 
@@ -267,6 +335,9 @@ _PLANTILLAS = {
     "no_resuelto": _plantilla_no_resuelto,
     "ayuda": _plantilla_ayuda,
     "error": _plantilla_error,
+    "consulta_vehiculo": _plantilla_consulta_vehiculo,
+    "evento_registrado": _plantilla_evento_registrado,
+    "agenda": _plantilla_agenda,
 }
 
 

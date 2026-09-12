@@ -1,6 +1,6 @@
-"""Agente orquestador: `create_agent` (LangGraph) con las 6 tools del
-núcleo, `response_format=RespuestaAgente` y checkpointer en Postgres (ver
-skill, "Arquitectura" y "Política del orquestador").
+"""Agente orquestador: `create_agent` (LangGraph) con las tools del núcleo
+más las de la Fase 9, `response_format=RespuestaAgente` y checkpointer en
+Postgres (ver skill, "Arquitectura" y "Política del orquestador").
 
 Nota de API (verificar antes de la demo si cambia `langchain`/`langgraph`):
 `create_agent` viene de `langchain.agents` (`langchain==1.4.0` al escribir
@@ -23,10 +23,13 @@ from langgraph.checkpoint.postgres import PostgresSaver
 from fitosanitarios.config import Settings
 from fitosanitarios.dominio.modelos import RespuestaAgente
 from fitosanitarios.orquestador.prompt_sistema import PROMPT_SISTEMA
+from fitosanitarios.tools.consultar_agenda import consultar_agenda
 from fitosanitarios.tools.consultar_productos import consultar_productos
 from fitosanitarios.tools.evaluar_riesgo import evaluar_riesgo
 from fitosanitarios.tools.evaluar_viabilidad_legal import evaluar_viabilidad_legal
 from fitosanitarios.tools.leer_receta import crear_tool_leer_receta_ligada, leer_receta
+from fitosanitarios.tools.registrar_evento import registrar_evento
+from fitosanitarios.tools.resolver_vehiculo import resolver_vehiculo
 from fitosanitarios.tools.responder_consulta_normativa import responder_consulta_normativa
 from fitosanitarios.tools.validar_producto_registro import validar_producto_registro
 
@@ -39,6 +42,10 @@ TOOLS = [
     evaluar_riesgo,
     evaluar_viabilidad_legal,
     responder_consulta_normativa,
+    # Fase 9 (extensiones):
+    resolver_vehiculo,
+    registrar_evento,
+    consultar_agenda,
 ]
 
 

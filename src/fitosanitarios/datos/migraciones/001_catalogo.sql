@@ -110,3 +110,26 @@ CREATE INDEX IF NOT EXISTS ix_uso_registrado_adversidad
     ON catalogo.uso_registrado (adversidad_id);
 CREATE INDEX IF NOT EXISTS ix_uso_registrado_dosis_gin
     ON catalogo.uso_registrado USING gin (dosis);
+
+-- Vehículos/equipos de aplicación (Fase 9, RF6 resolver_vehiculo). Catálogo
+-- chico y fijo (a diferencia de catalogo.producto): matching por sinónimo
+-- exacto + pg_trgm como fallback de typos, sin columna vector -- no hace
+-- falta embeddings para un puñado de categorías conocidas (ver DECISIONES.md).
+CREATE TABLE IF NOT EXISTS catalogo.vehiculo (
+    id BIGSERIAL PRIMARY KEY,
+    nombre TEXT NOT NULL UNIQUE,
+    tipo_aplicacion TEXT NOT NULL CHECK (tipo_aplicacion IN ('terrestre', 'aerea')),
+    sinonimos JSONB NOT NULL DEFAULT '[]'::jsonb
+);
+CREATE INDEX IF NOT EXISTS ix_vehiculo_nombre_trgm
+    ON catalogo.vehiculo USING gin (nombre gin_trgm_ops);
+
+INSERT INTO catalogo.vehiculo (nombre, tipo_aplicacion, sinonimos) VALUES
+    ('pulverizador autopropulsado', 'terrestre',
+     '["mosquito", "autopropulsada", "autopropulsado"]'::jsonb),
+    ('pulverizador de arrastre', 'terrestre',
+     '["arrastre", "de arrastre", "pulverizadora de arrastre"]'::jsonb),
+    ('mochila', 'terrestre', '["mochila", "manual", "mochila de espalda"]'::jsonb),
+    ('avión fumigador', 'aerea', '["avión", "avion", "avioneta", "fumigador"]'::jsonb),
+    ('dron', 'aerea', '["dron", "drone"]'::jsonb)
+ON CONFLICT (nombre) DO NOTHING;

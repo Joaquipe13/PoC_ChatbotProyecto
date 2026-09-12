@@ -112,6 +112,10 @@ class RespuestaAgente(BaseModel):  # response_format del agente
         "no_resuelto",
         "ayuda",
         "error",
+        # Fase 9 (extensiones RF6/RF7/RF9, ver DECISIONES.md):
+        "consulta_vehiculo",
+        "evento_registrado",
+        "agenda",
     ]
     intro: str | None = None  # máximo una línea
     faltantes: list[CampoFaltante] = Field(default_factory=list)  # solo si repregunta sin tools

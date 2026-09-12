@@ -2,6 +2,12 @@
 
 Registro de qué falló y cómo se resolvió. Una entrada por dificultad relevante, en orden cronológico (más reciente arriba).
 
+## Fase 9 — Extensiones
+
+### Un test de guardia de la Fase 1 asumía que `MotivoNoResuelto` nunca crecería
+
+`tests/dominio/test_motivos.py::test_son_nueve_motivos_segun_la_skill` afirmaba `len(list(MotivoNoResuelto)) == 9` a secas, para asegurar que el enum coincidiera exactamente con el catálogo fijo de la skill. Al agregar `VEHICULO_NO_ENCONTRADO` y `SIN_EVENTO_EN_CURSO` (Fase 9, fuera del alcance de la skill) falló con `11 == 9`, detectado en la corrida de regresión completa. No es un bug de producción: el test codificaba una invariante que dejó de ser cierta a propósito (la skill no cubre RF6-9, así que "coincidir con la skill" ya no es "tener exactamente 9"). Se reescribió el test para separar explícitamente los 9 motivos del núcleo (los de la skill) de los agregados por extensiones, en vez de simplemente subir el número a 11 -- así, si en el futuro se agrega un motivo de núcleo por error sin pasar por la skill, el test lo sigue detectando.
+
 ## Fase 8 — Canal WhatsApp
 
 ### Tests de dedup con `message_id` fijo: pasaban solos, fallaban en la segunda corrida de la suite completa

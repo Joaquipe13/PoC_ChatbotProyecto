@@ -202,3 +202,93 @@ def test_partir_por_seccion_no_corta_una_lista_a_mitad():
 
 def test_partir_por_seccion_texto_corto_no_se_parte():
     assert partir_por_seccion("hola", limite=4096) == ["hola"]
+
+
+# --- Fase 9: consulta_vehiculo, evento_registrado, agenda ---
+
+
+def test_consulta_vehiculo():
+    respuesta = RespuestaAgente(tipo="consulta_vehiculo")
+    resultado = ResultadoTool(
+        estado="ok", datos={"vehiculo": "dron", "tipo_aplicacion": "aerea"}
+    )
+    texto = _un_mensaje(respuesta, [resultado])
+    assert texto == "*Vehículo:* dron (aerea)"
+
+
+def test_evento_registrado_iniciado():
+    respuesta = RespuestaAgente(tipo="evento_registrado")
+    resultado = ResultadoTool(
+        estado="ok",
+        datos={"vehiculo": "dron", "lote": "4", "fecha_inicio": "2026-09-12T10:00:00+00:00"},
+    )
+    texto = _un_mensaje(respuesta, [resultado])
+    assert texto == (
+        "✅ *Aplicación iniciada*\n"
+        "- *Vehículo:* dron\n"
+        "- *Lote:* 4\n"
+        "- *Inicio:* 2026-09-12T10:00:00+00:00"
+    )
+
+
+def test_evento_registrado_finalizado():
+    respuesta = RespuestaAgente(tipo="evento_registrado")
+    resultado = ResultadoTool(
+        estado="ok",
+        datos={
+            "lote": "4",
+            "fecha_inicio": "2026-09-12T10:00:00+00:00",
+            "fecha_fin": "2026-09-12T12:00:00+00:00",
+        },
+    )
+    texto = _un_mensaje(respuesta, [resultado])
+    assert texto == (
+        "✅ *Aplicación finalizada*\n"
+        "- *Lote:* 4\n"
+        "- *Inicio:* 2026-09-12T10:00:00+00:00\n"
+        "- *Fin:* 2026-09-12T12:00:00+00:00"
+    )
+
+
+def test_evento_registrado_ya_en_curso():
+    respuesta = RespuestaAgente(tipo="evento_registrado")
+    resultado = ResultadoTool(
+        estado="observado",
+        datos={"lote": "1", "fecha_inicio": "2026-09-12T09:00:00+00:00"},
+        advertencias=[
+            "ya hay una aplicación en curso desde 2026-09-12T09:00:00+00:00 en el lote 1"
+        ],
+    )
+    texto = _un_mensaje(respuesta, [resultado])
+    assert texto == (
+        "⚠️ *Ya hay una aplicación en curso*\n"
+        "- ya hay una aplicación en curso desde 2026-09-12T09:00:00+00:00 en el lote 1"
+    )
+
+
+def test_agenda_vacia():
+    respuesta = RespuestaAgente(tipo="agenda")
+    resultado = ResultadoTool(estado="ok", datos={"fecha": "2026-09-12", "tareas": [], "total": 0})
+    texto = _un_mensaje(respuesta, [resultado])
+    assert texto == "No tenés tareas agendadas para el 2026-09-12."
+
+
+def test_agenda_con_tareas():
+    respuesta = RespuestaAgente(tipo="agenda")
+    resultado = ResultadoTool(
+        estado="ok",
+        datos={
+            "fecha": "2026-09-12",
+            "total": 2,
+            "tareas": [
+                {"cultivo": "soja", "lote": "A", "estado_tarea": "pendiente"},
+                {"cultivo": "maiz", "lote": "B", "estado_tarea": "en_curso"},
+            ],
+        },
+    )
+    texto = _un_mensaje(respuesta, [resultado])
+    assert texto == (
+        "*Agenda del 2026-09-12* (2)\n"
+        "1. ⏳ soja — lote A (pendiente)\n"
+        "2. 🚜 maiz — lote B (en_curso)"
+    )
