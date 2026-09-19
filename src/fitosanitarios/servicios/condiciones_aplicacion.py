@@ -45,6 +45,7 @@ def calcular_condiciones(
             DistanciaMinima(
                 tipo_zona=tipo_zona,
                 distancia_min_m=mas_restrictiva.distancia_min_m,
+                norma_limitante=_cita(mas_restrictiva),
                 citas=[_cita(r) for r in aplicables],
                 advertencias=[r.observaciones for r in aplicables if r.observaciones],
             )

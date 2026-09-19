@@ -65,7 +65,7 @@ def test_dictamen_observada_con_citas():
         "*Observaciones*\n"
         "1. Distancia a escuela insuficiente: 80 m, mínimo 100 m.\n\n"
         "*Fuentes*\n"
-        "- ordenanza-914-2018, art. 8 (san-carlos-centro)"
+        "- Ordenanza 914/2018, art. 8 (san-carlos-centro)"
     )
 
 
@@ -84,50 +84,186 @@ def test_dictamen_apta_sin_observaciones():
     assert "Observaciones" not in texto
 
 
+_NORMA_ART_7 = {"fuente": "normativa", "norma": "ordenanza-841-2010", "articulo": "7",
+                "jurisdiccion_id": "el-trebol"}
+_NORMA_ART_6 = {**_NORMA_ART_7, "articulo": "6"}
+_SENASA = {"fuente": "senasa", "registro_senasa": "41881", "documento": "detalle API"}
+
 _CONDICIONES_EL_TREBOL = {
     "localidad": "El Trébol", "tipo_aplicacion": "aerea", "banda": "II",
     "banda_color": "amarilla",
     "productos_por_banda": {"Producto A": "IV", "Producto B": "II"},
-    "distancias_minimas": [{"tipo_zona": "zona_urbana", "distancia_min_m": 3000.0}],
+    "distancias_minimas": [{
+        "tipo_zona": "zona_urbana", "distancia_min_m": 3000.0,
+        "norma_limitante": _NORMA_ART_7, "citas": [_NORMA_ART_6, _NORMA_ART_7],
+    }],
     "advertencias": [],
 }
 
 
-def test_dictamen_informa_banda_de_la_aplicacion_y_distancia_minima():
-    respuesta = RespuestaAgente(tipo="dictamen")
-    resultado = ResultadoTool(
+def _dictamen_el_trebol(resultado="APTA", **extra):
+    return ResultadoTool(
         estado="ok",
         datos={
             "jurisdiccion_id": "el-trebol",
             "dictamen": {
-                "resultado": "APTA", "observaciones": [], "chequeos_no_realizados": [],
-                "citas": [{"fuente": "normativa", "norma": "ordenanza-841-2010", "articulo": "7"}],
-                "condiciones": _CONDICIONES_EL_TREBOL,
+                "resultado": resultado, "observaciones": [], "chequeos_no_realizados": [],
+                "citas": [_SENASA, _NORMA_ART_6, _NORMA_ART_7],
+                "condiciones": _CONDICIONES_EL_TREBOL, **extra,
             },
         },
     )
-    texto = _un_mensaje(respuesta, [resultado])
+
+
+def test_dictamen_da_la_distancia_minima_con_la_norma_que_la_fija_y_ofrece_seguimiento():
+    texto = _un_mensaje(RespuestaAgente(tipo="dictamen"), [_dictamen_el_trebol()])
     assert texto == (
-        "*Dictamen* — el-trebol\n"
+        "*Dictamen* — El Trébol\n"
         "*Resultado:* ✅ APTA\n\n"
-        "*Condiciones de aplicación* — El Trébol\n"
-        "- *Banda de la aplicación:* II (amarilla), aplicación aérea\n"
-        "  La rige el producto más peligroso de la mezcla: Producto A (IV), Producto B (II)\n"
-        "- *Distancia mínima a zona urbana:* 3000 m\n\n"
+        "*Condiciones de aplicación* — El Trébol · aérea · banda II (amarilla)\n"
+        "- *Distancia mínima a zona urbana:* 3000 m (Ordenanza 841/2010, art. 7)\n\n"
         "*Fuentes*\n"
-        "- ordenanza-841-2010, art. 7"
+        "- SENASA, Reg. 41881 (detalle API)\n"
+        "- Ordenanza 841/2010, art. 6 (el-trebol)\n\n"
+        "¿Querés más info (la banda de cada producto) o que agende la aplicación?"
     )
+
+
+def test_dictamen_no_muestra_la_banda_de_cada_producto_hasta_que_se_pide():
+    texto = _un_mensaje(RespuestaAgente(tipo="dictamen"), [_dictamen_el_trebol()])
+    assert "Producto A" not in texto
+
+
+def test_dictamen_observado_no_ofrece_agendar():
+    texto = _un_mensaje(RespuestaAgente(tipo="dictamen"), [_dictamen_el_trebol("OBSERVADA")])
+    assert texto.endswith("¿Querés más info (la banda de cada producto)?")
+    assert "agende" not in texto
 
 
 def test_evaluar_riesgo_suelto_muestra_condiciones_sin_veredicto():
-    respuesta = RespuestaAgente(tipo="dictamen")
     resultado = ResultadoTool(
         estado="ok",
         datos={"jurisdiccion_id": "el-trebol", "condiciones": _CONDICIONES_EL_TREBOL},
+        citas=[Cita.model_validate(_NORMA_ART_7)],
     )
-    texto = _un_mensaje(respuesta, [resultado])
+    texto = _un_mensaje(RespuestaAgente(tipo="dictamen"), [resultado])
     assert texto.startswith("*Condiciones de aplicación* — El Trébol")
     assert "Resultado" not in texto
+    assert "Fuentes" not in texto  # la única norma ya está en la línea de la distancia
+    assert texto.endswith("o que agende la aplicación?")
+
+
+def test_detalle_bandas_lista_la_banda_de_cada_producto():
+    resultado = ResultadoTool(
+        estado="ok",
+        datos={
+            "jurisdiccion_id": "el-trebol",
+            "productos": [{"nombre": "Producto B", "numero_inscripcion": "41881"}],
+            "condiciones": {**_CONDICIONES_EL_TREBOL, "productos_por_banda": {
+                "Producto A": "IV", "Producto B": "II", "Producto C": None,
+            }},
+        },
+    )
+    texto = _un_mensaje(RespuestaAgente(tipo="detalle_bandas"), [resultado])
+    assert texto == (
+        "*Banda de cada producto*\n"
+        "- Producto A: IV (verde)\n"
+        "- Producto B · Reg. SENASA 41881: II (amarilla)\n"
+        "- Producto C: no figura en SENASA ⚠️\n"
+        "La aplicación se rige por la más peligrosa: II (amarilla).\n\n"
+        "¿Querés que agende la aplicación?"
+    )
+
+
+def test_agendar_sin_fecha_pregunta_la_fecha():
+    resultado = ResultadoTool(
+        estado="faltan_datos",
+        faltantes=[CampoFaltante(
+            campo="fecha", motivo="no se indicó la fecha",
+            pregunta_sugerida="¿Para qué fecha querés agendar la aplicación?",
+            tipo_entrada="texto",
+        )],
+    )
+    texto = _un_mensaje(RespuestaAgente(tipo="agendar_aplicacion"), [resultado])
+    assert texto.startswith("¿Para qué fecha querés agendar la aplicación?")
+    assert "martes" in texto
+
+
+def test_agendar_con_fecha_muestra_la_agenda_del_dia_y_pregunta_el_horario():
+    resultado = ResultadoTool(
+        estado="faltan_datos",
+        datos={
+            "fecha": "2026-09-22", "fecha_legible": "martes 22/09/2026",
+            "tareas": [{"cultivo": "soja", "lote": "4", "hora": "08:00",
+                        "estado_tarea": "pendiente"}],
+        },
+        faltantes=[CampoFaltante(
+            campo="hora", motivo="no se indicó el horario",
+            pregunta_sugerida="¿En qué horario querés agendarla?", tipo_entrada="texto",
+        )],
+    )
+    texto = _un_mensaje(RespuestaAgente(tipo="agendar_aplicacion"), [resultado])
+    assert texto == (
+        "*Agenda del martes 22/09/2026* (1)\n"
+        "1. ⏳ 08:00 — soja — lote 4 (pendiente)\n\n"
+        "¿En qué horario querés agendarla? Por ejemplo: 8:30 o 3 de la tarde."
+    )
+
+
+def test_agendar_dia_libre_lo_dice_y_pregunta_el_horario():
+    resultado = ResultadoTool(
+        estado="faltan_datos",
+        datos={"fecha": "2026-09-22", "fecha_legible": "martes 22/09/2026", "tareas": []},
+        faltantes=[CampoFaltante(
+            campo="hora", motivo="no se indicó el horario",
+            pregunta_sugerida="¿En qué horario querés agendarla?", tipo_entrada="texto",
+        )],
+    )
+    texto = _un_mensaje(RespuestaAgente(tipo="agendar_aplicacion"), [resultado])
+    assert texto.startswith("No tenés nada agendado para el martes 22/09/2026.")
+    assert "¿En qué horario querés agendarla?" in texto
+
+
+def test_agendar_confirmada_avisa_si_ya_hay_algo_a_esa_hora():
+    resultado = ResultadoTool(
+        estado="ok",
+        datos={"fecha_legible": "martes 22/09/2026", "hora": "08:30",
+               "cultivo": "soja", "lote": "4"},
+        advertencias=["Ya tenías trigo (lote 2) agendada a las 08:30"],
+    )
+    texto = _un_mensaje(RespuestaAgente(tipo="agendar_aplicacion"), [resultado])
+    assert texto == (
+        "✅ *Aplicación agendada* — martes 22/09/2026, 08:30 hs\n"
+        "- *Cultivo:* soja\n"
+        "- *Lote:* 4\n"
+        "⚠️ Ya tenías trigo (lote 2) agendada a las 08:30"
+    )
+
+
+def test_agendar_fecha_pasada_explica_y_repregunta():
+    resultado = ResultadoTool(
+        estado="faltan_datos",
+        faltantes=[CampoFaltante(
+            campo="fecha", motivo="lunes 14/09/2026 ya pasó",
+            pregunta_sugerida="¿Para qué fecha querés agendar la aplicación?",
+            tipo_entrada="texto",
+        )],
+    )
+    texto = _un_mensaje(RespuestaAgente(tipo="agendar_aplicacion"), [resultado])
+    assert texto.startswith("Lunes 14/09/2026 ya pasó. ¿Para qué fecha")
+
+
+def test_agenda_muestra_la_hora_y_la_fecha_legible():
+    resultado = ResultadoTool(
+        estado="ok",
+        datos={
+            "fecha": "2026-09-22", "fecha_legible": "martes 22/09/2026", "total": 1,
+            "tareas": [{"cultivo": "soja", "lote": "4", "hora": "08:00",
+                        "estado_tarea": "pendiente"}],
+        },
+    )
+    texto = _un_mensaje(RespuestaAgente(tipo="agenda"), [resultado])
+    assert texto == "*Agenda del martes 22/09/2026* (1)\n1. ⏳ 08:00 — soja — lote 4 (pendiente)"
 
 
 def test_consulta_producto_listado():
@@ -176,7 +312,7 @@ def test_consulta_normativa():
     assert texto == (
         "*No.* La distancia mínima es de 100 metros.\n\n"
         "*Fuentes*\n"
-        "- ordenanza-914-2018, art. 8 (san-carlos-centro)"
+        "- Ordenanza 914/2018, art. 8 (san-carlos-centro)"
     )
 
 

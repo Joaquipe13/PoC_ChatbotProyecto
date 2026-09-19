@@ -81,7 +81,8 @@ class DistanciaMinima(BaseModel):
 
     tipo_zona: str  # "zona_urbana", "escuela", "curso_agua", ...
     distancia_min_m: float
-    citas: list[Cita] = Field(default_factory=list)
+    norma_limitante: Cita | None = None  # la regla que fija ese mínimo (la más restrictiva)
+    citas: list[Cita] = Field(default_factory=list)  # todas las reglas que aplican
     advertencias: list[str] = Field(default_factory=list)
 
 
@@ -142,6 +143,9 @@ class RespuestaAgente(BaseModel):  # response_format del agente
         "consulta_vehiculo",
         "evento_registrado",
         "agenda",
+        # Seguimiento del dictamen: banda de cada producto y agendado.
+        "detalle_bandas",
+        "agendar_aplicacion",
     ]
     intro: str | None = None  # máximo una línea
     faltantes: list[CampoFaltante] = Field(default_factory=list)  # solo si repregunta sin tools

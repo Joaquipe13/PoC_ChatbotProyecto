@@ -23,6 +23,7 @@ from langgraph.checkpoint.postgres import PostgresSaver
 from fitosanitarios.config import Settings
 from fitosanitarios.dominio.modelos import RespuestaAgente
 from fitosanitarios.orquestador.prompt_sistema import PROMPT_SISTEMA
+from fitosanitarios.tools.agendar_aplicacion import agendar_aplicacion
 from fitosanitarios.tools.consultar_agenda import consultar_agenda
 from fitosanitarios.tools.consultar_productos import consultar_productos
 from fitosanitarios.tools.evaluar_riesgo import evaluar_riesgo
@@ -46,6 +47,7 @@ TOOLS = [
     resolver_vehiculo,
     registrar_evento,
     consultar_agenda,
+    agendar_aplicacion,
 ]
 
 

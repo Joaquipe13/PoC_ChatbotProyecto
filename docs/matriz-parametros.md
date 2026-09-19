@@ -104,3 +104,19 @@ class ConsultarProductosArgs(BaseModel):
 - Todos los `Args` heredan de `pydantic.BaseModel`; el orquestador (Fase 7) valida contra este schema antes de invocar la tool, nunca completa un campo por suposición.
 - `TipoAplicacion` es el enum de `src/fitosanitarios/dominio/modelos.py` (`terrestre` | `aerea`), reutilizado acá para no duplicar el tipo.
 - El validador de `ConsultarProductosArgs` (al menos un filtro) es ilustrativo del patrón a seguir; se implementa junto con la tool en la Fase 5.
+
+## `agendar_aplicacion`
+
+```python
+class AgendarAplicacionArgs(BaseModel):
+    fecha: str | None = None   # texto del operario: "martes", "mañana", "25/09" (lo resuelve el código)
+    hora: str | None = None    # "8", "8:30", "3 de la tarde"
+    numero: str | None = None; cultivo: str | None = None; lote: str | None = None
+    superficie_ha: float | None = None; tipo_aplicacion: str | None = None
+```
+
+| Requeridos | Opcionales | Si falta |
+|---|---|---|
+| fecha, hora | datos de la receta (para mostrarla en la agenda) | fecha: pregunta el día. Hora: muestra la agenda de ese día y pregunta el horario |
+
+`thread_id` sale del `config` del turno, no del LLM. Ver DECISIONES.md ("Seguimiento del dictamen").

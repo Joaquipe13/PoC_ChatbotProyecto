@@ -178,6 +178,7 @@ Fuera de dominio no es un motivo de tool: lo decide el orquestador antes de llam
 | `validar_producto_registro` | producto(s), cultivo | adversidad, dosis + unidad | cultivo: texto. Producto ambiguo: lista de candidatos |
 | `evaluar_riesgo` | localidad o municipio (texto), tipo de aplicación, productos, cultivo, dosis + unidad | adversidad (pasa a requerida si las dosis registradas varían por adversidad) | localidad: lista de las cargadas. Tipo: botones Terrestre/Aérea |
 | `evaluar_viabilidad_legal` | receta confirmada con los requeridos de las dos anteriores | superficie, fecha prevista | repreguntar agrupado |
+| `agendar_aplicacion` | fecha, hora (texto del operario, resuelto en código) | datos de la receta | fecha: pregunta el día. Hora: muestra la agenda de ese día y pregunta el horario |
 | `responder_consulta_normativa` | pregunta, jurisdicción (explícita o de la receta en curso) | tipo de aplicación, tipo de zona | jurisdicción: lista de las localidades cargadas |
 | `consultar_productos` | al menos uno: cultivo, adversidad o principio activo | aptitud, banda máxima | pedir cultivo o plaga |
 

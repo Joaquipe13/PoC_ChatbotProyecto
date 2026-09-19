@@ -298,3 +298,22 @@ No se pudo verificar contra documentación oficial el tipo exacto de excepción 
 **Sin tocar a propósito (código que quedó sin uso, no borrado):** `servicios/geo.py` (punto en polígono y distancias), `localidades_candidatas_por_punto` / `zonas_protegidas_en_radio` en `datos/retrievers/territorio.py`, `evaluar_distancia_zona` en `servicios/reglas.py`, la carga de `zona_protegida` y `radio_busqueda_zonas_m`, `Receta.ubicacion_lat/lon`, y el botón de ubicación del canal web y el mensaje `location` de WhatsApp. Se dejan por si se retoma una capa SIG (ver evaluación de viabilidad de capas y mapa); limpiarlos es una tarea aparte.
 
 **Verificación.** Los tests puros (localidad, condiciones, dictamen, formateador) corren. Los de integración de `evaluar_riesgo`, `evaluar_viabilidad_legal` y ruteo se reescribieron pero **no se pudieron correr** en esta sesión (Docker/Postgres no disponible: se saltan).
+
+### Seguimiento del dictamen: respuesta concreta, "más info" y agendar la aplicación
+
+**Cambio (19/09/2026).** La respuesta del dictamen se acorta: resultado, observaciones (si hay), y las *Condiciones de aplicación* con la **distancia mínima y la norma que la fija** en la misma línea ("- Distancia mínima a zona urbana: 3000 m (Ordenanza 841/2010, art. 7)"). Entre las reglas que aplican, la que fija el mínimo es la más restrictiva (`DistanciaMinima.norma_limitante`); las otras siguen citadas en *Fuentes*. Las citas de normativa se muestran legibles ("Ordenanza 841/2010") en vez del nombre del PDF. Cierra con una pregunta: "¿Querés más info (la banda de cada producto) o que agende la aplicación?". Un dictamen OBSERVADO solo ofrece la info, no agendar.
+
+**Más info.** Si el usuario la pide, el LLM vuelve a llamar `evaluar_riesgo` con los mismos argumentos y responde `detalle_bandas`: banda de cada producto (con registro SENASA) y la de la aplicación (la más peligrosa). Se re-ejecuta la tool en vez de guardar el resultado anterior porque el formateador solo renderiza artifacts del turno actual (así el LLM no puede alterar números).
+
+**Agendar (`agendar_aplicacion`, tipo `agendar_aplicacion`).** El flujo lo decide el código:
+- "sí, agendala" (sin día) -> pregunta la fecha;
+- "agendala para el martes" -> muestra la agenda de ese día y pregunta el horario;
+- con fecha y hora -> agenda y confirma; si ya había algo a esa hora avisa, pero agenda igual.
+
+Las fechas y horas las resuelve `servicios/fechas.py`, no el LLM (que no conoce la fecha actual con confiabilidad): el LLM pasa el texto tal cual ("martes", "mañana", "25/09", "8:30"). Un día de la semana es siempre el **próximo** (si hoy es martes, "el martes" es dentro de 7 días); no se agenda en el pasado. El resumen que ve el LLM incluye `fecha=AAAA-MM-DD` para que el turno del horario reutilice la fecha ya resuelta. `consultar_agenda` acepta el mismo texto y ahora muestra la hora de cada tarea.
+
+**Persistencia.** La agenda reutiliza `operacion.receta` (`fecha_prevista` + nueva columna `hora_prevista TIME`): cada agendado inserta una receta en estado `evaluada` con los datos que el LLM copia de la conversación (cultivo, lote, número, superficie, tipo). **Hay que correr `003_operacion.sql` en las bases existentes** (agrega la columna con `ADD COLUMN IF NOT EXISTS`).
+
+**Límites conocidos:** no hay cancelar ni reprogramar; no se valida horario laboral ni zona horaria (usa la del servidor); la receta agendada no sale de `guardar_receta_en_curso` (sigue sin conectarse al flujo del orquestador, como ya estaba documentado). El prompt ganó ~13 líneas (~1000 tokens en total, dentro del presupuesto de ~3k).
+
+**Verificación.** Corren sin base: parseo de fechas/horas, flujo de la tool con dobles, plantillas del formateador. **No corrieron** los tests contra Postgres (`test_agendar_aplicacion_db`, ruteo) ni una conversación real con Gemini: falta probar que el LLM encadena bien "sí, agendala" -> fecha -> hora.

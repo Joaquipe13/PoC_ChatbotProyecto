@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS operacion.receta (
     superficie_ha NUMERIC,
     tipo_aplicacion TEXT CHECK (tipo_aplicacion IN ('terrestre', 'aerea')),
     fecha_prevista DATE,
+    hora_prevista TIME, -- horario agendado de la aplicación (agendar_aplicacion)
     estado TEXT NOT NULL DEFAULT 'borrador'
         CHECK (estado IN ('borrador', 'confirmada', 'evaluada', 'cancelada')),
     datos_extraidos JSONB NOT NULL DEFAULT '{}'::jsonb, -- campos + confianza de leer_receta
@@ -27,6 +28,8 @@ CREATE TABLE IF NOT EXISTS operacion.receta (
     creado_en TIMESTAMPTZ NOT NULL DEFAULT now(),
     actualizado_en TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+-- Bases creadas antes de agendar_aplicacion: CREATE TABLE IF NOT EXISTS no agrega la columna.
+ALTER TABLE operacion.receta ADD COLUMN IF NOT EXISTS hora_prevista TIME;
 CREATE INDEX IF NOT EXISTS ix_receta_thread ON operacion.receta (thread_id);
 CREATE INDEX IF NOT EXISTS ix_receta_localidad ON operacion.receta (localidad_id);
 CREATE INDEX IF NOT EXISTS ix_receta_datos_extraidos_gin

@@ -113,7 +113,8 @@ def consultar_agenda_logica(conn, thread_id: str, fecha: date) -> list[dict]:
     with conn.cursor() as cur:
         cur.execute(
             """
-            SELECT r.id, r.numero, r.cultivo, r.lote, e.estado, e.fecha_inicio, e.fecha_fin
+            SELECT r.id, r.numero, r.cultivo, r.lote, e.estado, e.fecha_inicio, e.fecha_fin,
+                   r.hora_prevista
             FROM operacion.receta r
             LEFT JOIN LATERAL (
                 SELECT estado, fecha_inicio, fecha_fin
@@ -122,14 +123,14 @@ def consultar_agenda_logica(conn, thread_id: str, fecha: date) -> list[dict]:
                 ORDER BY fecha_inicio DESC LIMIT 1
             ) e ON true
             WHERE r.thread_id = %s AND r.fecha_prevista = %s AND r.estado != 'cancelada'
-            ORDER BY r.creado_en
+            ORDER BY r.hora_prevista NULLS LAST, r.creado_en
             """,
             (thread_id, fecha),
         )
         filas = cur.fetchall()
 
     tareas = []
-    for id_, numero, cultivo, lote, estado_evento, fecha_inicio, fecha_fin in filas:
+    for id_, numero, cultivo, lote, estado_evento, fecha_inicio, fecha_fin, hora in filas:
         if estado_evento == "finalizado":
             estado_tarea = "finalizada"
         elif estado_evento == "en_curso":
@@ -142,6 +143,7 @@ def consultar_agenda_logica(conn, thread_id: str, fecha: date) -> list[dict]:
                 "numero": numero,
                 "cultivo": cultivo,
                 "lote": lote,
+                "hora": hora.strftime("%H:%M") if hora else None,
                 "estado_tarea": estado_tarea,
                 "fecha_inicio": fecha_inicio.isoformat() if fecha_inicio else None,
                 "fecha_fin": fecha_fin.isoformat() if fecha_fin else None,

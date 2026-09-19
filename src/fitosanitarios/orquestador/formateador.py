@@ -11,6 +11,8 @@ de una carpeta `plantillas/` -- son 9 funciones chicas, no ameritan
 subpaquete propio (ver DECISIONES.md).
 """
 
+import re
+
 from fitosanitarios.dominio.modelos import Cita, RespuestaAgente, ResultadoTool
 from fitosanitarios.dominio.motivos import DESCRIPCION_MOTIVO, MotivoNoResuelto
 
@@ -36,10 +38,29 @@ def _num(valor) -> str:
     return f"{valor}".replace(".", ",")
 
 
+def _norma_legible(norma: str) -> str:
+    """"ordenanza-841-2010" (nombre del PDF) -> "Ordenanza 841/2010"."""
+    m = re.fullmatch(r"(ordenanza|decreto|resolucion|ley)-(\w+)-(\d{4})", norma)
+    if not m:
+        return norma
+    tipo = "Resolución" if m[1] == "resolucion" else m[1].capitalize()
+    return f"{tipo} {m[2]}/{m[3]}"
+
+
+def _cita_norma(cita: Cita) -> str:
+    """Norma y artículo sin la jurisdicción: "Ordenanza 841/2010, art. 7"."""
+    partes = [
+        p for p in (
+            _norma_legible(cita.norma) if cita.norma else None,
+            f"art. {cita.articulo}" if cita.articulo else None,
+        ) if p
+    ]
+    return ", ".join(partes) if partes else "normativa"
+
+
 def _texto_cita(cita: Cita) -> str:
     if cita.fuente == "normativa":
-        partes = [p for p in (cita.norma, f"art. {cita.articulo}" if cita.articulo else None) if p]
-        texto = ", ".join(partes) if partes else "normativa"
+        texto = _cita_norma(cita)
         if cita.jurisdiccion_id:
             texto += f" ({cita.jurisdiccion_id})"
         return texto
@@ -108,30 +129,47 @@ def _plantilla_confirmacion_receta(
 
 # --- dictamen ---
 
+_SEGUIMIENTO_COMPLETO = (
+    "¿Querés más info (la banda de cada producto) o que agende la aplicación?"
+)
+_SEGUIMIENTO_SOLO_INFO = "¿Querés más info (la banda de cada producto)?"
+
 
 def _bloque_condiciones(condiciones: dict | None) -> str:
-    """Banda de la aplicación completa y distancia mínima por tipo de zona
-    según la localidad (no compara contra la ubicación del lote)."""
+    """Lo más concreto posible: distancia mínima y la norma que la fija. La
+    banda de cada producto queda para cuando el usuario pide más info. No
+    compara contra la ubicación del lote."""
     if not condiciones:
         return ""
-    lineas = [f"*Condiciones de aplicación* — {condiciones['localidad']}"]
     tipo = "aérea" if condiciones["tipo_aplicacion"] == "aerea" else condiciones["tipo_aplicacion"]
     banda = condiciones.get("banda")
     if banda:
         color = f" ({condiciones['banda_color']})" if condiciones.get("banda_color") else ""
-        lineas.append(f"- *Banda de la aplicación:* {banda}{color}, aplicación {tipo}")
+        detalle = f"{tipo} · banda {banda}{color}"
     else:
-        lineas.append(f"- *Banda de la aplicación:* no se pudo determinar ⚠️ (aplicación {tipo})")
-    por_banda = condiciones.get("productos_por_banda") or {}
-    if len(por_banda) > 1:
-        detalle = ", ".join(f"{p} ({b or 'sin banda'})" for p, b in por_banda.items())
-        lineas.append(f"  La rige el producto más peligroso de la mezcla: {detalle}")
+        detalle = f"{tipo} · banda no determinada ⚠️"
+    lineas = [f"*Condiciones de aplicación* — {condiciones['localidad']} · {detalle}"]
     for d in condiciones.get("distancias_minimas", []):
         zona = _NOMBRE_ZONA.get(d["tipo_zona"], d["tipo_zona"])
-        lineas.append(f"- *Distancia mínima a {zona}:* {_num(d['distancia_min_m'])} m")
-    for advertencia in condiciones.get("advertencias", []):
-        lineas.append(f"⚠️ {advertencia}")
+        limitante = d.get("norma_limitante")
+        norma = f" ({_cita_norma(Cita.model_validate(limitante))})" if limitante else ""
+        lineas.append(f"- *Distancia mínima a {zona}:* {_num(d['distancia_min_m'])} m{norma}")
+    for d in condiciones.get("distancias_minimas", []):
+        lineas.extend(f"⚠️ {a}" for a in d.get("advertencias", []))
+    lineas.extend(f"⚠️ {a}" for a in condiciones.get("advertencias", []))
     return "\n".join(lineas)
+
+
+def _citas_no_mostradas_inline(citas: list[Cita], condiciones: dict | None) -> list[Cita]:
+    """La norma que limita cada distancia ya va en su línea: en *Fuentes*
+    queda el resto (SENASA, otras reglas que aplican) sin repetirla."""
+    if not condiciones:
+        return citas
+    inline = [
+        Cita.model_validate(d["norma_limitante"])
+        for d in condiciones.get("distancias_minimas", []) if d.get("norma_limitante")
+    ]
+    return [c for c in citas if c not in inline]
 
 
 def _plantilla_dictamen(respuesta: RespuestaAgente, resultados: list[ResultadoTool]) -> str:
@@ -139,20 +177,23 @@ def _plantilla_dictamen(respuesta: RespuestaAgente, resultados: list[ResultadoTo
     dictamen = datos.get("dictamen")
     if dictamen is None:
         # `evaluar_riesgo` suelto: solo condiciones de aplicación, sin veredicto.
+        condiciones = datos.get("condiciones")
         no_realizados = [c for r in resultados for c in r.chequeos_no_realizados]
         bloque_no_realizados = (
             "\n".join(["*No se pudo verificar*"] + [f"- {c}" for c in no_realizados])
             if no_realizados else ""
         )
+        citas = _citas_no_mostradas_inline(_todas_las_citas(resultados), condiciones)
         return _unir_secciones(
-            _bloque_condiciones(datos.get("condiciones")), bloque_no_realizados,
-            _seccion_fuentes(_todas_las_citas(resultados)),
+            _bloque_condiciones(condiciones), bloque_no_realizados, _seccion_fuentes(citas),
+            _SEGUIMIENTO_COMPLETO if condiciones else "",
         )
     resultado = dictamen.get("resultado", "NO_EVALUABLE")
-    jurisdiccion = datos.get("jurisdiccion_id", "")
+    condiciones = dictamen.get("condiciones")
+    lugar = (condiciones or {}).get("localidad") or datos.get("jurisdiccion_id", "")
     icono = _ICONO_DICTAMEN.get(resultado, "⚠️")
 
-    titulo = f"*Dictamen*{' — ' + jurisdiccion if jurisdiccion else ''}"
+    titulo = f"*Dictamen*{' — ' + lugar if lugar else ''}"
     encabezado = f"{titulo}\n*Resultado:* {icono} {resultado}"
 
     observaciones = dictamen.get("observaciones", [])
@@ -170,9 +211,100 @@ def _plantilla_dictamen(respuesta: RespuestaAgente, resultados: list[ResultadoTo
         bloque_no_realizados = "\n".join(lineas)
 
     citas = [Cita.model_validate(c) for c in dictamen.get("citas", [])]
+    seguimiento = ""
+    if condiciones:
+        # Una receta observada no se ofrece para agendar.
+        seguimiento = _SEGUIMIENTO_SOLO_INFO if resultado == "OBSERVADA" else _SEGUIMIENTO_COMPLETO
     return _unir_secciones(
         encabezado, bloque_observaciones, bloque_no_realizados,
-        _bloque_condiciones(dictamen.get("condiciones")), _seccion_fuentes(citas),
+        _bloque_condiciones(condiciones),
+        _seccion_fuentes(_citas_no_mostradas_inline(citas, condiciones)),
+        seguimiento,
+    )
+
+
+# --- detalle_bandas ---
+
+
+_COLOR_BANDA = {"Ia": "roja", "Ib": "roja", "II": "amarilla", "III": "azul", "IV": "verde"}
+
+
+def _plantilla_detalle_bandas(respuesta: RespuestaAgente, resultados: list[ResultadoTool]) -> str:
+    """Banda toxicológica de cada producto a aplicar (lo que se ofrece tras el
+    dictamen). Sale de la evaluación de riesgo del turno, no del LLM."""
+    datos = _primer_dato(resultados) or {}
+    condiciones = datos.get("condiciones") or (datos.get("dictamen") or {}).get("condiciones")
+    if not condiciones:
+        return "No pude obtener la banda de los productos."
+    registros = {p.get("nombre"): p.get("numero_inscripcion") for p in datos.get("productos", [])}
+
+    lineas = ["*Banda de cada producto*"]
+    for producto, banda in (condiciones.get("productos_por_banda") or {}).items():
+        reg = f" · Reg. SENASA {registros[producto]}" if registros.get(producto) else ""
+        if banda:
+            lineas.append(f"- {producto}{reg}: {banda} ({_COLOR_BANDA.get(banda, 'sin color')})")
+        else:
+            lineas.append(f"- {producto}{reg}: no figura en SENASA ⚠️")
+    if condiciones.get("banda"):
+        color = _COLOR_BANDA.get(condiciones["banda"], "")
+        lineas.append(
+            f"La aplicación se rige por la más peligrosa: {condiciones['banda']}"
+            + (f" ({color})." if color else ".")
+        )
+    return _unir_secciones("\n".join(lineas), "¿Querés que agende la aplicación?")
+
+
+# --- agendar_aplicacion ---
+
+
+def _lineas_agenda(tareas: list[dict]) -> list[str]:
+    _ICONO_TAREA = {"pendiente": "⏳", "en_curso": "🚜", "finalizada": "✅"}
+    lineas = []
+    for i, t in enumerate(tareas, start=1):
+        icono = _ICONO_TAREA.get(t.get("estado_tarea"), "⚠️")
+        hora = f"{t['hora']} — " if t.get("hora") else ""
+        cultivo = t.get("cultivo") or "sin cultivo"
+        lote = t.get("lote") or "sin lote"
+        lineas.append(f"{i}. {icono} {hora}{cultivo} — lote {lote} ({t.get('estado_tarea')})")
+    return lineas
+
+
+def _plantilla_agendar_aplicacion(
+    respuesta: RespuestaAgente, resultados: list[ResultadoTool]
+) -> str:
+    resultado = resultados[0] if resultados else None
+    datos = (resultado.datos if resultado else None) or {}
+
+    if resultado is not None and resultado.estado == "ok":
+        lineas = [f"✅ *Aplicación agendada* — {datos['fecha_legible']}, {datos['hora']} hs"]
+        if datos.get("cultivo"):
+            lineas.append(f"- *Cultivo:* {datos['cultivo']}")
+        if datos.get("lote"):
+            lineas.append(f"- *Lote:* {datos['lote']}")
+        lineas.extend(f"⚠️ {a}" for a in resultado.advertencias)
+        return "\n".join(lineas)
+
+    faltante = resultado.faltantes[0] if resultado and resultado.faltantes else None
+    if faltante is None:
+        return "No pude agendar la aplicación. ¿Me decís de nuevo el día y el horario?"
+
+    if faltante.campo == "hora":
+        tareas = datos.get("tareas", [])
+        if tareas:
+            agenda = "\n".join(
+                [f"*Agenda del {datos['fecha_legible']}* ({len(tareas)})"] + _lineas_agenda(tareas)
+            )
+        else:
+            agenda = f"No tenés nada agendado para el {datos['fecha_legible']}."
+        pregunta = f"{faltante.pregunta_sugerida} Por ejemplo: 8:30 o 3 de la tarde."
+        return _unir_secciones(agenda, pregunta)
+
+    aviso = ""
+    if not faltante.motivo.startswith("no se indicó"):
+        aviso = f"{faltante.motivo[0].upper()}{faltante.motivo[1:]}. "
+    return (
+        f"{aviso}{faltante.pregunta_sugerida} Podés decirme un día (por ejemplo "
+        "\"martes\" o \"mañana\") o una fecha (por ejemplo 25/09)."
     )
 
 
@@ -331,17 +463,11 @@ def _plantilla_agenda(respuesta: RespuestaAgente, resultados: list[ResultadoTool
 
     if not tareas:
         if fecha:
-            return f"No tenés tareas agendadas para el {fecha}."
+            return f"No tenés tareas agendadas para el {datos.get('fecha_legible') or fecha}."
         return "No tenés tareas agendadas."
 
-    _ICONO_TAREA = {"pendiente": "⏳", "en_curso": "🚜", "finalizada": "✅"}
-    lineas = [f"*Agenda del {fecha}* ({len(tareas)})"]
-    for i, t in enumerate(tareas, start=1):
-        icono = _ICONO_TAREA.get(t.get("estado_tarea"), "⚠️")
-        cultivo = t.get("cultivo") or "sin cultivo"
-        lote = t.get("lote") or "sin lote"
-        lineas.append(f"{i}. {icono} {cultivo} — lote {lote} ({t.get('estado_tarea')})")
-    return "\n".join(lineas)
+    fecha = datos.get("fecha_legible") or fecha
+    return "\n".join([f"*Agenda del {fecha}* ({len(tareas)})"] + _lineas_agenda(tareas))
 
 
 # --- ayuda ---
@@ -382,6 +508,8 @@ _PLANTILLAS = {
     "consulta_vehiculo": _plantilla_consulta_vehiculo,
     "evento_registrado": _plantilla_evento_registrado,
     "agenda": _plantilla_agenda,
+    "detalle_bandas": _plantilla_detalle_bandas,
+    "agendar_aplicacion": _plantilla_agendar_aplicacion,
 }
 
 
