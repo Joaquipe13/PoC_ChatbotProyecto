@@ -84,6 +84,52 @@ def test_dictamen_apta_sin_observaciones():
     assert "Observaciones" not in texto
 
 
+_CONDICIONES_EL_TREBOL = {
+    "localidad": "El Trébol", "tipo_aplicacion": "aerea", "banda": "II",
+    "banda_color": "amarilla",
+    "productos_por_banda": {"Producto A": "IV", "Producto B": "II"},
+    "distancias_minimas": [{"tipo_zona": "zona_urbana", "distancia_min_m": 3000.0}],
+    "advertencias": [],
+}
+
+
+def test_dictamen_informa_banda_de_la_aplicacion_y_distancia_minima():
+    respuesta = RespuestaAgente(tipo="dictamen")
+    resultado = ResultadoTool(
+        estado="ok",
+        datos={
+            "jurisdiccion_id": "el-trebol",
+            "dictamen": {
+                "resultado": "APTA", "observaciones": [], "chequeos_no_realizados": [],
+                "citas": [{"fuente": "normativa", "norma": "ordenanza-841-2010", "articulo": "7"}],
+                "condiciones": _CONDICIONES_EL_TREBOL,
+            },
+        },
+    )
+    texto = _un_mensaje(respuesta, [resultado])
+    assert texto == (
+        "*Dictamen* — el-trebol\n"
+        "*Resultado:* ✅ APTA\n\n"
+        "*Condiciones de aplicación* — El Trébol\n"
+        "- *Banda de la aplicación:* II (amarilla), aplicación aérea\n"
+        "  La rige el producto más peligroso de la mezcla: Producto A (IV), Producto B (II)\n"
+        "- *Distancia mínima a zona urbana:* 3000 m\n\n"
+        "*Fuentes*\n"
+        "- ordenanza-841-2010, art. 7"
+    )
+
+
+def test_evaluar_riesgo_suelto_muestra_condiciones_sin_veredicto():
+    respuesta = RespuestaAgente(tipo="dictamen")
+    resultado = ResultadoTool(
+        estado="ok",
+        datos={"jurisdiccion_id": "el-trebol", "condiciones": _CONDICIONES_EL_TREBOL},
+    )
+    texto = _un_mensaje(respuesta, [resultado])
+    assert texto.startswith("*Condiciones de aplicación* — El Trébol")
+    assert "Resultado" not in texto
+
+
 def test_consulta_producto_listado():
     respuesta = RespuestaAgente(tipo="consulta_producto")
     resultado = ResultadoTool(
@@ -168,7 +214,7 @@ def test_no_resuelto_con_motivo():
         estado="no_resuelto", motivo=MotivoNoResuelto.JURISDICCION_NO_CUBIERTA
     )
     texto = _un_mensaje(respuesta, [resultado])
-    assert "no cae en ningún polígono de localidad cargado" in texto
+    assert "no está entre las cargadas" in texto
 
 
 def test_ayuda_es_texto_fijo():

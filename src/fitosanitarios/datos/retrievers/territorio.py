@@ -6,21 +6,13 @@ estos retrievers -- sin PostGIS (ver skill, "Base de datos").
 """
 
 import math
-from dataclasses import dataclass
 
 import psycopg
 
 from fitosanitarios.datos.vectores import vector_literal
 from fitosanitarios.servicios.geo import LocalidadCandidata, ZonaCandidata
+from fitosanitarios.servicios.localidad import Jurisdiccion
 from fitosanitarios.servicios.reglas import ReglaCandidata
-
-
-@dataclass
-class Jurisdiccion:
-    id: int
-    jurisdiccion_id: str
-    nombre: str
-    provincia_id: int
 
 METROS_POR_GRADO_LAT = 111_320
 
@@ -126,6 +118,18 @@ def obtener_localidad_por_jurisdiccion_id(
     if fila is None:
         return None
     return Jurisdiccion(id=fila[0], jurisdiccion_id=fila[1], nombre=fila[2], provincia_id=fila[3])
+
+
+def listar_localidades(conn: psycopg.Connection) -> list[Jurisdiccion]:
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT id, jurisdiccion_id, nombre, provincia_id FROM territorio.localidad "
+            "ORDER BY nombre"
+        )
+        return [
+            Jurisdiccion(id=f[0], jurisdiccion_id=f[1], nombre=f[2], provincia_id=f[3])
+            for f in cur.fetchall()
+        ]
 
 
 def listar_jurisdicciones_cargadas(conn: psycopg.Connection) -> list[str]:

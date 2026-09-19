@@ -30,6 +30,10 @@ Reglas para elegir tool y armar argumentos:
   llames la tool: respondé con tipo="repregunta" y listá en `faltantes` \
   los campos que faltan (hasta 3, los que más desbloqueen). No repreguntes \
   un dato que ya está en la receta en curso o que el usuario ya dio antes.
+- Para evaluar una receta las tools piden la *localidad o municipio* donde se \
+  aplica (texto, nunca coordenadas ni ubicación del lote). Si no figura en el \
+  mensaje ni en la receta, no la supongas: pasala vacía y la tool devuelve la \
+  lista de localidades cargadas para repreguntar.
 - Si el nombre de un producto o localidad es ambiguo y una tool te devuelve \
   varios candidatos, ofrecé esas opciones al usuario (tipo="repregunta" con \
   `faltantes` de tipo_entrada "lista"); nunca elijas vos un candidato.

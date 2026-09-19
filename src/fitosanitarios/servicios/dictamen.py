@@ -8,15 +8,18 @@
   correr (ej. producto sin usos registrados: cultivo y dosis quedan "no
   verificados", nunca APTA por omisión).
 
-Obligatorios: producto registrado y activo, cultivo autorizado, distancia
-mínima a zonas protegidas, dosis dentro de rango.
+Obligatorios: producto registrado y activo, cultivo autorizado y dosis
+dentro de rango. La distancia mínima a zonas protegidas ya no se compara
+contra la ubicación del lote: se informa como `condiciones` (banda de la
+aplicación y distancias mínimas de la localidad) y no cambia el resultado.
+Lo único que sí lo condiciona es una banda de producto desconocida: sin ella
+la banda de la aplicación podría ser más restrictiva, así que queda NO_EVALUABLE.
 """
 
 from dataclasses import dataclass, field
 
-from fitosanitarios.dominio.modelos import Cita, Dictamen, Observacion
+from fitosanitarios.dominio.modelos import Cita, CondicionesAplicacion, Dictamen, Observacion
 from fitosanitarios.servicios.dosis import ChequeoDosis
-from fitosanitarios.servicios.reglas import ChequeoDistanciaZona
 
 
 @dataclass
@@ -35,9 +38,9 @@ class ChequeoProducto:
 
 def armar_dictamen(
     chequeos_producto: list[ChequeoProducto],
-    chequeos_distancia: list[ChequeoDistanciaZona],
     chequeos_dosis: list[ChequeoDosis],
     chequeos_no_realizados: list[str] | None = None,
+    condiciones: CondicionesAplicacion | None = None,
 ) -> Dictamen:
     observaciones: list[Observacion] = []
     citas: list[Cita] = []
@@ -69,20 +72,6 @@ def armar_dictamen(
                 "(el producto no tiene usos registrados)"
             )
 
-    for cd in chequeos_distancia:
-        citas.extend(cd.citas)
-        if not cd.cumple:
-            observaciones.append(
-                Observacion(
-                    descripcion=(
-                        f"Distancia a {cd.zona_tipo} ({cd.zona_nombre}) insuficiente: el "
-                        f"lote está a {cd.distancia_real_m:.0f} m y el mínimo es "
-                        f"{cd.distancia_min_aplicable_m:.0f} m."
-                    ),
-                    citas=cd.citas,
-                )
-            )
-
     for chd in chequeos_dosis:
         if not chd.comparable:
             if chd.requiere_volumen_caldo:
@@ -108,6 +97,15 @@ def armar_dictamen(
                 )
             )
 
+    if condiciones is not None:
+        for distancia in condiciones.distancias_minimas:
+            citas.extend(distancia.citas)
+        no_realizados.extend(
+            f"{producto}: no figura su banda toxicológica en SENASA; la de la aplicación "
+            "podría ser más restrictiva"
+            for producto in condiciones.productos_sin_banda
+        )
+
     if observaciones:
         resultado = "OBSERVADA"
     elif no_realizados:
@@ -120,4 +118,5 @@ def armar_dictamen(
         observaciones=observaciones,
         chequeos_no_realizados=no_realizados,
         citas=citas,
+        condiciones=condiciones,
     )

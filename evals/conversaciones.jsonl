@@ -2,12 +2,12 @@
 {"id": "ruteo_02", "categoria": "ruteo", "mensaje": "Necesito saber si puedo usar Glifosato Full 48 SL en mi lote de maíz", "tool_esperada": "validar_producto_registro"}
 {"id": "ruteo_03", "categoria": "ruteo", "mensaje": "¿Qué productos hay registrados para yuyo colorado en soja?", "tool_esperada": "consultar_productos"}
 {"id": "ruteo_04", "categoria": "ruteo", "mensaje": "Dame un listado de insecticidas para maíz", "tool_esperada": "consultar_productos"}
-{"id": "ruteo_05", "categoria": "ruteo", "mensaje": "Quiero aplicar Flyer 10 Ec en soja a 170 cm3/ha, terrestre, lote en -32.912,-60.642, contra chinche de la alfalfa. ¿Hay algún riesgo por la ubicación?", "tool_esperada": "evaluar_riesgo"}
+{"id": "ruteo_05", "categoria": "ruteo", "mensaje": "Quiero aplicar Flyer 10 Ec en soja a 170 cm3/ha, terrestre, en San Carlos Centro, contra chinche de la alfalfa. ¿A qué distancia de la zona urbana tengo que aplicar?", "tool_esperada": "evaluar_riesgo"}
 {"id": "ruteo_06", "categoria": "ruteo", "mensaje": "¿A cuántos metros de una escuela puedo aplicar por tierra en San Carlos Centro?", "tool_esperada": "responder_consulta_normativa"}
 {"id": "ruteo_07", "categoria": "ruteo", "mensaje": "¿Puedo aplicar fitosanitarios cerca de un curso de agua en San Carlos Centro?", "tool_esperada": "responder_consulta_normativa"}
 {"id": "ruteo_08", "categoria": "ruteo", "mensaje": "¿Hay productos con principio activo glifosato registrados para soja?", "tool_esperada": "consultar_productos"}
 {"id": "ruteo_09", "categoria": "ruteo", "mensaje": "El producto Abril 50 Curasemilla, ¿sirve para trigo?", "tool_esperada": "validar_producto_registro"}
-{"id": "ruteo_10", "categoria": "ruteo", "mensaje": "Quiero validar la receta completa: Flyer 10 Ec en soja, 170 cm3/ha, terrestre, lote -32.912,-60.642, contra chinche de la alfalfa", "tool_esperada": "evaluar_viabilidad_legal"}
+{"id": "ruteo_10", "categoria": "ruteo", "mensaje": "Quiero validar la receta completa: Flyer 10 Ec en soja, 170 cm3/ha, terrestre, en San Carlos Centro, contra chinche de la alfalfa", "tool_esperada": "evaluar_viabilidad_legal"}
 {"id": "ruteo_11", "categoria": "ruteo", "mensaje": "En Colonia Vecina, ¿cuál es la distancia mínima a una escuela para aplicación terrestre?", "tool_esperada": "responder_consulta_normativa"}
 {"id": "ruteo_12", "categoria": "ruteo", "mensaje": "¿Qué fungicidas hay para trigo?", "tool_esperada": "consultar_productos"}
 {"id": "repregunta_01", "categoria": "repregunta", "mensaje": "Quiero evaluar si puedo aplicar en mi lote", "tool_esperada": null}
@@ -26,7 +26,7 @@
 {"id": "ambiguedad_02", "categoria": "ambiguedad", "mensaje": "Quiero aplicar el de siempre en el lote 4", "tool_esperada": null, "notas": "no identifica el producto, debería repreguntar"}
 {"id": "no_resuelto_01", "categoria": "no_resuelto", "mensaje": "¿El producto Xyzzynoexisteregistro123 sirve para soja?", "tool_esperada": "validar_producto_registro", "notas": "producto inexistente -> PRODUCTO_NO_ENCONTRADO"}
 {"id": "no_resuelto_02", "categoria": "no_resuelto", "mensaje": "¿A qué distancia de una escuela puedo aplicar en Buenos Aires Capital?", "tool_esperada": "responder_consulta_normativa", "notas": "jurisdiccion no cargada"}
-{"id": "no_resuelto_03", "categoria": "no_resuelto", "mensaje": "Quiero evaluar riesgo para un lote en -34.6, -58.4 (Buenos Aires), Flyer 10 Ec, soja, terrestre, 170 cm3/ha", "tool_esperada": "evaluar_riesgo", "notas": "fuera de las localidades cargadas -> JURISDICCION_NO_CUBIERTA"}
+{"id": "no_resuelto_03", "categoria": "no_resuelto", "mensaje": "Quiero evaluar riesgo para una aplicación en Buenos Aires, Flyer 10 Ec, soja, terrestre, 170 cm3/ha", "tool_esperada": "evaluar_riesgo", "notas": "localidad fuera de las cargadas -> JURISDICCION_NO_CUBIERTA"}
 {"id": "comando_01", "categoria": "comando", "mensaje": "nueva receta", "tool_esperada": null}
 {"id": "comando_02", "categoria": "comando", "mensaje": "cancelar", "tool_esperada": null}
 {"id": "comando_03", "categoria": "comando", "mensaje": "quiero cancelar la receta que estaba haciendo", "tool_esperada": null}

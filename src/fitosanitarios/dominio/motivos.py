@@ -27,10 +27,10 @@ class MotivoNoResuelto(StrEnum):
 
 DESCRIPCION_MOTIVO: dict[MotivoNoResuelto, str] = {
     MotivoNoResuelto.JURISDICCION_NO_CUBIERTA: (
-        "El punto del lote no cae en ningún polígono de localidad cargado."
+        "La localidad indicada no está entre las cargadas en el sistema."
     ),
     MotivoNoResuelto.SIN_REGLA_APLICABLE: (
-        "La jurisdicción del lote no tiene ninguna regla de distancia para "
+        "La localidad no tiene ninguna regla de distancia para "
         "ese tipo de zona o de aplicación."
     ),
     MotivoNoResuelto.PRODUCTO_NO_ENCONTRADO: (

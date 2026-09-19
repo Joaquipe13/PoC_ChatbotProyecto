@@ -76,11 +76,37 @@ class Observacion(BaseModel):
     citas: list[Cita] = Field(default_factory=list)
 
 
+class DistanciaMinima(BaseModel):
+    """Distancia mínima que fija la normativa de la localidad para un tipo de zona."""
+
+    tipo_zona: str  # "zona_urbana", "escuela", "curso_agua", ...
+    distancia_min_m: float
+    citas: list[Cita] = Field(default_factory=list)
+    advertencias: list[str] = Field(default_factory=list)
+
+
+class CondicionesAplicacion(BaseModel):
+    """Qué exige la normativa para esta aplicación, sin comparar contra la
+    ubicación del lote: solo informa banda y distancias mínimas según la
+    localidad, el tipo de aplicación y las bandas de los productos."""
+
+    localidad: str
+    tipo_aplicacion: str
+    banda: str | None = None  # la más peligrosa entre los productos de la aplicación
+    banda_color: str | None = None
+    productos_por_banda: dict[str, str | None] = Field(default_factory=dict)
+    # Sin su banda, la de la aplicación podría ser más restrictiva de lo que se informa.
+    productos_sin_banda: list[str] = Field(default_factory=list)
+    distancias_minimas: list[DistanciaMinima] = Field(default_factory=list)
+    advertencias: list[str] = Field(default_factory=list)
+
+
 class Dictamen(BaseModel):
     resultado: Literal["APTA", "OBSERVADA", "NO_EVALUABLE"]
     observaciones: list[Observacion] = Field(default_factory=list)
     chequeos_no_realizados: list[str] = Field(default_factory=list)
     citas: list[Cita] = Field(default_factory=list)
+    condiciones: CondicionesAplicacion | None = None
 
 
 class CampoFaltante(BaseModel):

@@ -111,7 +111,7 @@ Más las tablas propias del checkpointer de LangGraph.
 | Tool | Qué recupera | Qué se hace con lo recuperado |
 |---|---|---|
 | `validar_producto_registro` | candidatos por embedding de producto + trigram; joins a activos y usos; cultivo y adversidad resueltos por embedding | validación en código |
-| `evaluar_riesgo` | localidad (bbox + punto en polígono), zonas en radio, reglas de localidad + provincia + nación con norma y artículo, dosis del uso registrado | distancia y rango de dosis en código |
+| `evaluar_riesgo` | localidad por nombre, reglas de localidad + provincia + nación con norma y artículo, banda de cada producto, dosis del uso registrado | banda de la aplicación (la más peligrosa), distancia mínima por tipo de zona y rango de dosis en código |
 | `responder_consulta_normativa` | artículos por embedding (+ full-text) con join a norma, filtrados por localidad, provincia y nacional | el LLM responde solo con esos artículos; citas verificadas en código |
 | `consultar_productos` | productos registrados por cultivo, adversidad, principio activo, aptitud o banda: términos resueltos por embedding, después joins y filtros | lista con registro, banda y dosis registrada. Informa lo registrado; no recomienda qué aplicar (eso lo prescribe el agrónomo) |
 
@@ -176,7 +176,7 @@ Fuera de dominio no es un motivo de tool: lo decide el orquestador antes de llam
 |---|---|---|---|
 | `leer_receta` | imagen de la receta | — | pedir la foto, nítida y completa |
 | `validar_producto_registro` | producto(s), cultivo | adversidad, dosis + unidad | cultivo: texto. Producto ambiguo: lista de candidatos |
-| `evaluar_riesgo` | ubicación del lote (lat/lon), tipo de aplicación, productos con banda, cultivo, dosis + unidad | adversidad (pasa a requerida si las dosis registradas varían por adversidad) | ubicación: mensaje de ubicación. Tipo: botones Terrestre/Aérea |
+| `evaluar_riesgo` | localidad o municipio (texto), tipo de aplicación, productos, cultivo, dosis + unidad | adversidad (pasa a requerida si las dosis registradas varían por adversidad) | localidad: lista de las cargadas. Tipo: botones Terrestre/Aérea |
 | `evaluar_viabilidad_legal` | receta confirmada con los requeridos de las dos anteriores | superficie, fecha prevista | repreguntar agrupado |
 | `responder_consulta_normativa` | pregunta, jurisdicción (explícita o de la receta en curso) | tipo de aplicación, tipo de zona | jurisdicción: lista de las localidades cargadas |
 | `consultar_productos` | al menos uno: cultivo, adversidad o principio activo | aptitud, banda máxima | pedir cultivo o plaga |

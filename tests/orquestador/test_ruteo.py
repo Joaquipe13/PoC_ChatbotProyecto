@@ -17,7 +17,7 @@ from tests.orquestador.fake_chat_model import (
     mensaje_respuesta_estructurada,
 )
 
-LAT_SAN_CARLOS, LON_SAN_CARLOS = -32.912, -60.642  # lejos de zonas protegidas
+LOCALIDAD = "San Carlos Centro"
 
 
 def _turno_con_respuestas(respuestas, mensaje="mensaje de prueba", thread_id="t-ruteo"):
@@ -51,7 +51,7 @@ def test_ruteo_consultar_productos(conexion):
 def test_ruteo_evaluar_riesgo(conexion):
     respuesta, mensajes, _ = _turno_con_respuestas([
         mensaje_llama_tool("evaluar_riesgo", {
-            "lat": LAT_SAN_CARLOS, "lon": LON_SAN_CARLOS, "tipo_aplicacion": "terrestre",
+            "localidad": LOCALIDAD, "tipo_aplicacion": "terrestre",
             "productos": ["Flyer 10 Ec"], "cultivo": "Soja",
             "dosis_valor": 170, "dosis_unidad": "cm³/ha",
         }),
@@ -67,7 +67,7 @@ def test_ruteo_evaluar_viabilidad_legal(conexion):
     # misma fase, DECISIONES.md).
     respuesta, mensajes, _ = _turno_con_respuestas([
         mensaje_llama_tool("evaluar_viabilidad_legal", {
-            "lat": LAT_SAN_CARLOS, "lon": LON_SAN_CARLOS, "tipo_aplicacion": "terrestre",
+            "localidad": LOCALIDAD, "tipo_aplicacion": "terrestre",
             "productos": [{"nombre": "Flyer 10 Ec", "dosis_valor": 170, "dosis_unidad": "cm³/ha"}],
             "cultivo": "Soja", "adversidad": "Chinche De La Alfalfa",
         }),
@@ -75,7 +75,8 @@ def test_ruteo_evaluar_viabilidad_legal(conexion):
     ])
     assert respuesta.tipo == "dictamen"
     assert "Dictamen" in mensajes[0]
-    assert "APTA" in mensajes[0]  # lejos de zonas protegidas, dosis en rango
+    assert "APTA" in mensajes[0]  # producto registrado y dosis en rango
+    assert "Condiciones de aplicación" in mensajes[0]
 
 
 def test_ruteo_responder_consulta_normativa(conexion):

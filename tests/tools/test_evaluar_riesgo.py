@@ -1,55 +1,62 @@
+"""Integración contra Postgres real (Docker) con las localidades sintéticas de
+`tests/fixtures/insumos/`. La tool ya no usa la ubicación del lote: identifica
+la localidad por nombre e informa banda de la aplicación y distancias mínimas.
+
+"Flyer 10 Ec" es un producto real del catálogo, banda II."""
+
+from fitosanitarios.dominio.motivos import MotivoNoResuelto
 from fitosanitarios.tools.evaluar_riesgo import EvaluarRiesgoArgs, evaluar_riesgo_logica
 
-RADIO_BUSQUEDA_M = 2000
 TOLERANCIA_PCT = 10.0
 
-LON_LEJOS, LAT_LEJOS = -60.642, -32.912
-LON_ESCUELA_80M, LAT_ESCUELA_80M = -60.6505, -32.92877865019107
 
-
-def test_riesgo_ok_lejos_de_zonas_protegidas(conexion, modelo_embeddings):
-    args = EvaluarRiesgoArgs(
-        lat=LAT_LEJOS, lon=LON_LEJOS, tipo_aplicacion="terrestre",
+def _args(**kwargs) -> EvaluarRiesgoArgs:
+    base = dict(
+        localidad="San Carlos Centro", tipo_aplicacion="terrestre",
         productos=["Flyer 10 Ec"], cultivo="Soja", adversidad="Chinche De La Alfalfa",
         dosis_valor=170, dosis_unidad="cm³/ha",
     )
-    resultado = evaluar_riesgo_logica(
-        args, conexion, modelo_embeddings, RADIO_BUSQUEDA_M, TOLERANCIA_PCT
-    )
+    return EvaluarRiesgoArgs(**{**base, **kwargs})
+
+
+def test_riesgo_informa_banda_y_distancias_minimas_de_la_localidad(conexion, modelo_embeddings):
+    resultado = evaluar_riesgo_logica(_args(), conexion, modelo_embeddings, TOLERANCIA_PCT)
     assert resultado.estado == "ok"
     assert resultado.datos["jurisdiccion_id"] == "san-carlos-centro"
+    condiciones = resultado.datos["condiciones"]
+    assert condiciones["banda"] == "II"
+    distancias = {d["tipo_zona"]: d["distancia_min_m"] for d in condiciones["distancias_minimas"]}
+    assert distancias["escuela"] == 100
+    assert distancias["curso_agua"] == 50
+    assert distancias["zona_urbana"] == 300  # regla provincial: aplica a toda localidad de Santa Fe
+    assert len(resultado.citas) > 0
 
 
-def test_riesgo_observado_por_distancia_a_escuela(conexion, modelo_embeddings):
-    args = EvaluarRiesgoArgs(
-        lat=LAT_ESCUELA_80M, lon=LON_ESCUELA_80M, tipo_aplicacion="terrestre",
-        productos=["Flyer 10 Ec"], cultivo="Soja", adversidad="Chinche De La Alfalfa",
-        dosis_valor=170, dosis_unidad="cm³/ha",
-    )
+def test_riesgo_aplicacion_aerea_usa_la_regla_aerea(conexion, modelo_embeddings):
     resultado = evaluar_riesgo_logica(
-        args, conexion, modelo_embeddings, RADIO_BUSQUEDA_M, TOLERANCIA_PCT
+        _args(tipo_aplicacion="aerea"), conexion, modelo_embeddings, TOLERANCIA_PCT
     )
-    assert resultado.estado == "observado"
-    # Con radio 2000 m también entra la escuela de colonia-vecina (a más de
-    # 100 m, cumple) -- las reglas de la jurisdicción del lote (San Carlos)
-    # se aplican a toda zona protegida en el radio, sea de la localidad que
-    # sea (ver skill, "Geo"). Hay que buscar puntualmente la escuela cercana.
-    zona_escuela = next(
-        z for z in resultado.datos["zonas_evaluadas"] if z["tipo"] == "escuela" and not z["cumple"]
-    )
-    assert zona_escuela["distancia_m"] < 100
+    distancias = {
+        d["tipo_zona"]: d["distancia_min_m"]
+        for d in resultado.datos["condiciones"]["distancias_minimas"]
+    }
+    assert distancias["escuela"] == 200
+    assert any("Aviso previo" in a for a in resultado.advertencias)
 
 
-def test_riesgo_jurisdiccion_no_cubierta(conexion, modelo_embeddings):
-    args = EvaluarRiesgoArgs(
-        lat=-50.0, lon=-70.0, tipo_aplicacion="terrestre",
-        productos=["Flyer 10 Ec"], cultivo="Soja", dosis_valor=170, dosis_unidad="cm³/ha",
-    )
+def test_riesgo_sin_localidad_pide_la_lista_de_cargadas(conexion, modelo_embeddings):
     resultado = evaluar_riesgo_logica(
-        args, conexion, modelo_embeddings, RADIO_BUSQUEDA_M, TOLERANCIA_PCT
+        _args(localidad=None), conexion, modelo_embeddings, TOLERANCIA_PCT
+    )
+    assert resultado.estado == "faltan_datos"
+    (faltante,) = resultado.faltantes
+    assert faltante.campo == "localidad"
+    assert "San Carlos Centro" in faltante.opciones
+
+
+def test_riesgo_localidad_no_cargada(conexion, modelo_embeddings):
+    resultado = evaluar_riesgo_logica(
+        _args(localidad="Buenos Aires"), conexion, modelo_embeddings, TOLERANCIA_PCT
     )
     assert resultado.estado == "no_resuelto"
-
-    from fitosanitarios.dominio.motivos import MotivoNoResuelto
-
     assert resultado.motivo == MotivoNoResuelto.JURISDICCION_NO_CUBIERTA

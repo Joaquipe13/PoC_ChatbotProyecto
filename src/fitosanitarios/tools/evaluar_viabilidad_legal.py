@@ -7,17 +7,13 @@ tools (ver skill, "Arquitectura")."""
 from langchain_core.tools import tool
 from pydantic import BaseModel
 
-from fitosanitarios.datos.retrievers.territorio import (
-    localidades_candidatas_por_punto,
-    reglas_candidatas,
-    zonas_protegidas_en_radio,
-)
+from fitosanitarios.datos.retrievers.territorio import reglas_candidatas
 from fitosanitarios.dominio.modelos import CampoFaltante, ResultadoTool
 from fitosanitarios.dominio.motivos import MotivoNoResuelto
+from fitosanitarios.servicios.condiciones_aplicacion import calcular_condiciones
 from fitosanitarios.servicios.dictamen import armar_dictamen
-from fitosanitarios.servicios.geo import calcular_distancias, resolver_jurisdiccion
-from fitosanitarios.servicios.reglas import evaluar_distancia_zona
 from fitosanitarios.servicios.validacion_producto import resolver_y_validar_producto
+from fitosanitarios.tools._localidad import resolver_localidad_o_cortar
 
 
 class ProductoDeclarado(BaseModel):
@@ -27,8 +23,7 @@ class ProductoDeclarado(BaseModel):
 
 
 class EvaluarViabilidadLegalArgs(BaseModel):
-    lat: float
-    lon: float
+    localidad: str | None = None
     tipo_aplicacion: str  # "terrestre" | "aerea"
     productos: list[ProductoDeclarado]
     cultivo: str
@@ -40,23 +35,17 @@ def evaluar_viabilidad_legal_logica(
     args: EvaluarViabilidadLegalArgs,
     conn,
     modelo_embeddings,
-    radio_busqueda_m: float,
     tolerancia_pct: float,
 ) -> ResultadoTool:
-    localidades = localidades_candidatas_por_punto(conn, args.lat, args.lon)
-    localidad = resolver_jurisdiccion(args.lat, args.lon, localidades)
-    if localidad is None:
-        return ResultadoTool(
-            estado="no_resuelto", motivo=MotivoNoResuelto.JURISDICCION_NO_CUBIERTA
-        )
+    localidad, corte = resolver_localidad_o_cortar(conn, args.localidad)
+    if corte is not None:
+        return corte
 
-    zonas = zonas_protegidas_en_radio(conn, args.lat, args.lon, radio_busqueda_m)
-    distancias = calcular_distancias(args.lat, args.lon, zonas)
     reglas = reglas_candidatas(conn, localidad.id, localidad.provincia_id)
 
     chequeos_producto = []
-    chequeos_distancia = []
     chequeos_dosis = []
+    banda_por_producto: dict[str, str | None] = {}
 
     for producto in args.productos:
         resolucion = resolver_y_validar_producto(
@@ -86,18 +75,12 @@ def evaluar_viabilidad_legal_logica(
         if resolucion.chequeo_dosis is not None:
             chequeos_dosis.append(resolucion.chequeo_dosis)
 
-        if resolucion.motivo_no_resuelto == MotivoNoResuelto.SIN_USOS_REGISTRADOS:
-            continue  # sin banda/usos: no hay con qué evaluar distancia para este producto
+        banda_por_producto[resolucion.marca] = resolucion.banda_toxicologica
 
-        banda = resolucion.banda_toxicologica or "todas"
-        for zona in distancias:
-            chequeo = evaluar_distancia_zona(
-                zona.tipo, zona.nombre, zona.distancia_m, reglas, args.tipo_aplicacion, banda
-            )
-            if chequeo is not None:
-                chequeos_distancia.append(chequeo)
-
-    dictamen = armar_dictamen(chequeos_producto, chequeos_distancia, chequeos_dosis, [])
+    condiciones = calcular_condiciones(
+        localidad.nombre, args.tipo_aplicacion, banda_por_producto, reglas
+    )
+    dictamen = armar_dictamen(chequeos_producto, chequeos_dosis, [], condiciones)
 
     estado = "ok" if dictamen.resultado == "APTA" else "observado"
     return ResultadoTool(
@@ -107,6 +90,8 @@ def evaluar_viabilidad_legal_logica(
             "jurisdiccion_id": localidad.jurisdiccion_id,
         },
         citas=dictamen.citas,
+        advertencias=condiciones.advertencias
+        + [a for d in condiciones.distancias_minimas for a in d.advertencias],
         chequeos_no_realizados=dictamen.chequeos_no_realizados,
     )
 
@@ -117,21 +102,21 @@ def evaluar_viabilidad_legal_logica(
     response_format="content_and_artifact",
 )
 def evaluar_viabilidad_legal(
-    lat: float,
-    lon: float,
     tipo_aplicacion: str,
     productos: list[ProductoDeclarado],
     cultivo: str,
+    localidad: str | None = None,
     adversidad: str | None = None,
     superficie_ha: float | None = None,
 ) -> tuple[str, ResultadoTool]:
     """Emite el dictamen completo (APTA/OBSERVADA/NO EVALUABLE) de una
-    receta ya confirmada por el operario. Requiere los mismos datos que
-    `validar_producto_registro` y `evaluar_riesgo` juntos.
+    receta ya confirmada por el operario e informa la banda de la aplicación
+    y la distancia mínima a zona urbana y otras zonas que fija la normativa
+    de la localidad (no usa la ubicación exacta del lote). Requiere los
+    mismos datos que `validar_producto_registro` y `evaluar_riesgo` juntos.
 
     Args:
-        lat: latitud del lote.
-        lon: longitud del lote.
+        localidad: localidad o municipio donde se va a aplicar.
         tipo_aplicacion: "terrestre" o "aerea".
         productos: lista de productos con su dosis declarada.
         cultivo: cultivo declarado.
@@ -142,13 +127,13 @@ def evaluar_viabilidad_legal(
     from fitosanitarios.tools._recursos import con_conexion_y_modelo
 
     args = EvaluarViabilidadLegalArgs(
-        lat=lat, lon=lon, tipo_aplicacion=tipo_aplicacion, productos=productos,
+        localidad=localidad, tipo_aplicacion=tipo_aplicacion, productos=productos,
         cultivo=cultivo, adversidad=adversidad, superficie_ha=superficie_ha,
     )
     settings = get_settings()
     resultado = con_conexion_y_modelo(
         lambda conn, modelo: evaluar_viabilidad_legal_logica(
-            args, conn, modelo, settings.radio_busqueda_zonas_m, settings.dosis_tolerancia_pct
+            args, conn, modelo, settings.dosis_tolerancia_pct
         )
     )
     dictamen_resultado = resultado.datos["dictamen"]["resultado"] if resultado.datos else "-"

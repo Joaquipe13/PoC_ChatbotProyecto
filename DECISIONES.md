@@ -281,3 +281,20 @@ A ese ritmo, embeber el catálogo completo de SENASA (~7.374 productos, más pri
 ### Excepción de cuota agotada del LLM: detección heurística por texto
 
 No se pudo verificar contra documentación oficial el tipo exacto de excepción que levantan `google-genai` y `groq` ante un 429/cuota agotada. `src/fitosanitarios/llm/client.py` detecta el caso buscando "429", "RESOURCE_EXHAUSTED" o "RATE LIMIT" en el texto de la excepción, en vez de capturar una clase específica. **Verificar** antes de la Fase 2 (primera llamada real) y reemplazar por el tipo de excepción correcto si existe uno más específico.
+
+### Se quita la validación por ubicación del lote: ahora se informa banda y distancia mínima por localidad
+
+**Cambio de planes (19/09/2026).** El dictamen ya no compara la ubicación del lote (lat/lon) contra escuelas, cursos de agua y zona urbana para decir si la aplicación es válida en ese lote. En su lugar, con los datos de la receta contrastados con SENASA, el chatbot informa:
+- la **banda toxicológica de la aplicación completa**: la más peligrosa entre los productos de la mezcla (Ia > Ib > II > III > IV), sin perder la banda propia de cada producto;
+- según la **localidad o municipio** donde se aplica y el tipo de aplicación, la **distancia mínima** a cada tipo de zona (zona urbana, escuela, curso de agua) que fijan las reglas de esa localidad, provinciales y nacionales, con la más restrictiva citando todas las normas que aplican.
+
+**Qué cambió.** `evaluar_riesgo` y `evaluar_viabilidad_legal` reciben `localidad` (texto) en vez de `lat`/`lon`. Nuevo `servicios/localidad.py` (resuelve el nombre contra las localidades cargadas, sin tildes ni mayúsculas; si es ambiguo devuelve opciones, nunca elige) y `servicios/condiciones_aplicacion.py` (banda de la aplicación + distancias mínimas, función pura). `Dictamen` suma `condiciones`; el formateador agrega la sección *Condiciones de aplicación*. Sin localidad, la tool devuelve `faltan_datos` con la lista de las cargadas; localidad no cargada, `JURISDICCION_NO_CUBIERTA` (el texto del motivo pasó de "el punto no cae en ningún polígono" a "la localidad no está entre las cargadas").
+
+**Decisiones de criterio:**
+- La distancia mínima **informa, no dictamina**: ya no hay ubicación contra la cual verificarla, así que no genera OBSERVADA ni bloquea APTA. Si la localidad no tiene regla para esa combinación de aplicación y banda, se advierte en vez de inventar un valor.
+- Una **banda de producto desconocida sí deja el dictamen NO EVALUABLE**: sin ella, la banda de la aplicación (y por lo tanto la distancia) podría ser más restrictiva de lo informado. Ausencia de evidencia no es aprobación.
+- La localidad la aporta el usuario o la receta en curso (el LLM la pasa como texto); `leer_receta` todavía no la extrae de la foto. Pendiente si se quiere leerla de la receta.
+
+**Sin tocar a propósito (código que quedó sin uso, no borrado):** `servicios/geo.py` (punto en polígono y distancias), `localidades_candidatas_por_punto` / `zonas_protegidas_en_radio` en `datos/retrievers/territorio.py`, `evaluar_distancia_zona` en `servicios/reglas.py`, la carga de `zona_protegida` y `radio_busqueda_zonas_m`, `Receta.ubicacion_lat/lon`, y el botón de ubicación del canal web y el mensaje `location` de WhatsApp. Se dejan por si se retoma una capa SIG (ver evaluación de viabilidad de capas y mapa); limpiarlos es una tarea aparte.
+
+**Verificación.** Los tests puros (localidad, condiciones, dictamen, formateador) corren. Los de integración de `evaluar_riesgo`, `evaluar_viabilidad_legal` y ruteo se reescribieron pero **no se pudieron correr** en esta sesión (Docker/Postgres no disponible: se saltan).

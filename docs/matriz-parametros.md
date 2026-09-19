@@ -34,8 +34,7 @@ class ValidarProductoRegistroArgs(BaseModel):
 
 ```python
 class EvaluarRiesgoArgs(BaseModel):
-    lat: float
-    lon: float
+    localidad: str | None = None  # nombre de la localidad/municipio; ya no lat/lon (ver DECISIONES.md)
     tipo_aplicacion: str  # "terrestre" | "aerea"
     productos: list[str]  # nombres tal como los escribió el operario
     cultivo: str
@@ -48,7 +47,9 @@ class EvaluarRiesgoArgs(BaseModel):
 
 | Requeridos | Opcionales | Si falta |
 |---|---|---|
-| ubicación del lote (lat/lon), tipo de aplicación, productos con banda, cultivo, dosis + unidad | adversidad (condicional) | ubicación: mensaje de ubicación. Tipo: botones Terrestre/Aérea |
+| localidad o municipio, tipo de aplicación, productos, cultivo, dosis + unidad | adversidad (condicional) | localidad: lista de las cargadas. Tipo: botones Terrestre/Aérea |
+
+Devuelve la banda de la aplicación completa (la más peligrosa de la mezcla) y la distancia mínima por tipo de zona (zona urbana, escuela, curso de agua) que fija la normativa de la localidad. No compara contra la ubicación del lote.
 
 ## `evaluar_viabilidad_legal`
 

@@ -18,6 +18,13 @@ LIMITE_CARACTERES_WHATSAPP = 4096
 
 _ICONO_DICTAMEN = {"APTA": "✅", "OBSERVADA": "❌", "NO_EVALUABLE": "⚠️"}
 
+_NOMBRE_ZONA = {
+    "zona_urbana": "zona urbana",
+    "escuela": "escuelas",
+    "curso_agua": "cursos de agua",
+    "otro": "otras zonas protegidas",
+}
+
 
 def _num(valor) -> str:
     if valor is None:
@@ -102,9 +109,45 @@ def _plantilla_confirmacion_receta(
 # --- dictamen ---
 
 
+def _bloque_condiciones(condiciones: dict | None) -> str:
+    """Banda de la aplicación completa y distancia mínima por tipo de zona
+    según la localidad (no compara contra la ubicación del lote)."""
+    if not condiciones:
+        return ""
+    lineas = [f"*Condiciones de aplicación* — {condiciones['localidad']}"]
+    tipo = "aérea" if condiciones["tipo_aplicacion"] == "aerea" else condiciones["tipo_aplicacion"]
+    banda = condiciones.get("banda")
+    if banda:
+        color = f" ({condiciones['banda_color']})" if condiciones.get("banda_color") else ""
+        lineas.append(f"- *Banda de la aplicación:* {banda}{color}, aplicación {tipo}")
+    else:
+        lineas.append(f"- *Banda de la aplicación:* no se pudo determinar ⚠️ (aplicación {tipo})")
+    por_banda = condiciones.get("productos_por_banda") or {}
+    if len(por_banda) > 1:
+        detalle = ", ".join(f"{p} ({b or 'sin banda'})" for p, b in por_banda.items())
+        lineas.append(f"  La rige el producto más peligroso de la mezcla: {detalle}")
+    for d in condiciones.get("distancias_minimas", []):
+        zona = _NOMBRE_ZONA.get(d["tipo_zona"], d["tipo_zona"])
+        lineas.append(f"- *Distancia mínima a {zona}:* {_num(d['distancia_min_m'])} m")
+    for advertencia in condiciones.get("advertencias", []):
+        lineas.append(f"⚠️ {advertencia}")
+    return "\n".join(lineas)
+
+
 def _plantilla_dictamen(respuesta: RespuestaAgente, resultados: list[ResultadoTool]) -> str:
     datos = _primer_dato(resultados) or {}
-    dictamen = datos.get("dictamen", {})
+    dictamen = datos.get("dictamen")
+    if dictamen is None:
+        # `evaluar_riesgo` suelto: solo condiciones de aplicación, sin veredicto.
+        no_realizados = [c for r in resultados for c in r.chequeos_no_realizados]
+        bloque_no_realizados = (
+            "\n".join(["*No se pudo verificar*"] + [f"- {c}" for c in no_realizados])
+            if no_realizados else ""
+        )
+        return _unir_secciones(
+            _bloque_condiciones(datos.get("condiciones")), bloque_no_realizados,
+            _seccion_fuentes(_todas_las_citas(resultados)),
+        )
     resultado = dictamen.get("resultado", "NO_EVALUABLE")
     jurisdiccion = datos.get("jurisdiccion_id", "")
     icono = _ICONO_DICTAMEN.get(resultado, "⚠️")
@@ -128,7 +171,8 @@ def _plantilla_dictamen(respuesta: RespuestaAgente, resultados: list[ResultadoTo
 
     citas = [Cita.model_validate(c) for c in dictamen.get("citas", [])]
     return _unir_secciones(
-        encabezado, bloque_observaciones, bloque_no_realizados, _seccion_fuentes(citas)
+        encabezado, bloque_observaciones, bloque_no_realizados,
+        _bloque_condiciones(dictamen.get("condiciones")), _seccion_fuentes(citas),
     )
 
 
