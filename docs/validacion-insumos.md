@@ -1,12 +1,14 @@
 # Validación de insumos — primera carga
 
+> Estructura de carpetas actualizada el 19/09/2026 (municipios dentro de la carpeta de su provincia, ver `docs/contrato-insumos.md`). Los resultados de carga de abajo son de la primera corrida y siguen valiendo: solo cambiaron las rutas.
+
 Reporte de la primera carga real del pipeline de insumos (Fase 3). **No hay insumos reales del equipo todavía** (capas SIG y normativa de las 10 localidades del caso de estudio, ver `plandefases.md` sección 6) — este reporte corre el pipeline completo contra las **fixtures sintéticas** de `tests/fixtures/insumos/`, que tienen la misma estructura y pasan las mismas validaciones que exigirán los datos reales. Cuando el equipo suba las localidades reales, se corre este mismo proceso sobre `data/insumos/` y se actualiza este documento con el resultado real.
 
 ## Insumos usados (sintéticos)
 
-- `localidades/san-carlos-centro/`: límite, 3 zonas protegidas (escuela, curso de agua, zona urbana), `ordenanza-914-2018.pdf` (3 artículos), `reglas.csv` (3 filas). Mismos nombres que usan los ejemplos de referencia de la skill (Ordenanza 914/2018, art. 8, escuela a distancia mínima de 100 m) para tener continuidad con esos casos en fases futuras.
-- `localidades/colonia-vecina/`: límite, 1 zona protegida (escuela), `ordenanza-45-2019.pdf` (1 artículo), `reglas.csv` (1 fila). Localidad limítrofe, para tener un segundo caso y poder probar más adelante (Fase 5) el filtro por jurisdicción y las zonas de localidades vecinas.
-- `normativa-general/provincial/santa-fe/`: `ley-13740-2017.pdf` (3 artículos), `reglas.csv` (1 fila, regla de zona urbana sin localidad asociada).
+- `santa-fe/san-carlos-centro/`: límite, 3 zonas protegidas (escuela, curso de agua, zona urbana), `ordenanza-914-2018.pdf` (3 artículos), `reglas.csv` (3 filas). Mismos nombres que usan los ejemplos de referencia de la skill (Ordenanza 914/2018, art. 8, escuela a distancia mínima de 100 m) para tener continuidad con esos casos en fases futuras.
+- `santa-fe/colonia-vecina/`: límite, 1 zona protegida (escuela), `ordenanza-45-2019.pdf` (1 artículo), `reglas.csv` (1 fila). Localidad limítrofe, para tener un segundo caso y poder probar más adelante (Fase 5) el filtro por jurisdicción y las zonas de localidades vecinas.
+- `santa-fe/` (normativa provincial, en la carpeta de la provincia): `ley-13740-2017.pdf` (3 artículos), `reglas.csv` (1 fila, regla de zona urbana sin localidad asociada).
 - `normativa-general/nacional/`: `ley-27302-2016.pdf` (2 artículos), **sin** `reglas.csv` — a propósito, para probar que el caso opcional no rompe la carga.
 
 Todo el contenido de estos PDFs es ficticio (generado para esta fixture), no transcribe normativa real.
@@ -22,7 +24,7 @@ for clave, r in validar_insumos(Path('tests/fixtures/insumos')).items():
 "
 ```
 
-Resultado: las 4 carpetas (`localidades/san-carlos-centro`, `localidades/colonia-vecina`, `normativa-general/provincial/santa-fe`, `normativa-general/nacional`) validan sin errores ni advertencias.
+Resultado: las 4 carpetas (`santa-fe/san-carlos-centro`, `santa-fe/colonia-vecina`, `santa-fe`, `normativa-general/nacional`) validan sin errores ni advertencias.
 
 ## Carga (`loader_geo.py` → `loader_normativa.py` → `loader_reglas.py`, en ese orden)
 
@@ -55,6 +57,6 @@ El filtro por jurisdicción excluye correctamente artículos de otra localidad: 
 
 ## Pendiente
 
-- Cargar las localidades reales apenas el equipo las suba a `data/insumos/localidades/` (mínimo 2 completas + provinciales para poder empezar a probar la Fase 5 con datos reales; las 10 antes de cerrar esa fase, ver `plandefases.md`).
+- Cargar las localidades reales apenas el equipo las suba a `data/insumos/<provincia>/` (mínimo 2 completas + provinciales para poder empezar a probar la Fase 5 con datos reales; las 10 antes de cerrar esa fase, ver `plandefases.md`).
 - Probar el camino de OCR con un PDF escaneado real: Tesseract no está instalado en la máquina de desarrollo de esta sesión, así que `extraer_texto_o_ocr` nunca ejecutó el branch de OCR de verdad (ver DIFICULTADES.md). El código maneja la ausencia de Tesseract sin romper (marca `requiere_revision=True` y sigue), pero el resultado real del OCR no está validado.
 - Actualizar este documento con los números reales una vez cargada la normativa real.

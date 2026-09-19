@@ -15,6 +15,7 @@ from pathlib import Path
 import psycopg
 
 from fitosanitarios.config import get_settings
+from fitosanitarios.insumos.estructura import carpeta_nacional, carpetas_provincia, localidades
 
 logger = logging.getLogger(__name__)
 
@@ -89,19 +90,18 @@ def _resolver_articulo(
 def cargar_reglas(conn: psycopg.Connection, data_dir: Path) -> int:
     total = 0
     with conn.cursor() as cur:
-        total += _cargar_reglas_localidades(cur, data_dir / "localidades")
-        total += _cargar_reglas_ambito_general(cur, data_dir / "normativa-general")
+        total += _cargar_reglas_localidades(cur, data_dir)
+        total += _cargar_reglas_provinciales(cur, data_dir)
+        total += _cargar_reglas_nacionales(cur, data_dir)
         conn.commit()
     return total
 
 
-def _cargar_reglas_localidades(cur, localidades_dir: Path) -> int:
-    if not localidades_dir.exists():
-        return 0
+def _cargar_reglas_localidades(cur, data_dir: Path) -> int:
     total = 0
-    for carpeta in sorted(localidades_dir.iterdir()):
+    for _provincia, carpeta in localidades(data_dir):
         reglas_csv = carpeta / "reglas.csv"
-        if not carpeta.is_dir() or not reglas_csv.exists():
+        if not reglas_csv.exists():
             continue
         cur.execute(
             "SELECT id FROM territorio.localidad WHERE jurisdiccion_id = %s", (carpeta.name,)
@@ -122,32 +122,34 @@ def _cargar_reglas_localidades(cur, localidades_dir: Path) -> int:
     return total
 
 
-def _cargar_reglas_ambito_general(cur, normativa_general_dir: Path) -> int:
+def _cargar_reglas_provinciales(cur, data_dir: Path) -> int:
+    """`reglas.csv` y PDFs directamente en la carpeta de cada provincia."""
     total = 0
-
-    provincial_dir = normativa_general_dir / "provincial"
-    if provincial_dir.exists():
-        for carpeta in sorted(provincial_dir.iterdir()):
-            reglas_csv = carpeta / "reglas.csv"
-            if not carpeta.is_dir() or not reglas_csv.exists():
-                continue
-            cur.execute("SELECT id FROM territorio.provincia WHERE nombre = %s", (carpeta.name,))
-            prov_row = cur.fetchone()
-            if prov_row:
-                cur.execute(
-                    """
-                    DELETE FROM territorio.regla_distancia
-                    WHERE norma_id IN (
-                        SELECT id FROM territorio.norma
-                        WHERE ambito = 'provincial' AND provincia_id = %s
-                    )
-                    """,
-                    (prov_row[0],),
+    for carpeta in carpetas_provincia(data_dir):
+        reglas_csv = carpeta / "reglas.csv"
+        if not reglas_csv.exists():
+            continue
+        cur.execute("SELECT id FROM territorio.provincia WHERE nombre = %s", (carpeta.name,))
+        prov_row = cur.fetchone()
+        if prov_row:
+            cur.execute(
+                """
+                DELETE FROM territorio.regla_distancia
+                WHERE norma_id IN (
+                    SELECT id FROM territorio.norma
+                    WHERE ambito = 'provincial' AND provincia_id = %s
                 )
-            mapa = _normas_de_carpeta(cur, {p.stem for p in carpeta.glob("*.pdf")})
-            total += cargar_reglas_de_csv(cur, reglas_csv, mapa)
+                """,
+                (prov_row[0],),
+            )
+        mapa = _normas_de_carpeta(cur, {p.stem for p in carpeta.glob("*.pdf")})
+        total += cargar_reglas_de_csv(cur, reglas_csv, mapa)
+    return total
 
-    nacional_dir = normativa_general_dir / "nacional"
+
+def _cargar_reglas_nacionales(cur, data_dir: Path) -> int:
+    total = 0
+    nacional_dir = carpeta_nacional(data_dir)
     reglas_csv = nacional_dir / "reglas.csv"
     if nacional_dir.exists() and reglas_csv.exists():
         cur.execute(

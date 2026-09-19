@@ -50,8 +50,8 @@ def _pdf_sin_texto(ruta: Path) -> None:
 
 def test_fixtures_sinteticas_son_validas():
     for carpeta in [
-        FIXTURES / "localidades" / "san-carlos-centro",
-        FIXTURES / "localidades" / "colonia-vecina",
+        FIXTURES / "santa-fe" / "san-carlos-centro",
+        FIXTURES / "santa-fe" / "colonia-vecina",
     ]:
         resultado = validar_carpeta_localidad(carpeta)
         assert resultado.es_valido, resultado.errores
@@ -229,3 +229,54 @@ def test_pdf_con_texto_no_dispara_a3(tmp_path):
     ruta = tmp_path / "documento.pdf"
     _pdf_con_texto(ruta)
     assert pdf_tiene_texto(ruta) is True
+
+
+# --- Estructura por provincia: <provincia>/<localidad> y normativa provincial en la provincia ---
+
+
+def _armar_provincia(base: Path, provincia: str, provincia_del_limite: str) -> Path:
+    carpeta_provincia = base / provincia
+    localidad = carpeta_provincia / "pueblo-a"
+    localidad.mkdir(parents=True)
+    _pdf_con_texto(carpeta_provincia / "ley-100-2010.pdf")  # normativa provincial
+    _escribir_geojson(localidad / "localidad.geojson", [
+        {"type": "Feature",
+         "properties": {"tipo": "limite", "nombre": "Pueblo A", "provincia": provincia_del_limite},
+         "geometry": LIMITE_VALIDO},
+    ])
+    _pdf_con_texto(localidad / "ordenanza-1-2020.pdf")
+    (localidad / "reglas.csv").write_text(
+        "tipo_zona,tipo_aplicacion,bandas,distancia_min_m,norma,articulo,observaciones\n"
+        "escuela,terrestre,todas,100,ordenanza-1-2020,1,\n",
+        encoding="utf-8",
+    )
+    return localidad
+
+
+def test_las_claves_reflejan_la_jerarquia_provincia_localidad(tmp_path):
+    _armar_provincia(tmp_path, "santa-fe", "santa-fe")
+    resultados = validar_insumos(tmp_path)
+    assert set(resultados) == {"santa-fe", "santa-fe/pueblo-a"}
+    assert all(r.es_valido for r in resultados.values()), resultados
+
+
+def test_la_provincia_se_valida_con_sus_propios_pdfs_no_con_los_de_las_localidades(tmp_path):
+    localidad = _armar_provincia(tmp_path, "santa-fe", "santa-fe")
+    (tmp_path / "santa-fe" / "ley-100-2010.pdf").unlink()  # sin normativa provincial
+    resultados = validar_insumos(tmp_path)
+    assert any(e.codigo == "F1" for e in resultados["santa-fe"].errores)
+    assert localidad.exists() and resultados["santa-fe/pueblo-a"].es_valido
+
+
+def test_f7_provincia_del_limite_distinta_de_la_carpeta_que_la_contiene(tmp_path):
+    _armar_provincia(tmp_path, "santa-fe", "cordoba")
+    resultado = validar_insumos(tmp_path)["santa-fe/pueblo-a"]
+    assert any(e.codigo == "F7" for e in resultado.errores)
+
+
+def test_es_clave_de_localidad():
+    from fitosanitarios.insumos.validador import es_clave_de_localidad
+
+    assert es_clave_de_localidad("santa-fe/el-trebol")
+    assert not es_clave_de_localidad("santa-fe")
+    assert not es_clave_de_localidad("normativa-general/nacional")

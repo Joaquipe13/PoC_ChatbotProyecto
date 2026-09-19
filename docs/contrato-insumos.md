@@ -6,29 +6,29 @@ Formato de los datos que carga el equipo a mano (capas SIG y normativa). Transcr
 
 ```
 data/insumos/
-├── localidades/
-│   └── <jurisdiccion_id>/            p. ej. san-carlos-centro
+├── <provincia>/                      p. ej. santa-fe
+│   ├── ley-NNNNN-AAAA.pdf            normativa provincial (una o más)
+│   ├── reglas.csv                    opcional (reglas de la normativa provincial)
+│   └── <jurisdiccion_id>/            municipio de esa provincia, p. ej. san-carlos-centro
 │       ├── localidad.geojson         límite + zonas protegidas, EPSG:4326
 │       ├── ordenanza-914-2018.pdf    <tipo>-<numero>-<anio>.pdf
 │       └── reglas.csv
 └── normativa-general/
-    ├── provincial/
-    │   └── <provincia>/              p. ej. santa-fe
-    │       ├── ley-NNNNN-AAAA.pdf
-    │       └── reglas.csv            opcional
     └── nacional/
         ├── ley-NNNNN-AAAA.pdf
         └── reglas.csv                opcional
 ```
 
-- `jurisdiccion_id` y `provincia` (nombres de carpeta): minúsculas, sin tildes, palabras separadas por guion. Son la clave que une geometría, normativa y reglas entre sí y con la base (`territorio.localidad.jurisdiccion_id`, `territorio.provincia.nombre`).
+**Cambio (19/09/2026, ver `DECISIONES.md`):** antes las localidades estaban en `localidades/` y la normativa provincial en `normativa-general/provincial/<provincia>/`. Ahora cada municipio vive dentro de la carpeta de su provincia, junto a la normativa provincial. `normativa-general/` queda solo para la nacional.
+
+- `provincia` y `jurisdiccion_id` (nombres de carpeta): minúsculas, sin tildes, palabras separadas por guion. Son la clave que une geometría, normativa y reglas entre sí y con la base (`territorio.localidad.jurisdiccion_id`, `territorio.provincia.nombre`).
 - PDFs: `<tipo>-<numero>-<anio>.pdf`, con `tipo` ∈ `ordenanza | decreto | resolucion | ley`. De ahí sale la cita ("Ordenanza 914/2018") y el ámbito (municipal/provincial/nacional) sale de la carpeta que lo contiene. Solo normas vigentes; si una fue modificada, va también la modificatoria o el texto ordenado completo.
 
 ## `localidad.geojson`
 
 `FeatureCollection` en EPSG:4326 (lat/lon). Cada feature lleva la propiedad `tipo`:
 
-- `limite`: **exactamente una**, `Polygon` o `MultiPolygon`, con propiedades `nombre` y `provincia` (igual al nombre de carpeta en `provincial/`).
+- `limite`: **exactamente una**, `Polygon` o `MultiPolygon`, con propiedades `nombre` y `provincia` (igual al nombre de la carpeta de la provincia que la contiene).
 - `escuela`, `curso_agua`, `zona_urbana` u `otro`: zonas protegidas, con propiedad `nombre`. Pueden ser `Point`, `LineString` o `Polygon` (una escuela como punto, un arroyo como línea); la distancia se calcula igual en cualquier caso.
 
 ## `reglas.csv`
@@ -54,18 +54,18 @@ Implementadas en `src/fitosanitarios/insumos/validador.py` (Fase 3). Dos niveles
 
 | # | Condición |
 |---|---|
-| F1 | A una carpeta de localidad le falta `localidad.geojson`, al menos un PDF, o `reglas.csv`. |
+| F1 | A una carpeta de localidad le falta `localidad.geojson`, al menos un PDF, o `reglas.csv`; o a la carpeta de una provincia le falta al menos un PDF de normativa provincial. |
 | F2 | El GeoJSON no tiene exactamente un feature `limite`. |
 | F3 | El GeoJSON trae un `tipo` de feature desconocido (fuera de `limite`, `escuela`, `curso_agua`, `zona_urbana`, `otro`). |
 | F4 | Una geometría es inválida (self-intersecting, coordenadas fuera de rango) o cae fuera del bounding box de Argentina. |
 | F5 | Una fila de `reglas.csv` cita en `norma` un PDF que no está en la misma carpeta. |
 | F6 | Un nombre de archivo o de carpeta no respeta la convención (`<tipo>-<numero>-<anio>.pdf`, carpeta en minúsculas/sin tildes/con guiones). |
+| F7 | La `provincia` del `limite` de una localidad no coincide con la carpeta de la provincia donde está. |
 
 ### Avisa (no bloquea)
 
 | # | Condición |
 |---|---|
-| A1 | La `provincia` del `limite` no tiene carpeta correspondiente en `provincial/`. |
 | A2 | Una zona protegida queda a más de `RADIO_BUSQUEDA_ZONAS_M` del límite de su propia localidad. |
 | A3 | Un PDF no tiene texto extraíble (escaneado): se marca `requiere_revision=true` en `territorio.articulo` y sigue por OCR (Fase 3). |
 

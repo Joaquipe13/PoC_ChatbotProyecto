@@ -22,6 +22,11 @@ import pdfplumber
 import psycopg
 
 from fitosanitarios.config import get_settings
+from fitosanitarios.insumos.estructura import (
+    carpeta_nacional,
+    carpetas_localidad,
+    carpetas_provincia,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -146,11 +151,25 @@ def cargar_normativa(conn: psycopg.Connection, data_dir: Path, modelo_embeddings
     resumen_total: dict[str, int] = {"normas": 0, "articulos": 0, "pdfs_requieren_revision": 0}
 
     with conn.cursor() as cur:
-        localidades_dir = data_dir / "localidades"
-        if localidades_dir.exists():
-            for carpeta in sorted(localidades_dir.iterdir()):
-                if not carpeta.is_dir():
-                    continue
+        for provincia_dir in carpetas_provincia(data_dir):
+            cur.execute(
+                """
+                INSERT INTO territorio.provincia (nombre) VALUES (%s)
+                ON CONFLICT (nombre) DO UPDATE SET nombre = EXCLUDED.nombre
+                RETURNING id
+                """,
+                (provincia_dir.name,),
+            )
+            provincia_id = cur.fetchone()[0]
+            # Normativa provincial: los PDFs de la propia carpeta de la provincia.
+            r = cargar_normas_de_carpeta(
+                cur, provincia_dir, "provincial", None, provincia_id, modelo_embeddings
+            )
+            for k in resumen_total:
+                resumen_total[k] += r[k]
+
+            # Normativa municipal: las carpetas de localidad dentro de la provincia.
+            for carpeta in carpetas_localidad(provincia_dir):
                 cur.execute(
                     "SELECT id FROM territorio.localidad WHERE jurisdiccion_id = %s",
                     (carpeta.name,),
@@ -162,34 +181,13 @@ def cargar_normativa(conn: psycopg.Connection, data_dir: Path, modelo_embeddings
                         carpeta.name,
                     )
                     continue
-                localidad_id = row[0]
                 r = cargar_normas_de_carpeta(
-                    cur, carpeta, "municipal", localidad_id, None, modelo_embeddings
+                    cur, carpeta, "municipal", row[0], None, modelo_embeddings
                 )
                 for k in resumen_total:
                     resumen_total[k] += r[k]
 
-        provincial_dir = data_dir / "normativa-general" / "provincial"
-        if provincial_dir.exists():
-            for carpeta in sorted(provincial_dir.iterdir()):
-                if not carpeta.is_dir():
-                    continue
-                cur.execute(
-                    """
-                    INSERT INTO territorio.provincia (nombre) VALUES (%s)
-                    ON CONFLICT (nombre) DO UPDATE SET nombre = EXCLUDED.nombre
-                    RETURNING id
-                    """,
-                    (carpeta.name,),
-                )
-                provincia_id = cur.fetchone()[0]
-                r = cargar_normas_de_carpeta(
-                    cur, carpeta, "provincial", None, provincia_id, modelo_embeddings
-                )
-                for k in resumen_total:
-                    resumen_total[k] += r[k]
-
-        nacional_dir = data_dir / "normativa-general" / "nacional"
+        nacional_dir = carpeta_nacional(data_dir)
         if nacional_dir.exists():
             r = cargar_normas_de_carpeta(
                 cur, nacional_dir, "nacional", None, None, modelo_embeddings

@@ -17,7 +17,8 @@ import psycopg
 from shapely.geometry import shape
 
 from fitosanitarios.config import get_settings
-from fitosanitarios.insumos.validador import validar_insumos
+from fitosanitarios.insumos.estructura import localidades
+from fitosanitarios.insumos.validador import es_clave_de_localidad, validar_insumos
 
 logger = logging.getLogger(__name__)
 
@@ -99,11 +100,8 @@ def cargar_localidad(cur, jurisdiccion_id: str, ruta_geojson: Path) -> int:
 
 def cargar_localidades(conn: psycopg.Connection, data_dir: Path) -> dict[str, int]:
     resumen: dict[str, int] = {}
-    localidades_dir = data_dir / "localidades"
     with conn.cursor() as cur:
-        for carpeta in sorted(localidades_dir.iterdir()):
-            if not carpeta.is_dir():
-                continue
+        for _provincia, carpeta in localidades(data_dir):
             geojson = carpeta / "localidad.geojson"
             if not geojson.exists():
                 logger.warning("Carpeta %s sin localidad.geojson, se omite", carpeta)
@@ -127,7 +125,7 @@ def main() -> None:
     args = parser.parse_args()
 
     resultados = validar_insumos(args.data)
-    hay_errores = any(r.errores for k, r in resultados.items() if k.startswith("localidades/"))
+    hay_errores = any(r.errores for k, r in resultados.items() if es_clave_de_localidad(k))
     if hay_errores and not args.forzar:
         for clave, resultado in resultados.items():
             for error in resultado.errores:

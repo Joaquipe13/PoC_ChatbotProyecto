@@ -84,12 +84,12 @@ def main() -> None:
             },
         ],
     }
-    (BASE / "localidades" / "san-carlos-centro" / "localidad.geojson").write_text(
+    (BASE / "santa-fe" / "san-carlos-centro" / "localidad.geojson").write_text(
         json.dumps(localidad_scc, ensure_ascii=False, indent=2), encoding="utf-8"
     )
 
     escribir_pdf(
-        BASE / "localidades" / "san-carlos-centro" / "ordenanza-914-2018.pdf",
+        BASE / "santa-fe" / "san-carlos-centro" / "ordenanza-914-2018.pdf",
         "Ordenanza 914/2018 - Aplicacion de fitosanitarios (texto ficticio, fixture de prueba)",
         [
             ("8", "Prohibese la aplicacion terrestre de fitosanitarios a menos de 100 metros "
@@ -103,7 +103,7 @@ def main() -> None:
         ],
     )
 
-    (BASE / "localidades" / "san-carlos-centro" / "reglas.csv").write_text(
+    (BASE / "santa-fe" / "san-carlos-centro" / "reglas.csv").write_text(
         "tipo_zona,tipo_aplicacion,bandas,distancia_min_m,norma,articulo,observaciones\n"
         "escuela,terrestre,todas,100,ordenanza-914-2018,8,\n"
         "escuela,aerea,todas,200,ordenanza-914-2018,9,Aviso previo a la direccion de la escuela\n"
@@ -137,12 +137,12 @@ def main() -> None:
             },
         ],
     }
-    (BASE / "localidades" / "colonia-vecina" / "localidad.geojson").write_text(
+    (BASE / "santa-fe" / "colonia-vecina" / "localidad.geojson").write_text(
         json.dumps(localidad_cv, ensure_ascii=False, indent=2), encoding="utf-8"
     )
 
     escribir_pdf(
-        BASE / "localidades" / "colonia-vecina" / "ordenanza-45-2019.pdf",
+        BASE / "santa-fe" / "colonia-vecina" / "ordenanza-45-2019.pdf",
         "Ordenanza 45/2019 - Aplicacion de fitosanitarios (texto ficticio, fixture de prueba)",
         [
             ("5", "Prohibese la aplicacion terrestre de fitosanitarios a menos de 150 metros "
@@ -150,7 +150,7 @@ def main() -> None:
         ],
     )
 
-    (BASE / "localidades" / "colonia-vecina" / "reglas.csv").write_text(
+    (BASE / "santa-fe" / "colonia-vecina" / "reglas.csv").write_text(
         "tipo_zona,tipo_aplicacion,bandas,distancia_min_m,norma,articulo,observaciones\n"
         "escuela,terrestre,todas,150,ordenanza-45-2019,5,\n",
         encoding="utf-8",
@@ -159,7 +159,7 @@ def main() -> None:
     # --- Provincial: Santa Fe ---
 
     escribir_pdf(
-        BASE / "normativa-general" / "provincial" / "santa-fe" / "ley-13740-2017.pdf",
+        BASE / "santa-fe" / "ley-13740-2017.pdf",
         "Ley 13.740/2017 - Fitosanitarios, Provincia de Santa Fe "
         "(texto ficticio, fixture de prueba)",
         [
@@ -173,7 +173,7 @@ def main() -> None:
         ],
     )
 
-    (BASE / "normativa-general" / "provincial" / "santa-fe" / "reglas.csv").write_text(
+    (BASE / "santa-fe" / "reglas.csv").write_text(
         "tipo_zona,tipo_aplicacion,bandas,distancia_min_m,norma,articulo,observaciones\n"
         "zona_urbana,todas,todas,300,ley-13740-2017,2,\n",
         encoding="utf-8",

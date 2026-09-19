@@ -1,5 +1,5 @@
 """Tests de servicios/geo.py usando la geometría real de la fixture de San
-Carlos Centro (tests/fixtures/insumos/localidades/san-carlos-centro/), la
+Carlos Centro (tests/fixtures/insumos/santa-fe/san-carlos-centro/), la
 misma localidad y escuela de los ejemplos de referencia de la skill."""
 
 from fitosanitarios.servicios.geo import (

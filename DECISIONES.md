@@ -317,3 +317,23 @@ Las fechas y horas las resuelve `servicios/fechas.py`, no el LLM (que no conoce 
 **Límites conocidos:** no hay cancelar ni reprogramar; no se valida horario laboral ni zona horaria (usa la del servidor); la receta agendada no sale de `guardar_receta_en_curso` (sigue sin conectarse al flujo del orquestador, como ya estaba documentado). El prompt ganó ~13 líneas (~1000 tokens en total, dentro del presupuesto de ~3k).
 
 **Verificación.** Corren sin base: parseo de fechas/horas, flujo de la tool con dobles, plantillas del formateador. **No corrieron** los tests contra Postgres (`test_agendar_aplicacion_db`, ruteo) ni una conversación real con Gemini: falta probar que el LLM encadena bien "sí, agendala" -> fecha -> hora.
+
+### Estructura de `data/insumos/`: municipios dentro de la carpeta de su provincia
+
+**Cambio (19/09/2026).** La legislación de cada municipio pasa a vivir dentro de la carpeta de la provincia a la que pertenece, y la normativa provincial en esa misma carpeta:
+
+```
+data/insumos/
+├── santa-fe/
+│   ├── ley-11273-1995.pdf         normativa provincial (+ reglas.csv opcional)
+│   └── el-trebol/                 municipio: localidad.geojson, ordenanza-*.pdf, reglas.csv
+└── normativa-general/nacional/    sin cambios
+```
+
+Antes: `localidades/<localidad>/` y `normativa-general/provincial/<provincia>/`. La provincia de una localidad ahora es la carpeta que la contiene, así que se sacó el aviso A1 ("la provincia del límite no tiene carpeta en `provincial/`") y se agregó el error **F7**: la propiedad `provincia` del `limite` tiene que coincidir con esa carpeta. Una carpeta de provincia sin PDF de normativa provincial sigue siendo error F1, como antes.
+
+**Qué cambió en el código.** Nuevo `insumos/estructura.py` (único lugar que sabe recorrer las carpetas), usado por el validador y los tres loaders. Las claves de `validar_insumos` pasan a `<provincia>/<localidad>`, `<provincia>` y `normativa-general/nacional`; `loader_geo` decide con `es_clave_de_localidad`. Las fixtures (`tests/fixtures/insumos/`) y los datos reales de El Trébol se movieron con la nueva estructura; el modelo de datos (`territorio.*`) no cambia.
+
+**Decisión abierta:** la normativa nacional quedó en `normativa-general/nacional/` porque no se pidió moverla. Si se quiere, va a `data/insumos/nacional/` con un cambio de una línea en `estructura.py`.
+
+**Verificación.** Corren sin base: validador (fixtures y casos F1–F7), chunking. Los tests de carga contra Postgres (`test_loaders_integracion`) se reescribieron pero no corrieron (sin Docker en esta sesión).

@@ -6,7 +6,7 @@ FIXTURES = Path(__file__).resolve().parent.parent / "fixtures" / "insumos"
 
 
 def test_chunkea_pdf_real_con_3_articulos():
-    ruta = FIXTURES / "localidades" / "san-carlos-centro" / "ordenanza-914-2018.pdf"
+    ruta = FIXTURES / "santa-fe" / "san-carlos-centro" / "ordenanza-914-2018.pdf"
     texto, requiere_revision = extraer_texto_o_ocr(ruta)
     assert requiere_revision is False
 

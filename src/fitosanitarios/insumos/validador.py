@@ -17,6 +17,11 @@ from shapely.geometry import shape
 from shapely.validation import explain_validity
 
 from fitosanitarios.config import get_settings
+from fitosanitarios.insumos.estructura import (
+    carpeta_nacional,
+    carpetas_localidad,
+    carpetas_provincia,
+)
 
 NOMBRE_CARPETA_VALIDO = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 NOMBRE_PDF_VALIDO = re.compile(r"^(ordenanza|decreto|resolucion|ley)-[a-z0-9]+-\d{4}\.pdf$")
@@ -188,7 +193,7 @@ def pdf_tiene_texto(ruta_pdf: Path) -> bool:
 
 
 def validar_carpeta_localidad(ruta: Path) -> ResultadoValidacion:
-    """Valida una carpeta de `data/insumos/localidades/<jurisdiccion_id>/`."""
+    """Valida una carpeta de `data/insumos/<provincia>/<jurisdiccion_id>/`."""
     resultado = ResultadoValidacion()
     resultado.extend(validar_nombre_carpeta(ruta.name, ruta))
 
@@ -221,9 +226,10 @@ def validar_carpeta_localidad(ruta: Path) -> ResultadoValidacion:
 
 
 def validar_carpeta_normativa_general(ruta: Path) -> ResultadoValidacion:
-    """Valida una carpeta de `normativa-general/provincial/<provincia>/` o
-    `normativa-general/nacional/` (mismo contrato que una localidad, salvo
-    que `reglas.csv` es opcional)."""
+    """Valida la carpeta de una provincia (`data/insumos/<provincia>/`, sus
+    propios PDFs; las subcarpetas de localidad se validan aparte) o
+    `normativa-general/nacional/`. Mismo contrato que una localidad, salvo
+    que `reglas.csv` es opcional."""
     resultado = ResultadoValidacion()
     pdfs = sorted(ruta.glob("*.pdf"))
     if not pdfs:
@@ -246,49 +252,42 @@ def validar_carpeta_normativa_general(ruta: Path) -> ResultadoValidacion:
     return resultado
 
 
+def es_clave_de_localidad(clave: str) -> bool:
+    """Claves de `validar_insumos`: `<provincia>/<localidad>`, `<provincia>`
+    (normativa provincial) y `normativa-general/nacional`."""
+    return "/" in clave and not clave.startswith("normativa-general/")
+
+
 def validar_insumos(data_dir: Path) -> dict[str, ResultadoValidacion]:
     """Valida todo `data/insumos/`. Devuelve un resultado por carpeta (clave =
     ruta relativa), para poder reportar y decidir qué localidades/normas
     entran y cuáles no, en vez de todo-o-nada."""
     resultados: dict[str, ResultadoValidacion] = {}
 
-    localidades_dir = data_dir / "localidades"
-    if localidades_dir.exists():
-        provincias_con_carpeta = {
-            p.name for p in (data_dir / "normativa-general" / "provincial").glob("*") if p.is_dir()
-        } if (data_dir / "normativa-general" / "provincial").exists() else set()
+    for provincia_dir in carpetas_provincia(data_dir):
+        provincia = provincia_dir.name
+        resultado_provincial = validar_carpeta_normativa_general(provincia_dir)
+        resultado_provincial.extend(validar_nombre_carpeta(provincia, provincia_dir))
+        resultados[provincia] = resultado_provincial
 
-        for carpeta in sorted(localidades_dir.iterdir()):
-            if not carpeta.is_dir():
-                continue
+        for carpeta in carpetas_localidad(provincia_dir):
             resultado = validar_carpeta_localidad(carpeta)
             geojson = carpeta / "localidad.geojson"
             if geojson.exists() and resultado.es_valido:
-                provincia = _provincia_del_limite(geojson)
-                if provincia and provincia not in provincias_con_carpeta:
-                    resultado.advertencias.append(
-                        AdvertenciaValidacion(
-                            "A1", str(carpeta),
-                            f"la provincia '{provincia}' del límite no tiene carpeta en "
-                            "normativa-general/provincial/",
+                provincia_del_limite = _provincia_del_limite(geojson)
+                if provincia_del_limite and provincia_del_limite != provincia:
+                    resultado.errores.append(
+                        ErrorValidacion(
+                            "F7", str(geojson),
+                            f"la provincia '{provincia_del_limite}' del límite no coincide con "
+                            f"la carpeta de la provincia donde está la localidad ('{provincia}')",
                         )
                     )
-            resultados[f"localidades/{carpeta.name}"] = resultado
+            resultados[f"{provincia}/{carpeta.name}"] = resultado
 
-    for ambito in ("provincial", "nacional"):
-        ambito_dir = data_dir / "normativa-general" / ambito
-        if not ambito_dir.exists():
-            continue
-        if ambito == "nacional":
-            resultados[f"normativa-general/{ambito}"] = validar_carpeta_normativa_general(
-                ambito_dir
-            )
-        else:
-            for carpeta in sorted(ambito_dir.iterdir()):
-                if carpeta.is_dir():
-                    resultados[f"normativa-general/{ambito}/{carpeta.name}"] = (
-                        validar_carpeta_normativa_general(carpeta)
-                    )
+    nacional_dir = carpeta_nacional(data_dir)
+    if nacional_dir.exists():
+        resultados["normativa-general/nacional"] = validar_carpeta_normativa_general(nacional_dir)
 
     return resultados
 

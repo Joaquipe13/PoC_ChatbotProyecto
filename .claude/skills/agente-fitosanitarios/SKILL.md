@@ -344,25 +344,23 @@ Formato propuesto; se congela al cerrar la Fase 1 y cualquier cambio va a DECISI
 
 ```
 data/insumos/
-├── localidades/
-│   └── <jurisdiccion_id>/          p. ej. san-carlos-centro
+├── <provincia>/                    p. ej. santa-fe
+│   ├── ley-NNNNN-AAAA.pdf          normativa provincial (una o más)
+│   ├── reglas.csv                  opcional (reglas de la normativa provincial)
+│   └── <jurisdiccion_id>/          municipio de esa provincia, p. ej. san-carlos-centro
 │       ├── localidad.geojson
 │       ├── ordenanza-914-2018.pdf  normas municipales vigentes (una o más)
 │       └── reglas.csv
 └── normativa-general/
-    ├── provincial/
-    │   └── <provincia>/            p. ej. santa-fe
-    │       ├── ley-NNNNN-AAAA.pdf
-    │       └── reglas.csv          opcional
     └── nacional/
         ├── ley-NNNNN-AAAA.pdf
         └── reglas.csv              opcional
 ```
 
-- Nombres de carpeta (`jurisdiccion_id`, `provincia`): minúsculas, sin tildes, palabras separadas por guion. Son la clave que une geometría, normativa y reglas.
+- Nombres de carpeta (`provincia`, `jurisdiccion_id`): minúsculas, sin tildes, palabras separadas por guion. Son la clave que une geometría, normativa y reglas. La provincia de una localidad es la carpeta que la contiene; la normativa provincial vive en esa misma carpeta.
 - PDFs: `<tipo>-<numero>-<anio>.pdf`, con tipo `ordenanza | decreto | resolucion | ley`. De ahí sale la cita ("Ordenanza 914/2018") y el ámbito (municipal, provincial o nacional) sale de la carpeta. Solo normas vigentes; si una fue modificada, va también la modificatoria o el texto ordenado.
 - `localidad.geojson`: `FeatureCollection` en EPSG:4326 (lat/lon). Cada feature lleva la propiedad `tipo`:
-  - `limite`: exactamente una, `Polygon` o `MultiPolygon`, con propiedades `nombre` y `provincia` (igual al nombre de su carpeta en `provincial/`).
+  - `limite`: exactamente una, `Polygon` o `MultiPolygon`, con propiedades `nombre` y `provincia` (igual al nombre de la carpeta de la provincia que la contiene).
   - `escuela`, `curso_agua`, `zona_urbana` u `otro`: zonas protegidas, con propiedad `nombre`. Pueden ser `Point`, `LineString` o `Polygon` (una escuela como punto, un arroyo como línea); la distancia se calcula igual.
 - `reglas.csv`: columnas `tipo_zona, tipo_aplicacion, bandas, distancia_min_m, norma, articulo, observaciones`.
   - Una fila significa: dentro de `distancia_min_m` de una zona `tipo_zona` no se puede hacer una aplicación `tipo_aplicacion` con productos de las bandas indicadas.
@@ -370,8 +368,8 @@ data/insumos/
   - `norma`: nombre de un PDF de la misma carpeta, sin extensión (`ordenanza-914-2018`). `articulo`: número.
   - `observaciones`: condiciones que el modelo no cubre (aviso previo, horarios, viento). El dictamen las muestra como advertencia.
 - Cada zona protegida pertenece a la localidad de su carpeta, pero la búsqueda de distancias considera también zonas de localidades vecinas dentro del radio.
-- El validador falla con mensajes claros si: a una carpeta de localidad le falta `localidad.geojson`, al menos un PDF o `reglas.csv`; el GeoJSON no tiene exactamente un `limite` o trae un tipo desconocido; una geometría es inválida o cae fuera de Argentina; una regla cita una norma que no está en su carpeta; un nombre de archivo o carpeta no respeta la convención.
-- El validador avisa (sin fallar) si: la provincia del límite no tiene carpeta en `provincial/`; una zona protegida queda a más de `RADIO_BUSQUEDA_ZONAS_M` del límite de su localidad; un PDF no tiene texto extraíble (escaneado, va por OCR).
+- El validador falla con mensajes claros si: a una carpeta de localidad le falta `localidad.geojson`, al menos un PDF o `reglas.csv`; el GeoJSON no tiene exactamente un `limite` o trae un tipo desconocido; una geometría es inválida o cae fuera de Argentina; la `provincia` del límite no coincide con la carpeta de la provincia donde está la localidad; una regla cita una norma que no está en su carpeta; un nombre de archivo o carpeta no respeta la convención.
+- El validador avisa (sin fallar) si: una zona protegida queda a más de `RADIO_BUSQUEDA_ZONAS_M` del límite de su localidad; un PDF no tiene texto extraíble (escaneado, va por OCR).
 - Para desarrollar y testear hay datos sintéticos con la misma estructura en `tests/fixtures/insumos/`, nunca los reales.
 - Los loaders cargan todo al schema `territorio`: los archivos son la fuente, pero las tools consultan la base.
 
