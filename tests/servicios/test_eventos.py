@@ -19,9 +19,9 @@ def _thread() -> str:
     return f"t-evento-test-{uuid.uuid4()}"
 
 
-def test_iniciar_y_finalizar_evento(conexion):
+def test_iniciar_y_finalizar_evento(conexion, modelo_embeddings):
     thread_id = _thread()
-    resolucion = resolver_vehiculo(conexion, "mochila")
+    resolucion = resolver_vehiculo(conexion, modelo_embeddings, "mochila")
 
     iniciado = iniciar_evento(conexion, thread_id, resolucion, "lote 7", None)
     assert iniciado.evento_id is not None
@@ -33,9 +33,9 @@ def test_iniciar_y_finalizar_evento(conexion):
     assert finalizado.fecha_fin is not None
 
 
-def test_iniciar_con_evento_ya_en_curso_no_duplica(conexion):
+def test_iniciar_con_evento_ya_en_curso_no_duplica(conexion, modelo_embeddings):
     thread_id = _thread()
-    resolucion = resolver_vehiculo(conexion, "dron")
+    resolucion = resolver_vehiculo(conexion, modelo_embeddings, "dron")
 
     primero = iniciar_evento(conexion, thread_id, resolucion, "lote 1", None)
     segundo = iniciar_evento(conexion, thread_id, resolucion, "lote 2", None)
@@ -51,9 +51,9 @@ def test_finalizar_sin_evento_en_curso(conexion):
     assert resultado.motivo_no_resuelto == MotivoNoResuelto.SIN_EVENTO_EN_CURSO
 
 
-def test_iniciar_con_vehiculo_no_resuelto_propaga_opciones(conexion):
+def test_iniciar_con_vehiculo_no_resuelto_propaga_opciones(conexion, modelo_embeddings):
     thread_id = _thread()
-    resolucion = resolver_vehiculo(conexion, "algo que no matchea zzz")
+    resolucion = resolver_vehiculo(conexion, modelo_embeddings, "xqzwplk asdf no es un vehiculo")
     resultado = iniciar_evento(conexion, thread_id, resolucion, "lote 1", None)
     assert resultado.opciones_ambiguas is not None
 
@@ -64,7 +64,7 @@ def test_agenda_vacia_sin_recetas_para_la_fecha(conexion):
     assert tareas == []
 
 
-def test_agenda_con_receta_pendiente_y_receta_en_curso(conexion):
+def test_agenda_con_receta_pendiente_y_receta_en_curso(conexion, modelo_embeddings):
     thread_id = _thread()
     hoy = date.today()
     with conexion.cursor() as cur:
@@ -86,7 +86,7 @@ def test_agenda_con_receta_pendiente_y_receta_en_curso(conexion):
         (receta_en_curso_id,) = cur.fetchone()
     conexion.commit()
 
-    resolucion = resolver_vehiculo(conexion, "mochila")
+    resolucion = resolver_vehiculo(conexion, modelo_embeddings, "mochila")
     iniciar_evento(conexion, thread_id, resolucion, "lote B", receta_en_curso_id)
 
     tareas = consultar_agenda_logica(conexion, thread_id, hoy)

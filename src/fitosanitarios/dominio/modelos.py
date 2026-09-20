@@ -31,7 +31,13 @@ class EstadoReceta(StrEnum):
 
 
 class RecetaItem(BaseModel):
-    """Un producto dentro de una receta, antes o después de resolverlo contra el catálogo."""
+    """Un producto dentro de una receta, antes o después de resolverlo contra el catálogo.
+
+    `principio_activo` y `clase_toxicologica`: lo que dice la receta en papel
+    (no lo que figura en SENASA -- eso lo trae la tool `validar_producto_registro`
+    aparte, y ambos pueden compararse más adelante). `adversidad` es la plaga/
+    maleza/enfermedad de ESTE producto puntual (campo opcional del formulario:
+    ver `Receta.adversidad` para la de toda la receta)."""
 
     producto_nombre: str
     producto_id: int | None = None
@@ -39,19 +45,38 @@ class RecetaItem(BaseModel):
     dosis_valor: float | None = None
     dosis_unidad: str | None = None
     adversidad: str | None = None
+    principio_activo: str | None = None
+    clase_toxicologica: str | None = None
 
 
 class Receta(BaseModel):
-    """Estado de una receta agronómica en curso o evaluada. Corresponde a `operacion.receta`."""
+    """Estado de una receta agronómica en curso o evaluada. Corresponde a `operacion.receta`.
+
+    Campos agregados (12/09/2026, ver DECISIONES.md) para reflejar la receta
+    agronómica real, sin datos personales/sensibles (productor, ingeniero
+    agrónomo, matrícula, receta de venta quedan fuera de este proyecto):
+    `caudal`, `ubic_poblado`, `condiciones`, `restricciones`, `observaciones`,
+    `fecha_emision`, `validez_dias`. Son descriptivos -- no alimentan ningún
+    chequeo legal (eso lo siguen haciendo cultivo/lote/superficie/producto/
+    dosis/tipo_aplicacion) -- así que `leer_receta` nunca repregunta por
+    ellos: si no se leen, quedan en `None` y se muestran como "no figura" en
+    la confirmación, sin bloquear."""
 
     id: int | None = None
-    numero: str | None = None
+    numero: str | None = None  # número de receta
     cultivo: str | None = None
     lote: str | None = None
-    adversidad: str | None = None
+    adversidad: str | None = None  # plaga/maleza/enfermedad general de la receta
     items: list[RecetaItem] = Field(default_factory=list)
     superficie_ha: float | None = None
     tipo_aplicacion: TipoAplicacion | None = None
+    caudal: str | None = None  # texto libre, ej. "100 L/ha"
+    ubic_poblado: str | None = None  # ubicación del lote respecto de zonas pobladas
+    condiciones: str | None = None  # condiciones ambientales al momento de aplicar
+    restricciones: str | None = None  # restricciones de uso indicadas en la receta
+    observaciones: str | None = None
+    fecha_emision: date | None = None
+    validez_dias: int | None = None
     ubicacion_lat: float | None = None
     ubicacion_lon: float | None = None
     jurisdiccion_id: str | None = None
@@ -82,6 +107,8 @@ class DistanciaMinima(BaseModel):
     tipo_zona: str  # "zona_urbana", "escuela", "curso_agua", ...
     distancia_min_m: float
     norma_limitante: Cita | None = None  # la regla que fija ese mínimo (la más restrictiva)
+    # Sin reglas.csv el mínimo se leyó del texto de la norma: hay que verificarlo.
+    extraida_de_pdf: bool = False
     citas: list[Cita] = Field(default_factory=list)  # todas las reglas que aplican
     advertencias: list[str] = Field(default_factory=list)
 
@@ -98,6 +125,8 @@ class CondicionesAplicacion(BaseModel):
     productos_por_banda: dict[str, str | None] = Field(default_factory=dict)
     # Sin su banda, la de la aplicación podría ser más restrictiva de lo que se informa.
     productos_sin_banda: list[str] = Field(default_factory=list)
+    # No hay ordenanzas de la localidad: rige la normativa provincial (y se aclara).
+    sin_normativa_municipal: bool = False
     distancias_minimas: list[DistanciaMinima] = Field(default_factory=list)
     advertencias: list[str] = Field(default_factory=list)
 

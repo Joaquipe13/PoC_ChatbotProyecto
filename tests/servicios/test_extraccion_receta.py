@@ -18,7 +18,6 @@ def _extraccion_completa() -> RecetaExtraidaLLM:
         lote="4",
         confianza_lote=0.9,
         adversidad="Malezas de hoja ancha",
-        confianza_adversidad=0.9,
         productos=[
             ProductoExtraidoLLM(
                 producto_nombre="Glifosato 48%", dosis_declarada="2 L/ha", confianza=0.9
@@ -27,7 +26,13 @@ def _extraccion_completa() -> RecetaExtraidaLLM:
         superficie_ha=35.0,
         confianza_superficie_ha=0.9,
         tipo_aplicacion="terrestre",
-        confianza_tipo_aplicacion=0.9,
+        caudal="100 L/ha",
+        ubic_poblado="a 500 m del pueblo",
+        condiciones="sin viento",
+        restricciones="no aplicar a menos de 100 m de cursos de agua",
+        observaciones="aplicar por la mañana",
+        fecha_emision="2026-09-01",
+        validez_dias=30,
     )
 
 
@@ -43,19 +48,82 @@ def test_conversion_con_todos_los_campos_altos_no_tiene_faltantes():
     assert receta.items[0].producto_nombre == "Glifosato 48%"
 
 
-def test_conversion_campo_con_baja_confianza_va_a_faltantes():
+def test_conversion_incluye_los_campos_descriptivos_nuevos():
+    receta, _ = convertir_a_receta_y_faltantes(_extraccion_completa())
+    assert receta.tipo_aplicacion == "terrestre"
+    assert receta.caudal == "100 L/ha"
+    assert receta.ubic_poblado == "a 500 m del pueblo"
+    assert receta.condiciones == "sin viento"
+    assert receta.restricciones == "no aplicar a menos de 100 m de cursos de agua"
+    assert receta.observaciones == "aplicar por la mañana"
+    assert receta.fecha_emision.isoformat() == "2026-09-01"
+    assert receta.validez_dias == 30
+
+
+def test_conversion_campos_descriptivos_ausentes_no_generan_faltantes():
+    """Son descriptivos (ver DECISIONES.md): si el LLM no los leyó, la receta
+    se arma igual con el resto -- nunca bloquean con una repregunta."""
     extraccion = _extraccion_completa()
     extraccion.tipo_aplicacion = None
-    extraccion.confianza_tipo_aplicacion = 0.0
+    extraccion.adversidad = None
+    extraccion.caudal = None
+    extraccion.ubic_poblado = None
+    extraccion.condiciones = None
+    extraccion.restricciones = None
+    extraccion.observaciones = None
+    extraccion.fecha_emision = None
+    extraccion.validez_dias = None
 
     receta, faltantes = convertir_a_receta_y_faltantes(extraccion)
 
+    assert faltantes == []
     assert receta.tipo_aplicacion is None
-    campos_faltantes = {f.campo for f in faltantes}
-    assert "tipo_aplicacion" in campos_faltantes
-    faltante = next(f for f in faltantes if f.campo == "tipo_aplicacion")
-    assert faltante.tipo_entrada == "botones"
-    assert faltante.opciones == ["Terrestre", "Aérea"]
+    assert receta.adversidad is None
+    assert receta.caudal is None
+    assert receta.fecha_emision is None
+
+
+def test_conversion_adversidad_ausente_no_es_faltante():
+    """Regresión: la plaga/adversidad general es opcional (el usuario lo
+    marcó explícitamente); no debe generar CampoFaltante ni bloquear la
+    receta aunque el LLM no la haya leído (ver DIFICULTADES.md)."""
+    extraccion = _extraccion_completa()
+    extraccion.adversidad = None
+
+    _, faltantes = convertir_a_receta_y_faltantes(extraccion)
+
+    assert not any(f.campo == "adversidad" for f in faltantes)
+
+
+def test_conversion_fecha_emision_no_parseable_se_descarta_sin_romper():
+    extraccion = _extraccion_completa()
+    extraccion.fecha_emision = "hace un mes"
+
+    receta, faltantes = convertir_a_receta_y_faltantes(extraccion)
+
+    assert receta.fecha_emision is None
+    assert faltantes == []
+
+
+def test_conversion_pasa_principio_activo_y_clase_toxicologica_por_item():
+    extraccion = _extraccion_completa()
+    extraccion.productos = [
+        ProductoExtraidoLLM(
+            producto_nombre="Glifosato 48%",
+            dosis_declarada="2 L/ha",
+            confianza=0.9,
+            adversidad="Yuyo colorado",
+            principio_activo="Glifosato",
+            clase_toxicologica="IV",
+        )
+    ]
+
+    receta, _ = convertir_a_receta_y_faltantes(extraccion)
+
+    item = receta.items[0]
+    assert item.adversidad == "Yuyo colorado"
+    assert item.principio_activo == "Glifosato"
+    assert item.clase_toxicologica == "IV"
 
 
 def test_conversion_valor_presente_pero_confianza_baja_tambien_es_faltante():

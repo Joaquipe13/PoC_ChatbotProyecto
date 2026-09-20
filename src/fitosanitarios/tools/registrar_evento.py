@@ -35,7 +35,9 @@ def thread_id_de_config(config: RunnableConfig | None) -> str:
     return thread_id
 
 
-def registrar_evento_logica(args: RegistrarEventoArgs, conn, thread_id: str) -> ResultadoTool:
+def registrar_evento_logica(
+    args: RegistrarEventoArgs, conn, modelo_embeddings, thread_id: str
+) -> ResultadoTool:
     if args.accion == "finalizar":
         resultado = finalizar_evento(conn, thread_id)
         if resultado.motivo_no_resuelto is not None:
@@ -63,7 +65,7 @@ def registrar_evento_logica(args: RegistrarEventoArgs, conn, thread_id: str) -> 
     if faltantes:
         return ResultadoTool(estado="faltan_datos", faltantes=faltantes)
 
-    resolucion = resolver_vehiculo_srv(conn, args.vehiculo)
+    resolucion = resolver_vehiculo_srv(conn, modelo_embeddings, args.vehiculo)
     resultado = iniciar_evento(conn, thread_id, resolucion, args.lote, args.receta_id)
 
     if resultado.motivo_no_resuelto is not None:
@@ -123,9 +125,11 @@ def registrar_evento(
         receta_id: si esta aplicación corresponde a una receta ya evaluada,
             su id (opcional).
     """
-    from fitosanitarios.tools._recursos import con_conexion
+    from fitosanitarios.tools._recursos import con_conexion_y_modelo
 
     args = RegistrarEventoArgs(accion=accion, vehiculo=vehiculo, lote=lote, receta_id=receta_id)
     thread_id = thread_id_de_config(config)
-    resultado = con_conexion(lambda conn: registrar_evento_logica(args, conn, thread_id))
+    resultado = con_conexion_y_modelo(
+        lambda conn, modelo: registrar_evento_logica(args, conn, modelo, thread_id)
+    )
     return f"registrar_evento: accion={accion} estado={resultado.estado}", resultado

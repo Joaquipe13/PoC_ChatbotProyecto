@@ -20,6 +20,11 @@ data/insumos/**/*.pdf
 data/insumos/**/*.geojson
 !tests/fixtures/**
 
+# Fotos reales de recetas para pruebas manuales (pueden traer datos reales,
+# a diferencia de tests/fixtures/recetas/ que son sintéticas)
+data/recetas_ejemplo/*
+!data/recetas_ejemplo/README.md
+
 # Notebooks: mantener limpios de outputs pesados no es automático,
 # se revisa a mano antes de commitear (ver DECISIONES.md)
 

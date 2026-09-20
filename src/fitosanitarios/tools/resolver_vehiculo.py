@@ -14,8 +14,8 @@ class ResolverVehiculoArgs(BaseModel):
     descripcion: str
 
 
-def resolver_vehiculo_logica(args: ResolverVehiculoArgs, conn) -> ResultadoTool:
-    resolucion = resolver_vehiculo_srv(conn, args.descripcion)
+def resolver_vehiculo_logica(args: ResolverVehiculoArgs, conn, modelo_embeddings) -> ResultadoTool:
+    resolucion = resolver_vehiculo_srv(conn, modelo_embeddings, args.descripcion)
 
     if resolucion.motivo_no_resuelto is not None:
         return ResultadoTool(estado="no_resuelto", motivo=resolucion.motivo_no_resuelto)
@@ -52,8 +52,10 @@ def resolver_vehiculo(descripcion: str) -> tuple[str, ResultadoTool]:
     Args:
         descripcion: cómo nombró el operario el vehículo, tal cual lo escribió.
     """
-    from fitosanitarios.tools._recursos import con_conexion
+    from fitosanitarios.tools._recursos import con_conexion_y_modelo
 
     args = ResolverVehiculoArgs(descripcion=descripcion)
-    resultado = con_conexion(lambda conn: resolver_vehiculo_logica(args, conn))
+    resultado = con_conexion_y_modelo(
+        lambda conn, modelo: resolver_vehiculo_logica(args, conn, modelo)
+    )
     return f"resolver_vehiculo: estado={resultado.estado}", resultado

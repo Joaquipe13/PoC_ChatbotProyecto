@@ -51,6 +51,7 @@ def test_cada_tabla_con_columna_vector_es_una_entidad_propia_del_dominio(conexio
         ("catalogo", "principio_activo"),
         ("catalogo", "cultivo"),
         ("catalogo", "adversidad"),
+        ("catalogo", "vehiculo"),  # RAG de equipos (matricula + caracteristicas propias)
         ("territorio", "articulo"),
     }
     assert tablas_con_vector == esperadas

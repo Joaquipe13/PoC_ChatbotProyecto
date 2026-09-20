@@ -1,19 +1,23 @@
 """Resuelve una descripción informal de vehículo/equipo de aplicación
 contra `catalogo.vehiculo` (Fase 9, RF6 `resolver_vehiculo`).
 
-A diferencia de `validacion_producto.py` (7370 productos, necesita
-trigram+embedding), acá el catálogo es un puñado de categorías fijas: se
-resuelve por sinónimo/nombre como substring de la descripción (case
-insensitive) y, si eso no matchea nada, similitud de trigram como fallback
-de typos -- sin cargar el modelo de embeddings (ver DECISIONES.md). Si
-tampoco hay match por trigram, nunca se elige al azar: se ofrece el
-catálogo completo como opciones (igual que un producto ambiguo)."""
+Desde la sesión post-Fase 11 ("RAG de equipos", ver DECISIONES.md) el
+catálogo dejó de ser solo un puñado de categorías genéricas: puede tener
+equipos puntuales (matrícula + características propias, ej. dos modelos de
+avión distintos). Se resuelve en dos pasos: primero sinónimo/nombre como
+substring exacto de la descripción (caso común, más preciso que cualquier
+score); si no matchea nada, RAG real -- mismo patrón que
+`datos/retrievers/catalogo.py::buscar_productos_por_nombre` (score
+combinado 0.5 trigram + 0.5 similitud coseno de embedding). Si tampoco supera
+el umbral, nunca se elige al azar: se ofrece el catálogo completo como
+opciones (igual que un producto ambiguo)."""
 
 from dataclasses import dataclass
 
+from fitosanitarios.datos.vectores import vector_literal
 from fitosanitarios.dominio.motivos import MotivoNoResuelto
 
-UMBRAL_SIMILITUD_TRIGRAM = 0.3
+UMBRAL_SIMILITUD_RAG = 0.5
 
 
 @dataclass
@@ -36,7 +40,7 @@ def _todos_los_nombres(conn) -> list[str]:
         return [fila[0] for fila in cur.fetchall()]
 
 
-def resolver_vehiculo(conn, descripcion: str) -> ResolucionVehiculo:
+def resolver_vehiculo(conn, modelo_embeddings, descripcion: str) -> ResolucionVehiculo:
     descripcion_norm = descripcion.strip().lower()
 
     with conn.cursor() as cur:
@@ -60,19 +64,22 @@ def resolver_vehiculo(conn, descripcion: str) -> ResolucionVehiculo:
             vehiculo=VehiculoResuelto(id=fila[0], nombre=fila[1], tipo_aplicacion=fila[2])
         )
 
+    embedding = vector_literal(modelo_embeddings.encode(descripcion).tolist())
     with conn.cursor() as cur:
         cur.execute(
             """
-            SELECT id, nombre, tipo_aplicacion, similarity(nombre, %(d)s) AS score
+            SELECT id, nombre, tipo_aplicacion,
+                   (0.5 * similarity(nombre, %(d)s)
+                    + 0.5 * (1 - (embedding <=> %(emb)s::vector))) AS score
             FROM catalogo.vehiculo
-            WHERE nombre %% %(d)s
+            WHERE embedding IS NOT NULL
             ORDER BY score DESC
             LIMIT 1
             """,
-            {"d": descripcion_norm},
+            {"d": descripcion_norm, "emb": embedding},
         )
         fila = cur.fetchone()
-    if fila and fila[3] >= UMBRAL_SIMILITUD_TRIGRAM:
+    if fila and fila[3] >= UMBRAL_SIMILITUD_RAG:
         return ResolucionVehiculo(
             vehiculo=VehiculoResuelto(id=fila[0], nombre=fila[1], tipo_aplicacion=fila[2])
         )

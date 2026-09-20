@@ -111,18 +111,34 @@ CREATE INDEX IF NOT EXISTS ix_uso_registrado_adversidad
 CREATE INDEX IF NOT EXISTS ix_uso_registrado_dosis_gin
     ON catalogo.uso_registrado USING gin (dosis);
 
--- Vehículos/equipos de aplicación (Fase 9, RF6 resolver_vehiculo). Catálogo
--- chico y fijo (a diferencia de catalogo.producto): matching por sinónimo
--- exacto + pg_trgm como fallback de typos, sin columna vector -- no hace
--- falta embeddings para un puñado de categorías conocidas (ver DECISIONES.md).
+-- Vehículos/equipos de aplicación (Fase 9, RF6 resolver_vehiculo; columnas
+-- matricula/caracteristicas/embedding agregadas en sesión post-Fase 11, ver
+-- DECISIONES.md "RAG de equipos"). Sigue siendo un catálogo chico, pero deja
+-- de ser solo categorías genéricas: cada equipo puede ser una entidad
+-- puntual (matrícula + características propias), y el matching ahora
+-- combina pg_trgm con similitud de embedding (mismo patrón que
+-- catalogo.producto), no solo sinónimo/substring -- necesario para
+-- distinguir entre varios equipos del mismo tipo_aplicacion por una
+-- descripción libre ("la avioneta grande" vs "la dromader").
 CREATE TABLE IF NOT EXISTS catalogo.vehiculo (
     id BIGSERIAL PRIMARY KEY,
     nombre TEXT NOT NULL UNIQUE,
     tipo_aplicacion TEXT NOT NULL CHECK (tipo_aplicacion IN ('terrestre', 'aerea')),
-    sinonimos JSONB NOT NULL DEFAULT '[]'::jsonb
+    sinonimos JSONB NOT NULL DEFAULT '[]'::jsonb,
+    matricula TEXT,
+    caracteristicas JSONB NOT NULL DEFAULT '{}'::jsonb,
+    embedding vector(768)
 );
+-- Bases creadas antes del RAG de equipos: CREATE TABLE IF NOT EXISTS no agrega las
+-- columnas nuevas. Después de esto, correr scripts/cargar_vehiculos.py (embeddings).
+ALTER TABLE catalogo.vehiculo ADD COLUMN IF NOT EXISTS matricula TEXT;
+ALTER TABLE catalogo.vehiculo
+    ADD COLUMN IF NOT EXISTS caracteristicas JSONB NOT NULL DEFAULT '{}'::jsonb;
+ALTER TABLE catalogo.vehiculo ADD COLUMN IF NOT EXISTS embedding vector(768);
 CREATE INDEX IF NOT EXISTS ix_vehiculo_nombre_trgm
     ON catalogo.vehiculo USING gin (nombre gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS ix_vehiculo_embedding_hnsw
+    ON catalogo.vehiculo USING hnsw (embedding vector_cosine_ops);
 
 INSERT INTO catalogo.vehiculo (nombre, tipo_aplicacion, sinonimos) VALUES
     ('pulverizador autopropulsado', 'terrestre',
@@ -132,4 +148,20 @@ INSERT INTO catalogo.vehiculo (nombre, tipo_aplicacion, sinonimos) VALUES
     ('mochila', 'terrestre', '["mochila", "manual", "mochila de espalda"]'::jsonb),
     ('avión fumigador', 'aerea', '["avión", "avion", "avioneta", "fumigador"]'::jsonb),
     ('dron', 'aerea', '["dron", "drone"]'::jsonb)
+ON CONFLICT (nombre) DO NOTHING;
+
+-- Dos aviones puntuales de ejemplo (matrícula ficticia -- "LV-EJEMPLO1/2" a
+-- propósito, no sigue el formato real LV-XXX de 3 letras, para que no se
+-- confunda con una matrícula real). El embedding se calcula aparte con
+-- `scripts/cargar_vehiculos.py` (necesita sentence-transformers, no se puede
+-- hacer en SQL plano).
+INSERT INTO catalogo.vehiculo (nombre, tipo_aplicacion, sinonimos, matricula, caracteristicas) VALUES
+    ('Air Tractor AT-502B', 'aerea',
+     '["air tractor", "at-502", "at502", "avioneta grande", "turbo"]'::jsonb,
+     'LV-EJEMPLO1',
+     '{"modelo": "Air Tractor AT-502B", "motor": "turbohélice", "capacidad_l": 3028, "ancho_faja_m": 18}'::jsonb),
+    ('PZL M18 Dromader', 'aerea',
+     '["dromader", "pzl", "m18", "pzl m18"]'::jsonb,
+     'LV-EJEMPLO2',
+     '{"modelo": "PZL M18 Dromader", "motor": "radial", "capacidad_l": 2500, "ancho_faja_m": 16}'::jsonb)
 ON CONFLICT (nombre) DO NOTHING;

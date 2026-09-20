@@ -38,6 +38,36 @@ def _es_error_cuota(exc: BaseException) -> bool:
     return "429" in texto or "RESOURCE_EXHAUSTED" in texto or "RATE LIMIT" in texto
 
 
+def _texto_de_respuesta(respuesta) -> str:
+    """`respuesta.text` (el accessor de conveniencia de `google-genai`) da
+    `""` para `gemini-3.5-flash-lite` en llamadas multimodales: el modelo
+    devuelve el JSON pedido correctamente en
+    `candidates[0].content.parts[*].text`, pero esas partes vienen con un
+    `thought_signature` (token de continuidad de "thinking" de la API nueva,
+    no un indicador de que el texto sea razonamiento interno) que rompe la
+    heurística de esa propiedad. Encontrado el 12/09/2026 probando el canal
+    web con una foto de receta real: `leer_receta` daba `IMAGEN_ILEGIBLE` en
+    el 100 % de los casos pese a que el modelo leía la receta perfecto (ver
+    DIFICULTADES.md). Reproducido con `resp.candidates[0].content.parts`
+    conteniendo el JSON completo mientras `resp.text == ""`.
+
+    Fallback: concatenar el texto de las partes de la primera respuesta que
+    no estén marcadas explícitamente como pensamiento (`part.thought`, un
+    campo distinto de `thought_signature`)."""
+    if respuesta.text:
+        return respuesta.text
+    if not respuesta.candidates:
+        return ""
+    candidato = respuesta.candidates[0]
+    if not candidato.content or not candidato.content.parts:
+        return ""
+    return "".join(
+        parte.text
+        for parte in candidato.content.parts
+        if parte.text and not getattr(parte, "thought", False)
+    )
+
+
 class ClienteGemini:
     """Rota entre las API keys configuradas ante error de cuota."""
 
@@ -109,7 +139,7 @@ class ClienteGemini:
         respuesta = cliente.models.generate_content(
             model=self._model, contents=contents, config=config
         )
-        return respuesta.text
+        return _texto_de_respuesta(respuesta)
 
 
 class ClienteGroq:

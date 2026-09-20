@@ -39,7 +39,9 @@ def _responder(settings: Settings, thread_id: str, mensajes: list[str]) -> None:
     try:
         cliente_graph.enviar_mensajes(settings, numero_envio, mensajes)
     except cliente_graph.ErrorEnvioWhatsApp:
-        logger.exception("No se pudo enviar la respuesta a %s", thread_id)
+        logger.exception(
+            "No se pudo enviar la respuesta a %s (thread_id=%s)", numero_envio, thread_id
+        )
 
 
 def construir_procesador(settings: Settings, model, checkpointer, contador) -> ProcesadorMensaje:
@@ -80,6 +82,16 @@ def construir_procesador(settings: Settings, model, checkpointer, contador) -> P
 
 def crear_app_produccion(pila: ExitStack):
     settings = get_settings()
+    if settings.use_fixtures:
+        # Ver `canales/web/app_produccion.py::crear_app_produccion` y
+        # DIFICULTADES.md: con USE_FIXTURES=true, leer_receta y
+        # responder_consulta_normativa usan un LLM fake para sus llamadas
+        # internas aunque el agente use Gemini real.
+        logger.warning(
+            "USE_FIXTURES=true: leer_receta y responder_consulta_normativa van a "
+            "usar un LLM fake para sus llamadas internas aunque el agente use "
+            "Gemini real. Arrancar con USE_FIXTURES=false para un canal real."
+        )
     model = crear_modelo_chat_gemini(settings)
     checkpointer = pila.enter_context(checkpointer_postgres(settings.database_url))
     contador = ContadorRepreguntas()

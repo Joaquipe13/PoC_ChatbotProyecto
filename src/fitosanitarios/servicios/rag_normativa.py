@@ -8,11 +8,24 @@ se recuperó por SQL + similitud.
 
 import json
 import logging
+import re
 from dataclasses import dataclass
 
 from fitosanitarios.dominio.modelos import Cita
 
 logger = logging.getLogger(__name__)
+
+_PATRON_NUMERO_ARTICULO = re.compile(r"\d+")
+
+
+def _normalizar_numero_articulo(valor: str) -> str:
+    """El contexto que se arma en `_armar_contexto` etiqueta cada fragmento
+    como "art. {numero}", y el LLM tiende a copiar ese prefijo en
+    "articulos_citados" en vez de devolver solo el número (ver
+    DIFICULTADES.md). Sin normalizar, el matching exacto contra `numero`
+    descarta citas válidas."""
+    m = _PATRON_NUMERO_ARTICULO.search(valor)
+    return m.group(0) if m else valor.strip()
 
 
 @dataclass
@@ -103,12 +116,14 @@ def responder_con_fragmentos(
     regla = datos.get("regla") or ""
     articulos_citados = datos.get("articulos_citados") or []
 
-    fragmentos_por_clave = {(f.norma, str(f.numero)): f for f in fragmentos}
+    fragmentos_por_clave = {
+        (f.norma, _normalizar_numero_articulo(str(f.numero))): f for f in fragmentos
+    }
     citas: list[Cita] = []
     advertencias: list[str] = []
 
     for ac in articulos_citados:
-        clave = (ac.get("norma"), str(ac.get("articulo")))
+        clave = (ac.get("norma"), _normalizar_numero_articulo(str(ac.get("articulo") or "")))
         fragmento = fragmentos_por_clave.get(clave)
         if fragmento is None:
             advertencias.append(

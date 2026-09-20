@@ -11,6 +11,7 @@ confirmación (Confirmar / Corregir) antes de evaluar").
 import hashlib
 import json
 import logging
+from datetime import date
 from pathlib import Path
 from typing import Protocol
 
@@ -25,19 +26,12 @@ UMBRAL_CONFIANZA_CAMPO = 0.6
 _TIPO_ENTRADA_POR_CAMPO = {
     "cultivo": "texto",
     "lote": "texto",
-    "adversidad": "texto",
-    "tipo_aplicacion": "botones",
     "superficie_ha": "texto",
     "productos": "texto",
-}
-_OPCIONES_POR_CAMPO: dict[str, list[str]] = {
-    "tipo_aplicacion": ["Terrestre", "Aérea"],
 }
 _PREGUNTA_POR_CAMPO = {
     "cultivo": "¿Qué cultivo es?",
     "lote": "¿Cuál es el número o nombre del lote?",
-    "adversidad": "¿Contra qué plaga, maleza o enfermedad es la aplicación?",
-    "tipo_aplicacion": "¿La aplicación es terrestre o aérea?",
     "superficie_ha": "¿Cuántas hectáreas tiene el lote?",
     "productos": "¿Qué producto(s) y dosis indica la receta?",
 }
@@ -47,10 +41,21 @@ class ProductoExtraidoLLM(BaseModel):
     producto_nombre: str
     dosis_declarada: str | None = None
     confianza: float = 0.0
+    adversidad: str | None = None  # plaga/maleza/enfermedad de este producto puntual
+    principio_activo: str | None = None
+    clase_toxicologica: str | None = None
 
 
 class RecetaExtraidaLLM(BaseModel):
-    """Salida cruda del LLM, antes de convertirla a `Receta` + faltantes."""
+    """Salida cruda del LLM, antes de convertirla a `Receta` + faltantes.
+
+    Solo los campos que alimentan un chequeo legal (`cultivo`, `lote`,
+    `superficie_ha`, `productos`) llevan confianza propia y pueden terminar
+    en `faltantes`. El resto son descriptivos de la receta real (ver
+    `Receta`, DECISIONES.md): se toman tal cual los lea el LLM -- que ya
+    tiene la instrucción de dejarlos en `null` si no los puede leer con
+    claridad, ver `PROMPT_SISTEMA_EXTRACCION` -- sin gatillar una repregunta
+    si faltan."""
 
     legible: bool = True
     numero: str | None = None
@@ -58,13 +63,18 @@ class RecetaExtraidaLLM(BaseModel):
     confianza_cultivo: float = 0.0
     lote: str | None = None
     confianza_lote: float = 0.0
-    adversidad: str | None = None
-    confianza_adversidad: float = 0.0
+    adversidad: str | None = None  # plaga/maleza/enfermedad general, opcional
     productos: list[ProductoExtraidoLLM] = Field(default_factory=list)
     superficie_ha: float | None = None
     confianza_superficie_ha: float = 0.0
     tipo_aplicacion: str | None = None  # "terrestre" | "aerea" | None
-    confianza_tipo_aplicacion: float = 0.0
+    caudal: str | None = None
+    ubic_poblado: str | None = None
+    condiciones: str | None = None
+    restricciones: str | None = None
+    observaciones: str | None = None
+    fecha_emision: str | None = None  # "AAAA-MM-DD"; se parsea al convertir
+    validez_dias: int | None = None
 
 
 class ClienteLLMMultimodalProtocolo(Protocol):
@@ -85,15 +95,26 @@ PROMPT_SISTEMA_EXTRACCION = (
     "markdown) con esta forma exacta:\n"
     "{\n"
     '  "legible": true,\n'
-    '  "numero": string o null,\n'
+    '  "numero": string o null (número de receta),\n'
     '  "cultivo": string o null, "confianza_cultivo": 0 a 1,\n'
     '  "lote": string o null, "confianza_lote": 0 a 1,\n'
-    '  "adversidad": string o null, "confianza_adversidad": 0 a 1,\n'
+    '  "adversidad": string o null (plaga/maleza/enfermedad general de la '
+    'receta, opcional),\n'
     '  "productos": [{"producto_nombre": string, "dosis_declarada": string o '
-    'null, "confianza": 0 a 1}, ...],\n'
+    'null, "confianza": 0 a 1, "adversidad": string o null (plaga de este '
+    'producto puntual, si difiere de la general), "principio_activo": string '
+    'o null, "clase_toxicologica": string o null}, ...],\n'
     '  "superficie_ha": numero o null, "confianza_superficie_ha": 0 a 1,\n'
-    '  "tipo_aplicacion": "terrestre" | "aerea" | null, '
-    '"confianza_tipo_aplicacion": 0 a 1\n'
+    '  "tipo_aplicacion": "terrestre" | "aerea" | null,\n'
+    '  "caudal": string o null (caudal/volumen de aplicación, ej. "100 L/ha"),\n'
+    '  "ubic_poblado": string o null (ubicación del lote respecto de zonas '
+    'pobladas cercanas),\n'
+    '  "condiciones": string o null (condiciones ambientales indicadas para '
+    'aplicar),\n'
+    '  "restricciones": string o null (restricciones de uso indicadas),\n'
+    '  "observaciones": string o null,\n'
+    '  "fecha_emision": string o null ("AAAA-MM-DD"),\n'
+    '  "validez_dias": entero o null (validez de la receta en días)\n'
     "}\n"
     "La confianza es tu propia evaluación de qué tan claro se lee ese campo "
     "específico en la imagen, no una opinión general sobre la receta."
@@ -175,11 +196,26 @@ def _validar_o_no_legible(datos: dict) -> RecetaExtraidaLLM:
         return RecetaExtraidaLLM(legible=False)
 
 
+def _fecha_o_none(texto: str | None):
+    if not texto:
+        return None
+    try:
+        return date.fromisoformat(texto)
+    except ValueError:
+        logger.warning("fecha_emision no parseable, se descarta: %r", texto)
+        return None
+
+
 def convertir_a_receta_y_faltantes(
     extraccion: RecetaExtraidaLLM, umbral: float = UMBRAL_CONFIANZA_CAMPO
 ) -> tuple[Receta, list[CampoFaltante]]:
     """Separa lo que se leyó con confianza suficiente (va a la `Receta`) de lo
-    que no (va a `CampoFaltante`, para que el orquestador repregunte)."""
+    que no. Solo `cultivo`, `lote`, `superficie_ha` y `productos` -- los que
+    alimentan un chequeo legal más adelante -- generan `CampoFaltante` (para
+    que el orquestador pueda repreguntar). El resto de los campos (ver
+    `Receta`, DECISIONES.md) son descriptivos: si el LLM no los pudo leer
+    quedan en `None` sin bloquear nada -- la receta se arma igual con lo que
+    sí se pudo leer, y el hueco se ve en la confirmación ("no figura")."""
     faltantes: list[CampoFaltante] = []
     confianza_por_campo: dict[str, float] = {}
 
@@ -193,7 +229,6 @@ def convertir_a_receta_y_faltantes(
                     motivo="no se pudo leer con confianza suficiente en la imagen",
                     pregunta_sugerida=_PREGUNTA_POR_CAMPO[nombre],
                     tipo_entrada=_TIPO_ENTRADA_POR_CAMPO[nombre],
-                    opciones=_OPCIONES_POR_CAMPO.get(nombre),
                 )
             )
             return None
@@ -201,12 +236,16 @@ def convertir_a_receta_y_faltantes(
 
     cultivo = _campo_o_faltante("cultivo", extraccion.cultivo)
     lote = _campo_o_faltante("lote", extraccion.lote)
-    adversidad = _campo_o_faltante("adversidad", extraccion.adversidad)
     superficie_ha = _campo_o_faltante("superficie_ha", extraccion.superficie_ha)
-    tipo_aplicacion_raw = _campo_o_faltante("tipo_aplicacion", extraccion.tipo_aplicacion)
 
     items = [
-        RecetaItem(producto_nombre=p.producto_nombre, dosis_declarada=p.dosis_declarada)
+        RecetaItem(
+            producto_nombre=p.producto_nombre,
+            dosis_declarada=p.dosis_declarada,
+            adversidad=p.adversidad,
+            principio_activo=p.principio_activo,
+            clase_toxicologica=p.clase_toxicologica,
+        )
         for p in extraccion.productos
         if p.confianza >= umbral
     ]
@@ -227,10 +266,17 @@ def convertir_a_receta_y_faltantes(
         numero=extraccion.numero,
         cultivo=cultivo,
         lote=lote,
-        adversidad=adversidad,
+        adversidad=extraccion.adversidad,
         items=items,
         superficie_ha=superficie_ha,
-        tipo_aplicacion=tipo_aplicacion_raw,
+        tipo_aplicacion=extraccion.tipo_aplicacion,
+        caudal=extraccion.caudal,
+        ubic_poblado=extraccion.ubic_poblado,
+        condiciones=extraccion.condiciones,
+        restricciones=extraccion.restricciones,
+        observaciones=extraccion.observaciones,
+        fecha_emision=_fecha_o_none(extraccion.fecha_emision),
+        validez_dias=extraccion.validez_dias,
         confianza_por_campo=confianza_por_campo,
     )
     return receta, faltantes

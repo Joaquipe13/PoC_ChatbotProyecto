@@ -19,14 +19,12 @@ RESPUESTA_COMPLETA = json.dumps(
         "lote": "4",
         "confianza_lote": 0.9,
         "adversidad": "Malezas de hoja ancha",
-        "confianza_adversidad": 0.9,
         "productos": [
             {"producto_nombre": "Glifosato 48%", "dosis_declarada": "2 L/ha", "confianza": 0.9}
         ],
         "superficie_ha": 35.0,
         "confianza_superficie_ha": 0.9,
         "tipo_aplicacion": "terrestre",
-        "confianza_tipo_aplicacion": 0.9,
     }
 )
 
@@ -38,14 +36,12 @@ RESPUESTA_CON_FALTANTES = json.dumps(
         "lote": None,
         "confianza_lote": 0.0,
         "adversidad": None,
-        "confianza_adversidad": 0.0,
         "productos": [
             {"producto_nombre": "Acefato 75%", "dosis_declarada": "0,5 kg/ha", "confianza": 0.9}
         ],
         "superficie_ha": None,
         "confianza_superficie_ha": 0.0,
         "tipo_aplicacion": None,
-        "confianza_tipo_aplicacion": 0.0,
     }
 )
 
@@ -68,9 +64,14 @@ def test_receta_con_campos_faltantes_devuelve_faltan_datos():
 
     assert resultado.estado == "faltan_datos"
     campos = {f.campo for f in resultado.faltantes}
-    assert campos == {"lote", "adversidad", "superficie_ha", "tipo_aplicacion"}
+    # tipo_aplicacion y adversidad son descriptivos/opcionales (ver
+    # DECISIONES.md): ausentes no generan CampoFaltante, la receta se arma
+    # igual sin ellos.
+    assert campos == {"lote", "superficie_ha"}
     # Los datos parciales que sí se leyeron no se pierden
     assert resultado.datos["cultivo"] == "Algodon"
+    assert resultado.datos["tipo_aplicacion"] is None
+    assert resultado.datos["adversidad"] is None
     assert len(resultado.datos["items"]) == 1
 
 

@@ -92,11 +92,17 @@ def crear_tool_leer_receta_ligada(imagen_base64: str):
 
     @tool("leer_receta", response_format="content_and_artifact")
     def leer_receta_ligada() -> tuple[str, ResultadoTool]:
-        """Lee la foto de la receta agronómica que el operario acaba de
-        enviar y extrae sus datos estructurados.
+        """Lee la foto de receta que el operario acaba de mandar EN ESTE
+        MISMO MENSAJE y extrae sus datos estructurados.
 
-        Usar cuando el operario mandó una foto de una receta fitosanitaria
-        nueva en este mensaje. No usar para preguntas de texto sobre
+        Esta tool solo aparece en tu lista de tools cuando el mensaje actual
+        trajo una imagen adjunta -- si la ves disponible, es porque hay una
+        foto nueva ahora mismo, sin importar de qué haya sido el resto de la
+        conversación antes (aunque hayas estado hablando de otra cosa, de
+        otra receta, o ya hayas confirmado una receta previa en este mismo
+        chat). Llamala siempre en ese caso, sin excepción: nunca respondas
+        pidiendo la foto de nuevo ni con una repregunta genérica cuando esta
+        tool está en tu lista. No usar para preguntas de texto sobre
         productos o normativa, ni para confirmar/corregir una receta ya
         leída (eso lo maneja el orquestador sobre el estado, no esta tool
         de nuevo).

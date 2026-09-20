@@ -81,6 +81,7 @@ def guardar_receta_en_curso(
                     adversidad = COALESCE(%(adversidad)s, adversidad),
                     superficie_ha = COALESCE(%(superficie_ha)s, superficie_ha),
                     tipo_aplicacion = COALESCE(%(tipo_aplicacion)s, tipo_aplicacion),
+                    fecha_prevista = COALESCE(%(fecha_prevista)s, fecha_prevista),
                     datos_extraidos = datos_extraidos || %(datos_extraidos)s::jsonb,
                     estado = %(estado)s,
                     actualizado_en = now()
@@ -93,6 +94,7 @@ def guardar_receta_en_curso(
                     "lote": campos.get("lote"), "adversidad": campos.get("adversidad"),
                     "superficie_ha": campos.get("superficie_ha"),
                     "tipo_aplicacion": campos.get("tipo_aplicacion"),
+                    "fecha_prevista": campos.get("fecha_prevista"),
                     "datos_extraidos": json.dumps(campos.get("datos_extraidos", {})),
                     "estado": estado,
                 },
@@ -102,10 +104,10 @@ def guardar_receta_en_curso(
                 """
                 INSERT INTO operacion.receta
                     (thread_id, numero, cultivo, lote, adversidad, superficie_ha,
-                     tipo_aplicacion, datos_extraidos, estado)
+                     tipo_aplicacion, fecha_prevista, datos_extraidos, estado)
                 VALUES (%(thread_id)s, %(numero)s, %(cultivo)s, %(lote)s, %(adversidad)s,
-                        %(superficie_ha)s, %(tipo_aplicacion)s, %(datos_extraidos)s::jsonb,
-                        %(estado)s)
+                        %(superficie_ha)s, %(tipo_aplicacion)s, %(fecha_prevista)s,
+                        %(datos_extraidos)s::jsonb, %(estado)s)
                 RETURNING id
                 """,
                 {
@@ -114,6 +116,7 @@ def guardar_receta_en_curso(
                     "lote": campos.get("lote"), "adversidad": campos.get("adversidad"),
                     "superficie_ha": campos.get("superficie_ha"),
                     "tipo_aplicacion": campos.get("tipo_aplicacion"),
+                    "fecha_prevista": campos.get("fecha_prevista"),
                     "datos_extraidos": json.dumps(campos.get("datos_extraidos", {})),
                     "estado": estado,
                 },

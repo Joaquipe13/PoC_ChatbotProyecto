@@ -106,23 +106,51 @@ def _todas_las_citas(resultados: list[ResultadoTool]) -> list[Cita]:
 def _plantilla_confirmacion_receta(
     respuesta: RespuestaAgente, resultados: list[ResultadoTool]
 ) -> str:
+    """`cultivo`, `lote`, `superficie`, `producto` y `tipo_aplicacion` son los
+    campos que alimentan un chequeo legal más adelante (el tipo define la banda
+    y la distancia mínima que se informan; ver `servicios/extraccion_receta.py`):
+    si faltan se muestran igual, con ⚠️. El resto de los campos (ver
+    `Receta`, DECISIONES.md) son descriptivos de la receta real -- se
+    muestran solo si se pudieron leer, sin ⚠️ ni bloquear la confirmación."""
     datos = _primer_dato(resultados) or {}
     numero_txt = f" N.° {datos['numero']}" if datos.get("numero") else ""
     lineas = [f"*Leí la receta{numero_txt}*. Confirmá los datos:"]
     lineas.append(f"- *Cultivo:* {datos.get('cultivo') or 'no figura ⚠️'}")
     lineas.append(f"- *Lote:* {datos.get('lote') or 'no figura ⚠️'}")
+    lineas.append(
+        f"- *Superficie:* {_num(datos['superficie_ha'])} ha"
+        if datos.get("superficie_ha") is not None
+        else "- *Superficie:* no figura ⚠️"
+    )
     if datos.get("adversidad"):
         lineas.append(f"- *Adversidad:* {datos['adversidad']}")
     for item in datos.get("items", []):
         producto = item.get("producto_nombre", "producto sin nombre")
         dosis = item.get("dosis_declarada") or "sin dosis"
-        lineas.append(f"- *Producto:* {producto} — {dosis}")
+        detalle = " · ".join(
+            p for p in (item.get("principio_activo"), item.get("clase_toxicologica")) if p
+        )
+        sufijo = f" ({detalle})" if detalle else ""
+        lineas.append(f"- *Producto:* {producto} — {dosis}{sufijo}")
+        if item.get("adversidad"):
+            lineas.append(f"  Plaga/maleza: {item['adversidad']}")
     if not datos.get("items"):
         lineas.append("- *Producto:* no figura ⚠️")
-    if datos.get("superficie_ha") is not None:
-        lineas.append(f"- *Superficie:* {_num(datos['superficie_ha'])} ha")
-    tipo_aplic = datos.get("tipo_aplicacion")
-    lineas.append(f"- *Tipo de aplicación:* {tipo_aplic if tipo_aplic else 'no figura ⚠️'}")
+    lineas.append(f"- *Tipo de aplicación:* {datos.get('tipo_aplicacion') or 'no figura ⚠️'}")
+    if datos.get("caudal"):
+        lineas.append(f"- *Caudal:* {datos['caudal']}")
+    if datos.get("ubic_poblado"):
+        lineas.append(f"- *Ubicación respecto de zonas pobladas:* {datos['ubic_poblado']}")
+    if datos.get("condiciones"):
+        lineas.append(f"- *Condiciones de aplicación:* {datos['condiciones']}")
+    if datos.get("restricciones"):
+        lineas.append(f"- *Restricciones:* {datos['restricciones']}")
+    if datos.get("observaciones"):
+        lineas.append(f"- *Observaciones:* {datos['observaciones']}")
+    if datos.get("fecha_emision"):
+        lineas.append(f"- *Fecha de emisión:* {datos['fecha_emision']}")
+    if datos.get("validez_dias") is not None:
+        lineas.append(f"- *Validez:* {_num(datos['validez_dias'])} días")
     lineas.append("[Confirmar] [Corregir]")
     return "\n".join(lineas)
 
@@ -155,6 +183,13 @@ def _bloque_condiciones(condiciones: dict | None) -> str:
         norma = f" ({_cita_norma(Cita.model_validate(limitante))})" if limitante else ""
         lineas.append(f"- *Distancia mínima a {zona}:* {_num(d['distancia_min_m'])} m{norma}")
     for d in condiciones.get("distancias_minimas", []):
+        if d.get("extraida_de_pdf") and d.get("norma_limitante"):
+            zona = _NOMBRE_ZONA.get(d["tipo_zona"], d["tipo_zona"])
+            fuente = _cita_norma(Cita.model_validate(d["norma_limitante"]))
+            lineas.append(
+                f"⚠️ La distancia a {zona} se leyó del texto de {fuente} (la norma no "
+                "tiene reglas.csv): verificala con la norma."
+            )
         lineas.extend(f"⚠️ {a}" for a in d.get("advertencias", []))
     lineas.extend(f"⚠️ {a}" for a in condiciones.get("advertencias", []))
     return "\n".join(lineas)
@@ -314,6 +349,13 @@ def _plantilla_agendar_aplicacion(
 def _plantilla_consulta_producto(
     respuesta: RespuestaAgente, resultados: list[ResultadoTool]
 ) -> str:
+    """Sin intro del LLM ni sección *Fuentes* aparte (ver `formatear_respuesta`
+    y DECISIONES.md): acá la única Cita que arman las tools es un marcador
+    genérico ("SENASA, (vademécum)" o "SENASA, Reg. NNNN (detalle API)") que
+    no agrega nada sobre lo que ya va en la línea del producto (el propio
+    n.° de registro), así que mostrarla aparte es puro ruido. La Cita real
+    sigue viajando en `ResultadoTool.citas` y quedando logueada por turno;
+    esto solo cambia qué se le muestra al usuario en el chat."""
     datos = _primer_dato(resultados) or {}
 
     if "productos" in datos:  # consultar_productos: listado
@@ -328,22 +370,32 @@ def _plantilla_consulta_producto(
             marca = p.get("marca", "(sin marca)")
             registro = p.get("numero_inscripcion", "-")
             banda = p.get("banda_toxicologica") or "S/D"
-            lineas.append(f"{i}. {marca} · Reg. SENASA {registro} · Banda {banda} · {dosis_txt}")
+            lineas.append(f"{i}. *{marca}* · Reg. SENASA {registro} · Banda {banda} · {dosis_txt}")
         lineas.append(
             "Es lo que figura en el registro; qué aplicar lo define la receta "
             "del ingeniero agrónomo."
         )
-        cuerpo = "\n".join(lineas)
-    else:  # validar_producto_registro: producto puntual
-        autorizado = (
-            "✅" if datos.get("cultivo_autorizado") else "⚠️ no autorizado para ese cultivo"
-        )
-        nombre = datos.get("producto", "(sin nombre)")
-        registro = datos.get("numero_inscripcion", "-")
-        banda = datos.get("banda_toxicologica") or "S/D"
-        cuerpo = f"*{nombre}* · Reg. SENASA {registro} · Banda {banda} · {autorizado}"
+        return "\n".join(lineas)
 
-    return _unir_secciones(cuerpo, _seccion_fuentes(_todas_las_citas(resultados)))
+    # validar_producto_registro: producto puntual
+    autorizado = (
+        "✅ autorizado" if datos.get("cultivo_autorizado") else "⚠️ no autorizado para ese cultivo"
+    )
+    nombre = datos.get("producto", "(sin nombre)")
+    registro = datos.get("numero_inscripcion", "-")
+    banda = datos.get("banda_toxicologica") or "S/D"
+    lineas = [f"*{nombre}* · Reg. SENASA {registro} · Banda {banda} · {autorizado}"]
+    dosis_txt = next(
+        (
+            (uso.get("dosis") or {}).get("texto_original")
+            for uso in datos.get("usos_registrados") or []
+            if (uso.get("dosis") or {}).get("texto_original")
+        ),
+        None,
+    )
+    if dosis_txt:
+        lineas.append(f"Dosis registrada: {dosis_txt}")
+    return "\n".join(lineas)
 
 
 # --- consulta_normativa ---
@@ -356,7 +408,12 @@ def _plantilla_consulta_normativa(
     veredicto = datos.get("veredicto", "Depende")
     regla = datos.get("regla", "")
     cuerpo = f"*{veredicto}.* {regla}"
-    return _unir_secciones(cuerpo, _seccion_fuentes(_todas_las_citas(resultados)))
+    aclaracion = "\n".join(
+        f"⚠️ {a}" for r in resultados for a in r.advertencias if a.startswith("No se cuenta con")
+    )
+    return _unir_secciones(
+        cuerpo, aclaracion, _seccion_fuentes(_todas_las_citas(resultados))
+    )
 
 
 # --- repregunta ---
@@ -539,6 +596,8 @@ def formatear_respuesta(respuesta: RespuestaAgente, resultados: list[ResultadoTo
     de WhatsApp (más de uno solo si supera el límite de caracteres)."""
     render = _PLANTILLAS[respuesta.tipo]
     texto = render(respuesta, resultados)
-    if respuesta.intro and respuesta.tipo not in ("fuera_de_dominio", "ayuda", "error"):
+    if respuesta.intro and respuesta.tipo not in (
+        "fuera_de_dominio", "ayuda", "error", "consulta_producto",
+    ):
         texto = f"{respuesta.intro}\n\n{texto}"
     return partir_por_seccion(texto)

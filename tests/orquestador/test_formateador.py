@@ -29,10 +29,65 @@ def test_confirmacion_receta():
         "*Leí la receta N.° 0042*. Confirmá los datos:\n"
         "- *Cultivo:* soja\n"
         "- *Lote:* 4\n"
+        "- *Superficie:* 35 ha\n"
         "- *Adversidad:* malezas de hoja ancha\n"
         "- *Producto:* Glifosato 48% — 2 L/ha\n"
-        "- *Superficie:* 35 ha\n"
         "- *Tipo de aplicación:* no figura ⚠️\n"
+        "[Confirmar] [Corregir]"
+    )
+
+
+def test_confirmacion_receta_cultivo_lote_y_superficie_faltantes_muestran_alerta():
+    respuesta = RespuestaAgente(tipo="confirmacion_receta")
+    resultado = ResultadoTool(estado="faltan_datos", datos={"items": []})
+    texto = _un_mensaje(respuesta, [resultado])
+    assert texto == (
+        "*Leí la receta*. Confirmá los datos:\n"
+        "- *Cultivo:* no figura ⚠️\n"
+        "- *Lote:* no figura ⚠️\n"
+        "- *Superficie:* no figura ⚠️\n"
+        "- *Producto:* no figura ⚠️\n"
+        "- *Tipo de aplicación:* no figura ⚠️\n"
+        "[Confirmar] [Corregir]"
+    )
+
+
+def test_confirmacion_receta_con_campos_descriptivos_completos():
+    """Los campos agregados el 12/09/2026 (ver DECISIONES.md) se muestran sin
+    ⚠️: son descriptivos, no bloquean la confirmación si faltan."""
+    respuesta = RespuestaAgente(tipo="confirmacion_receta")
+    resultado = ResultadoTool(
+        estado="ok",
+        datos={
+            "cultivo": "soja", "lote": "4", "superficie_ha": 35,
+            "items": [{
+                "producto_nombre": "Glifosato 48%", "dosis_declarada": "2 L/ha",
+                "adversidad": "yuyo colorado", "principio_activo": "Glifosato",
+                "clase_toxicologica": "IV",
+            }],
+            "tipo_aplicacion": "terrestre", "caudal": "100 L/ha",
+            "ubic_poblado": "a 500 m del pueblo", "condiciones": "sin viento",
+            "restricciones": "no aplicar cerca de cursos de agua",
+            "observaciones": "aplicar por la mañana",
+            "fecha_emision": "2026-09-01", "validez_dias": 30,
+        },
+    )
+    texto = _un_mensaje(respuesta, [resultado])
+    assert texto == (
+        "*Leí la receta*. Confirmá los datos:\n"
+        "- *Cultivo:* soja\n"
+        "- *Lote:* 4\n"
+        "- *Superficie:* 35 ha\n"
+        "- *Producto:* Glifosato 48% — 2 L/ha (Glifosato · IV)\n"
+        "  Plaga/maleza: yuyo colorado\n"
+        "- *Tipo de aplicación:* terrestre\n"
+        "- *Caudal:* 100 L/ha\n"
+        "- *Ubicación respecto de zonas pobladas:* a 500 m del pueblo\n"
+        "- *Condiciones de aplicación:* sin viento\n"
+        "- *Restricciones:* no aplicar cerca de cursos de agua\n"
+        "- *Observaciones:* aplicar por la mañana\n"
+        "- *Fecha de emisión:* 2026-09-01\n"
+        "- *Validez:* 30 días\n"
         "[Confirmar] [Corregir]"
     )
 
@@ -283,7 +338,9 @@ def test_consulta_producto_listado():
     texto = _un_mensaje(respuesta, [resultado])
     assert "*Productos registrados* (1 de 1)" in texto
     assert "Flyer 10 Ec" in texto
-    assert "*Fuentes*" in texto
+    assert "Banda II" in texto
+    assert "160-180 cm3/ha" in texto
+    assert "*Fuentes*" not in texto
 
 
 def test_consulta_producto_puntual():
@@ -293,11 +350,44 @@ def test_consulta_producto_puntual():
         datos={
             "producto": "Flyer 10 Ec", "numero_inscripcion": "41881",
             "banda_toxicologica": "II", "cultivo_autorizado": True,
+            "usos_registrados": [
+                {"cultivo": "soja", "dosis": {"texto_original": "160-180 cm3/ha"}}
+            ],
         },
         citas=[Cita(fuente="senasa", registro_senasa="41881", documento="detalle API")],
     )
     texto = _un_mensaje(respuesta, [resultado])
-    assert texto.startswith("*Flyer 10 Ec* · Reg. SENASA 41881 · Banda II · ✅")
+    assert texto == (
+        "*Flyer 10 Ec* · Reg. SENASA 41881 · Banda II · ✅ autorizado\n"
+        "Dosis registrada: 160-180 cm3/ha"
+    )
+    assert "*Fuentes*" not in texto
+
+
+def test_consulta_producto_puntual_sin_dosis_registrada():
+    respuesta = RespuestaAgente(tipo="consulta_producto")
+    resultado = ResultadoTool(
+        estado="ok",
+        datos={
+            "producto": "Flyer 10 Ec", "numero_inscripcion": "41881",
+            "banda_toxicologica": "II", "cultivo_autorizado": True,
+        },
+    )
+    texto = _un_mensaje(respuesta, [resultado])
+    assert texto == "*Flyer 10 Ec* · Reg. SENASA 41881 · Banda II · ✅ autorizado"
+
+
+def test_consulta_producto_ignora_el_intro_del_llm():
+    respuesta = RespuestaAgente(tipo="consulta_producto", intro="Acá tenés el resultado:")
+    resultado = ResultadoTool(
+        estado="ok",
+        datos={
+            "producto": "Flyer 10 Ec", "numero_inscripcion": "41881",
+            "banda_toxicologica": "II",
+        },
+    )
+    texto = _un_mensaje(respuesta, [resultado])
+    assert "Acá tenés" not in texto
 
 
 def test_consulta_normativa():
@@ -474,3 +564,66 @@ def test_agenda_con_tareas():
         "1. ⏳ soja — lote A (pendiente)\n"
         "2. 🚜 maiz — lote B (en_curso)"
     )
+
+
+def test_dictamen_sin_normativa_municipal_lo_aclara_junto_a_la_distancia_provincial():
+    condiciones = {
+        "localidad": "Rosario", "tipo_aplicacion": "terrestre", "banda": "IV",
+        "banda_color": "verde", "sin_normativa_municipal": True,
+        "distancias_minimas": [{
+            "tipo_zona": "zona_urbana", "distancia_min_m": 300.0,
+            "norma_limitante": {"fuente": "normativa", "norma": "ley-13740-2017", "articulo": "2"},
+        }],
+        "advertencias": [
+            "No se cuenta con la normativa municipal de Rosario: la distancia se basa en la "
+            "normativa provincial"
+        ],
+    }
+    resultado = ResultadoTool(
+        estado="ok",
+        datos={"dictamen": {"resultado": "APTA", "condiciones": condiciones}},
+    )
+    texto = _un_mensaje(RespuestaAgente(tipo="dictamen"), [resultado])
+    assert "- *Distancia mínima a zona urbana:* 300 m (Ley 13740/2017, art. 2)" in texto
+    assert "⚠️ No se cuenta con la normativa municipal de Rosario" in texto
+
+
+def test_consulta_normativa_sin_normativa_municipal_lo_aclara():
+    resultado = ResultadoTool(
+        estado="ok",
+        datos={"veredicto": "No", "regla": "La distancia mínima es de 300 metros."},
+        citas=[Cita(fuente="normativa", norma="ley-13740-2017", articulo="2")],
+        advertencias=[
+            "No se cuenta con la normativa municipal de Rosario: la respuesta se basa en la "
+            "normativa provincial"
+        ],
+    )
+    texto = _un_mensaje(RespuestaAgente(tipo="consulta_normativa"), [resultado])
+    assert texto == (
+        "*No.* La distancia mínima es de 300 metros.\n\n"
+        "⚠️ No se cuenta con la normativa municipal de Rosario: la respuesta se basa en la "
+        "normativa provincial\n\n"
+        "*Fuentes*\n"
+        "- Ley 13740/2017, art. 2"
+    )
+
+
+def test_dictamen_avisa_cuando_la_distancia_se_leyo_del_texto_de_la_norma():
+    condiciones = {
+        "localidad": "Rosario", "tipo_aplicacion": "aerea", "banda": "II",
+        "banda_color": "amarilla",
+        "distancias_minimas": [{
+            "tipo_zona": "zona_urbana", "distancia_min_m": 3000.0, "extraida_de_pdf": True,
+            "norma_limitante": {"fuente": "normativa", "norma": "ley-11273-1995", "articulo": "33"},
+        }],
+        "advertencias": [],
+    }
+    resultado = ResultadoTool(
+        estado="ok", datos={"dictamen": {"resultado": "APTA", "condiciones": condiciones}},
+    )
+    texto = _un_mensaje(RespuestaAgente(tipo="dictamen"), [resultado])
+    assert "- *Distancia mínima a zona urbana:* 3000 m (Ley 11273/1995, art. 33)" in texto
+    assert (
+        "⚠️ La distancia a zona urbana se leyó del texto de Ley 11273/1995, art. 33 "
+        "(la norma no tiene reglas.csv): verificala con la norma."
+    ) in texto
