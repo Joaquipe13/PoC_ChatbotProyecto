@@ -1,5 +1,66 @@
 # Decisiones
 
+## RAG de equipos: `catalogo.vehiculo` pasa a soportar embeddings y entidades puntuales (post-Fase 11)
+
+### Se revierte la decisión de la Fase 9 ("matching sin embeddings"), a pedido explícito del usuario
+
+La Fase 9 había decidido deliberadamente no usar embeddings para `catalogo.vehiculo` (ver esa sección más abajo): "un puñado de categorías fijas" no lo justificaba. El usuario pidió expresamente agregar búsqueda semántica ("el RAG de los equipos") porque el catálogo dejó de ser solo categorías genéricas: ahora puede tener **equipos puntuales** (una entidad distinta por matrícula/modelo, no una categoría). Con más de una unidad del mismo `tipo_aplicacion` (dos aviones), el matching por substring/trigram ya no alcanza para distinguir "la avioneta grande" de "la dromader" -- se necesita similitud semántica real.
+
+Se agregaron 3 columnas a `catalogo.vehiculo` (migración 001, aplicada a mano a la base de dev con `ALTER TABLE`, ver DIFICULTADES.md de fases previas sobre por qué editar el archivo no alcanza): `matricula TEXT` (nullable -- las categorías genéricas no tienen), `caracteristicas JSONB DEFAULT '{}'` (modelo, motor, capacidad, ancho de faja -- semiestructurado, mismo criterio que `catalogo.producto.toxicidad`) y `embedding vector(768)` con índice HNSW. `servicios/resolucion_vehiculo.py::resolver_vehiculo` ahora requiere `modelo_embeddings` y, si no hay match exacto por substring, calcula un score combinado `0.5 * trigram + 0.5 * (1 - distancia_coseno)` -- mismo patrón que `datos/retrievers/catalogo.py::buscar_productos_por_nombre`, umbral 0,5 (`UMBRAL_SIMILITUD_RAG`, calibrado empíricamente igual que el de normativa: "avioneta grande turbohelice" score ~0,6+ contra el Air Tractor). `tools/resolver_vehiculo.py` y `tools/registrar_evento.py` pasaron de `con_conexion` a `con_conexion_y_modelo` para poder pasarle el modelo al servicio.
+
+`scripts/cargar_vehiculos.py` (nuevo) calcula el embedding de cada fila a partir de nombre + sinónimos + modelo/motor de `caracteristicas` -- hay que correrlo después de tocar la tabla a mano, igual que `loader_normativa.py` para `territorio.articulo`.
+
+### Los 2 aviones nuevos: modelos reales, matrícula ficticia a propósito
+
+Se agregaron "Air Tractor AT-502B" y "PZL M18 Dromader" -- ambos aviones agrícolas reales y de uso común en Argentina (elegidos por ser representativos, no porque el usuario haya dado modelos puntuales), con matrícula `LV-EJEMPLO1`/`LV-EJEMPLO2`. Deliberadamente **no** siguen el formato real de matrícula argentina (`LV-XXX`, 3 letras) para que no se puedan confundir con una matrícula real de un avión existente. `características` incluye motor/capacidad/ancho de faja de cada modelo (datos públicos de fabricante, no verificados contra una ficha técnica puntual -- alcanza para el propósito de esta demo, no para un dictamen).
+
+### Extendido `guardar_receta_en_curso` para aceptar `fecha_prevista`, sin cambiar el comportamiento existente
+
+Al armar el test end-to-end (`scripts/demo_avion_agenda.py`) se encontró que `orquestador/estado.py::guardar_receta_en_curso` nunca escribía `fecha_prevista` -- la columna existe desde la Fase 1 y `consultar_agenda_logica` filtra por ella, pero no había ningún camino (ni de test, ni de código de producción) que la seteara vía esta función; los tests de agenda insertan la fila directo por SQL (ver DIFICULTADES.md). Se agregó `fecha_prevista` a los `INSERT`/`UPDATE` de `guardar_receta_en_curso` (con `COALESCE`, igual que el resto de los campos) -- cambio mínimo y retrocompatible: quien no pase `fecha_prevista` en `campos` obtiene exactamente el comportamiento de antes (`None`, columna sin tocar). No se conectó `guardar_receta_en_curso` al flujo del orquestador real (eso seguiría siendo una fase aparte, ver Fase 0 "Ampliación del modelo Receta"); el script de demo la llama directo, documentado como tal en su propio docstring.
+
+### `scripts/demo_avion_agenda.py`: test end-to-end verificado, corre contra Gemini/embeddings/Postgres reales
+
+Ejercita, en un solo script ejecutable (`uv run python scripts/demo_avion_agenda.py`): `leer_receta` sobre una imagen real (`data/recetas_ejemplo/01_apta_terrestre_lejos.jpg`) → guardar la receta con `fecha_prevista` de hoy → `registrar_evento` (iniciar) con una descripción de avión que **no** es ningún sinónimo cargado ("la avioneta grande turbohelice", resuelta por RAG al Air Tractor) → `consultar_agenda` (confirma `en_curso`) → `registrar_evento` (finalizar) → `consultar_agenda` de nuevo (confirma `finalizada`). Corrido de punta a punta antes de entregarlo: los 5 pasos dieron el resultado esperado.
+
+## Carga de datos reales de El Trébol y recalibración de RAG_UMBRAL_SIMILITUD (post-Fase 11)
+
+### Insumos de El Trébol no respetaban el contrato de la skill: normalizado el formato, no el contenido
+
+Los archivos crudos en `data/insumos/localidades/el-trebol/` venían de fuentes públicas (GeoJSON del límite descargado de INDEC tal cual, con las propiedades propias del shapefile de origen; PDF de la Ordenanza 841/2010 de la Municipalidad de El Trébol) sin adaptar al contrato de `docs/contrato-insumos.md`/skill. Se corrigió solo el formato:
+
+- `el-trebol.geojson` → renombrado a `localidad.geojson` (nombre fijo que exige el contrato; el validador lo reportaba como "falta localidad.geojson").
+- Agregadas las propiedades `tipo: "limite"`, `nombre: "El Trébol"` y `provincia: "santa-fe"` al feature del límite -- el GeoJSON de origen no las traía, y sin `tipo: "limite"` `loader_geo.py::cargar_localidad` rompe con un `StopIteration`.
+- `ley-055297-2017.pdf` y `ley-11273-1995.pdf` movidas de `normativa-general/provincial/` a `normativa-general/provincial/santa-fe/`: el loader espera una subcarpeta por provincia y las saltea silenciosamente si están sueltas.
+
+### Zona `zona_urbana` agregada al GeoJSON: aproximación del "Límite Agronómico" del art. 1, marcada como supuesto
+
+La Ordenanza 841/2010 mide las distancias de los artículos 6 y 7 desde el "Límite Agronómico o Límite 0" (art. 1), delimitado por un plano específico adjunto a la ordenanza que no está digitalizado por separado en este proyecto. Se usó el mismo polígono del límite catastral de INDEC (el que ya se carga como `limite` de jurisdicción) como aproximación, agregado además como zona protegida `tipo: "zona_urbana"`. Confirmado con el usuario antes de cargarlo (no es un dato verificado contra el plano real). **Pendiente de verificar**: si el plano del Límite Agronómico difiere del límite catastral INDEC, las distancias de `evaluar_riesgo`/`evaluar_viabilidad_legal` para El Trébol van a estar calculadas contra un límite aproximado, no el legal exacto.
+
+### `reglas.csv` de El Trébol: solo los artículos con distancia numérica (6 y 7); 2, 3 y 9 quedan sin representar
+
+El modelo de `territorio.regla_distancia` (distancia mínima a una zona protegida) no puede representar "prohibido aplicar/circular *dentro* de una zona" (arts. 2 y 3: solo banda D excepcional dentro del límite, terrestre no puede ni entrar) ni una restricción sin distancia numérica fija y sin esa geometría cargada (art. 9: cerca de vías del ferrocarril / Ruta Provincial 13). Se cargaron solo las dos reglas con distancia explícita, confirmadas con el usuario antes de cargar:
+
+| Artículo | Regla | Cargada como (`tipo_zona, tipo_aplicacion, bandas, distancia_min_m`) |
+|---|---|---|
+| 6 | Aérea prohibida hasta 500 m del Límite 0, todas las bandas | `zona_urbana, aerea, todas, 500` |
+| 7 | Aérea Banda Amarilla (II) prohibida hasta 3.000 m del Límite 0 | `zona_urbana, aerea, II, 3000` |
+| 2, 3 | Terrestre no circula dentro del límite; solo Banda Verde excepcional adentro | no representable con el modelo actual de reglas |
+| 9 | Prohibido cerca de vías del ferrocarril / Ruta Provincial 13 | sin distancia numérica ni geometría de esas vías cargada |
+
+Si más adelante hace falta cubrir 2/3/9, el modelo de reglas necesita un tipo nuevo ("prohibido siempre dentro de la zona", distinto de "prohibido a menos de X metros de la zona").
+
+### `RAG_UMBRAL_SIMILITUD` del `.env` real había drifteado a 0,75; recalibrado a 0,5 con el corpus real ya cargado
+
+`.env.example` y `config.py` siguen documentando 0,35 (la calibración de la Fase 6, sobre un corpus sintético de 9 artículos). El `.env` real de esta máquina (no versionado) tenía 0,75 -- no se pudo determinar cuándo ni por qué volvió a subir respecto del valor documentado. Con el corpus real ya cargado (El Trébol + 2 leyes provinciales, 136 artículos), ninguna consulta -- de El Trébol ni de las localidades de fixtures -- superaba nunca 0,75; el artículo genuinamente correcto scoreaba 0,50-0,63 según la localidad. Se subió el `.env` real a 0,5 (más alto que el 0,35 de la Fase 6, con un corpus más grande y heterogéneo para tener algo más de margen). La discriminación semántica pura sigue siendo débil (en una prueba, una pregunta totalmente fuera de tema scoreó 0,51, por encima de la cita correcta de una pregunta real que scoreó 0,507 en ese caso puntual) -- funciona en la práctica porque la verificación final depende de que el LLM efectivamente pueda citar, entre los fragmentos recuperados, un artículo que responda la pregunta (ver bug de citas abajo), no solo del score de similitud. **No se tocó `.env.example`/`config.py`** (0,35 sigue siendo el default para quien clona el repo); si 0,5 se confirma como mejor valor con más pruebas, actualizar ahí también.
+
+### Bug real: las citas del LLM se descartaban siempre por un mismatch de formato en el número de artículo
+
+`servicios/rag_normativa.py::_armar_contexto` arma el contexto que ve el LLM etiquetando cada fragmento como `"[archivo, art. {numero}, ...]"`. El LLM, al citar el artículo en su respuesta JSON, tiende a copiar ese mismo formato (`"articulo": "art. 7"`) en vez de devolver solo el número tal como pide el prompt de sistema. El matching de citas contra `fragmentos_por_clave` es una comparación exacta de tupla `(norma, numero)`, así que `"art. 7" != "7"` descartaba la cita siempre -- la respuesta correcta del LLM terminaba en la advertencia "citó un artículo que no está entre los fragmentos recuperados" y la tool devolvía `no_resuelto` (`NORMATIVA_SIN_RESPALDO`) aunque el LLM hubiera respondido bien. No es un problema específico de El Trébol: afecta a cualquier localidad; simplemente nunca se había probado con Gemini real después de la Fase 6 (los tests usan un LLM fake que no reproduce este estilo de respuesta). Corregido con `_normalizar_numero_articulo` (extrae solo los dígitos), aplicado a ambos lados del matching antes de comparar. Verificado con dos preguntas reales contra El Trébol con Gemini real: ambas citan ahora el artículo correcto (7 y 3 respectivamente). Los 90 tests de `tools`/`servicios` siguen pasando sin cambios.
+
+### 3 recetas de ejemplo generadas para El Trébol, con producto/dosis reales del catálogo SENASA ya cargado
+
+`scripts/generar_recetas_ejemplo_el_trebol.py` (nuevo, análogo a `generar_fixtures_recetas.py` de la Fase 4 pero con datos reales en vez de sintéticos) genera 3 imágenes en `data/recetas_ejemplo/` (gitignored) pensadas para ejercitar las reglas de distancia recién cargadas: una APTA (terrestre, lejos del límite urbano), una OBSERVADA por distancia (aérea, banda amarilla, ~300 m del límite -- viola arts. 6 y 7 a la vez) y una OBSERVADA por dosis (mismo tipo de aplicación y ubicación que la APTA, pero con la dosis muy por encima de lo registrado). Los tres usan productos reales con dosis registrada real (Flyer 10 Ec, reg. 41881, Banda II; Imazamox 70 Wg Brilliance, reg. 41759, Banda III) -- no números inventados. Las coordenadas de "cerca"/"lejos" del límite se calcularon con `pyproj.Geod` (geodésico real), no a ojo, mismo criterio que la Fase 5 con San Carlos Centro. Los tres casos se corrieron contra `evaluar_viabilidad_legal_logica` real antes de darlos por buenos, lo cual destapó un cuarto hallazgo (ver DIFICULTADES.md): los 3 dieron `JURISDICCION_NO_CUBIERTA`, porque el `limite` cargado es la mancha urbana de INDEC, no el partido/municipio real -- ningún punto de campo (donde está cualquier lote real) cae dentro. Las 3 imágenes quedan generadas igual, con el resultado esperado y este bloqueo documentados en `data/recetas_ejemplo/notas.txt`, para usarlas en cuanto se cargue el polígono de jurisdicción correcto.
+
 ## Fase 10 — Demo, documentación y defensa
 
 ### "cm3" sin el superíndice unicode: un bug real, no una limitación aceptada
@@ -278,6 +339,42 @@ Ya justificado en `plandefases.md` (decisión abierta #3): buen soporte de espa�
 
 A ese ritmo, embeber el catálogo completo de SENASA (~7.374 productos, más principios activos/cultivos/adversidades) es del orden de 1-2 minutos de cómputo puro, insignificante frente al tiempo del crawl (Fase 2, throttled a ~1 req/s). **Decisión cerrada**, no queda como decisión abierta. Dimensión 768 fijada en las migraciones SQL de la Fase 1; si se cambia de modelo más adelante hay que migrar esas columnas `vector` también.
 
+### Canal web como alternativa a WhatsApp (Fase 11)
+
+Después de cerrar la Fase 10 y cargar los insumos reales de un único municipio para empezar a probar, el usuario decidió que el canal WhatsApp (Fase 8) no era práctico para seguir iterando: el número de prueba de Meta admite hasta 5 destinatarios verificados y depende de un túnel HTTPS activo (cloudflared/ngrok) para cada sesión de prueba. Se agregó `canales/web/` como canal alternativo, sin tocar ni recortar el canal WhatsApp existente — queda documentado como implementación futura (`docs/setup-whatsapp.md`).
+
+Diseño: reutiliza sin modificar `orquestador/turno.py::ejecutar_turno`, `orquestador/agente.py::crear_agente` (incluida la tool `leer_receta` ligada a imagen por clausura, ya resuelta en la Fase 8) y `ContadorRepreguntas`. Solo cambia el transporte, siguiendo el mismo patrón de separación protocolo/wiring que WhatsApp (`canal.py` recibe `procesar_mensaje` inyectado, como `webhook.py::crear_app`). Diferencia clave de protocolo: WhatsApp debe responder 200 de inmediato y procesar en background (regla de Meta); el navegador espera la respuesta en la misma request, así que no hace falta cola de background ni deduplicación por `message.id`.
+
+Los botones y listas de WhatsApp nunca fueron elementos interactivos reales del lado del formateador (`orquestador/formateador.py` los renderiza como texto plano con patrones `[Opción]` y `   - opción`, ver skill "Formato de respuestas"); el canal web parsea esos mismos patrones en JavaScript para mostrarlos como chips clickeables, sin necesitar tocar el formateador ni el orquestador.
+
+`thread_id` del canal web: `f"web:{session_id}"`, con `session_id` generado en el navegador (`crypto.randomUUID()`, persistido en `localStorage`) — evita colisión con los números de teléfono normalizados que usa WhatsApp como `thread_id` en el mismo checkpointer/Postgres.
+
+### Ampliación del modelo `Receta`/`RecetaItem` a los campos reales del formulario (12/09/2026)
+
+El usuario definió el conjunto real de campos de una receta agronómica argentina (formato completo, con datos personales/matrículas) y el subconjunto que este proyecto va a manejar, excluyendo datos personales y sensibles (productor, ingeniero agrónomo, matrículas, receta de venta -- esta última se consideró pero el usuario la descartó también por ser un dato de autorización, no de la aplicación en sí):
+
+`numero_receta + cultivo + lote + superficie + (tipo_aplicacion) + (caudal) + ubic_poblado + condiciones + restricciones + observaciones + fecha_emision + validez_dias + 1{(plagas) + nombre_comercial + principio_activo + clase_toxicologica + dosis}n`
+
+Se agregaron a `Receta`: `caudal`, `ubic_poblado`, `condiciones`, `restricciones`, `observaciones`, `fecha_emision`, `validez_dias`; a `RecetaItem`: `principio_activo`, `clase_toxicologica` (más `adversidad` por ítem, que ya existía). `numero` ya cubría `numero_receta`, `superficie_ha` ya cubría `superficie`.
+
+**Criterio para qué bloquea y qué no:** el pedido original del usuario incluía la queja de que el sistema repreguntaba en vez de armar la receta con lo que pudo leer. Se separaron los campos en dos grupos:
+- **Alimentan un chequeo legal más adelante** (`cultivo`, `lote`, `superficie_ha`, al menos un `producto`): siguen generando `CampoFaltante` si no se leen con confianza suficiente -- son los únicos que la skill necesita para el dictamen.
+- **Descriptivos** (todo lo demás, incluido `tipo_aplicacion` -- que el propio usuario marcó como opcional entre paréntesis en su notación): se toman tal cual los devuelva el LLM, sin campo de confianza propio ni `CampoFaltante`. Si faltan, la `Receta` se arma igual y el hueco se ve en la plantilla de confirmación sin ⚠️ (reservado para los campos del primer grupo). `tipo_aplicacion` sigue siendo obligatorio más adelante para `evaluar_riesgo` (ver `docs/matriz-parametros.md`), pero eso lo repregunta esa tool en su momento, no `leer_receta`.
+
+No se agregaron columnas nuevas a `operacion.receta`: todos los campos nuevos son semiestructurados/descriptivos según el criterio de la skill ("JSONB si es semiestructurado o variable"), así que viajan dentro de `datos_extraidos` (ya JSONB) vía `Receta.model_dump()`, sin migración. `guardar_receta_en_curso` (que persiste la receta en curso) no está conectado todavía al flujo real del orquestador -- sigue siendo así, sin cambios.
+
+También se reforzó `orquestador/prompt_sistema.py` para dejar explícito que, después de `leer_receta`, la respuesta es `confirmacion_receta` con los datos parciales, nunca `repregunta` ni pedir la foto de nuevo -- encontrado como comportamiento inconsistente real (a veces el LLM repreguntaba igual pese a la regla ya existente), documentado en `DIFICULTADES.md`.
+
+**Corrección posterior (mismo día):** `adversidad` había quedado sin querer en el grupo de campos bloqueantes de `leer_receta` (junto a cultivo/lote/superficie_ha) cuando en realidad el usuario la definió como opcional desde el principio (la plaga solo aparece entre paréntesis, a nivel de cada producto, en su notación) -- ni `evaluar_riesgo` ni `evaluar_viabilidad_legal` la exigen (`adversidad: str | None = None` en ambos), así que no tenía sentido que `leer_receta` sí la bloqueara. Se sacó del grupo bloqueante junto con `confianza_adversidad` (que ya no tiene uso, igual que se hizo con `tipo_aplicacion`).
+
+### `consulta_producto`: sin intro del LLM ni sección *Fuentes* aparte
+
+Probando el canal web, una consulta de banda toxicológica devolvía "Acá tenés el resultado de la consulta..." (intro genérica del LLM) seguido de una sección *Fuentes* que solo decía "SENASA, (vademécum)" — no aporta nada que no esté ya en la línea del producto (que siempre trae su propio n.° de registro). El usuario pidió una respuesta directa: banda y dosis, sin ese relleno.
+
+Se sacó el intro del LLM para `consulta_producto` (se agregó a la lista de tipos que ya lo suprimían: `fuera_de_dominio`, `ayuda`, `error`) y se dejó de renderizar `_seccion_fuentes` en esa plantilla. Esto **no** afecta la trazabilidad real: la `Cita` sigue viajando en `ResultadoTool.citas` y quedando logueada en `operacion.turno` como siempre — solo cambia qué texto se le muestra al usuario en el chat, no lo que el sistema verifica o registra. No se tocó la plantilla de `dictamen` ni de `consulta_normativa`: ahí la sección *Fuentes* sí lleva información específica (norma + artículo) que no está repetida en ningún otro lado del mensaje, y es un requisito explícito de la skill ("toda afirmación sobre normativa o registro lleva su Cita").
+
+De paso se agregó la dosis registrada a la rama de `validar_producto_registro` (consulta de un producto puntual), que hasta ahora no la mostraba (solo la mostraba la rama de `consultar_productos`, el listado).
+
 ### Excepción de cuota agotada del LLM: detección heurística por texto
 
 No se pudo verificar contra documentación oficial el tipo exacto de excepción que levantan `google-genai` y `groq` ante un 429/cuota agotada. `src/fitosanitarios/llm/client.py` detecta el caso buscando "429", "RESOURCE_EXHAUSTED" o "RATE LIMIT" en el texto de la excepción, en vez de capturar una clase específica. **Verificar** antes de la Fase 2 (primera llamada real) y reemplazar por el tipo de excepción correcto si existe uno más específico.
@@ -337,3 +434,38 @@ Antes: `localidades/<localidad>/` y `normativa-general/provincial/<provincia>/`.
 **Decisión abierta:** la normativa nacional quedó en `normativa-general/nacional/` porque no se pidió moverla. Si se quiere, va a `data/insumos/nacional/` con un cambio de una línea en `estructura.py`.
 
 **Verificación.** Corren sin base: validador (fixtures y casos F1–F7), chunking. Los tests de carga contra Postgres (`test_loaders_integracion`) se reescribieron pero no corrieron (sin Docker en esta sesión).
+
+### Sin normativa municipal: respaldo en la provincial, aclarándolo
+
+**Cambio (19/09/2026).** Si la localidad no tiene normativa municipal, `evaluar_riesgo`, `evaluar_viabilidad_legal` y `responder_consulta_normativa` se basan en la provincial (y nacional) y **lo aclaran en la respuesta** ("No se cuenta con la normativa municipal de X: la distancia se basa en la normativa provincial"). Dos casos:
+- **Localidad cargada sin ordenanzas** (existe en `territorio.localidad` pero no tiene normas municipales): se detecta con `localidad_tiene_normativa_municipal` (existencia de normas municipales, no de reglas: una ordenanza que no fija distancia para terrestre no es "sin normativa"; en ese caso solo se avisa que no hay distancia cargada).
+- **Localidad no cargada:** antes daba `JURISDICCION_NO_CUBIERTA`. Ahora, si se conoce la provincia (argumento nuevo `provincia`, o mencionada en el mismo texto, "Rosario, Santa Fe"), se usa su normativa provincial. **Nunca se supone la provincia**: si falta, la tool devuelve `faltan_datos` con la lista de provincias cargadas. `JURISDICCION_NO_CUBIERTA` queda para una provincia sin normativa cargada.
+
+Implementación: `servicios/localidad.py::Ubicacion` y `tools/_localidad.py::resolver_ubicacion_o_cortar` (paso común de las tres tools); `CondicionesAplicacion.sin_normativa_municipal`; la plantilla de consulta normativa muestra la aclaración. Sin cambios en el modelo de datos.
+
+**Límite conocido:** con las leyes provinciales reales de Santa Fe cargadas hoy (sin `reglas.csv`), la distancia para una localidad sin ordenanza sale "no hay una distancia mínima cargada" (además de la aclaración); las distancias provinciales solo se informan si hay reglas provinciales cargadas.
+
+### Otros cambios de la misma sesión (19/09/2026)
+
+- **Canal web:** se quitó el botón 📍 y los campos `lat`/`lon` (la ubicación del lote ya no se usa). El mensaje `location` del webhook de WhatsApp no se tocó.
+- **Confirmación de receta:** vuelve a marcar "Tipo de aplicación: no figura ⚠️", porque ahora define la banda y la distancia que se informan.
+- **`001_catalogo.sql`:** `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` para `matricula`, `caracteristicas` y `embedding` de `catalogo.vehiculo` (las bases existentes no los tenían); después correr `scripts/cargar_vehiculos.py`.
+- Recetas de ejemplo de El Trébol renombradas (`01_apta_terrestre`, `02_apta_aerea_banda_ii`, `03_observada_dosis_fuera_de_rango`) con notas nuevas; `docs/testing-manual.md` y `docs/guion-demo.md` actualizados al flujo por localidad.
+
+### Sin `reglas.csv`, las distancias se leen del PDF de la norma (de forma determinista)
+
+**Cambio (19/09/2026).** `reglas.csv` pasa a ser opcional en cualquier carpeta (municipal, provincial, nacional). Si falta, `loader_reglas` lee las distancias del texto de los artículos de esa carpeta y las guarda en `territorio.regla_distancia` con `fuente='pdf_extraido'` (columna nueva; el CSV es `fuente='csv'`). Con CSV presente, el CSV es la única fuente de esa carpeta. Antes las leyes provinciales reales de Santa Fe (sin CSV) no aportaban ninguna distancia.
+
+**Determinista, sin LLM.** Primero se hizo con un LLM (Gemini) y salió una regla dudosa (el art. 53 del decreto, que solo describe un trámite) y excepciones como reglas; además el resultado variaba entre corridas. Se reemplazó por un parser en código (`servicios/extraccion_reglas.py`): el mismo texto da siempre las mismas reglas, no necesita API key, corre en cualquier entorno (también con `USE_FIXTURES=true`) y se testea sin red.
+
+**Qué acepta: solo prohibiciones firmes.** Una oración que prohíbe aplicar ("Prohíbese...", "queda prohibida...", "no se podrá aplicar...") y que tiene una única distancia (en metros o km; "quinientos ( 500 ) metros" cuenta una vez), una única zona (`zona_urbana`, `escuela`, `curso_agua`), un tipo de aplicación (terrestre, aérea, o todas si no lo dice) y clases toxicológicas explícitas (o ninguna, que vale para todas las bandas). Las clases se traducen con una tabla fija: A=Ia/Ib (roja), B=II (amarilla), C=III (azul), D=IV (verde), o por color.
+
+**Qué descarta** (ante la duda, no se extrae): excepciones y permisos ("excepcionalmente podrán aplicarse...", "salvo", "cuando exista ordenanza que lo autorice", "previa...", "conforme a la reglamentación"), trámites y requisitos, oraciones sin prohibición, rangos ("entre 500 y 3.000 m"), más de una distancia o de un número en la oración, más de una zona, y clases que el parser no reconoce.
+
+**En la respuesta:** la distancia lleva "⚠️ La distancia a zona urbana se leyó del texto de <norma, art. N> (la norma no tiene reglas.csv): verificala con la norma".
+
+**Corrida real (122 artículos provinciales y nacionales cargados):** 2 reglas, y ningún falso positivo: Ley 11.273 art. 33 (aérea: clases A y B a 3.000 m de plantas urbanas) y art. 34 (terrestre: A y B a 500 m). Quedan afuera a propósito las excepciones de los mismos artículos (clases C y D a 500 m con ordenanza; la de la clase B entre 500 y 3.000 m) y el art. 53 del decreto reglamentario.
+
+**Límites conocidos:** al descartar las excepciones no se extrae la prohibición *implícita* para las clases C y D en aérea (el artículo solo dice que "excepcionalmente" se puede dentro de 500 m con ordenanza): esa distancia solo aparece si se carga a mano en un `reglas.csv`. Solo entiende prosa: una distancia dada en una tabla o imagen no se lee. Un texto redactado de otra forma puede no reconocerse (se pierde la regla, nunca se inventa).
+
+**Migración:** `002_territorio.sql` agrega `fuente` con `ADD COLUMN IF NOT EXISTS` (aplicar en bases existentes; ya aplicada en la del contenedor).

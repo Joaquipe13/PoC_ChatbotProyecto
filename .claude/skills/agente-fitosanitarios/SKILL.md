@@ -350,7 +350,7 @@ data/insumos/
 │   └── <jurisdiccion_id>/          municipio de esa provincia, p. ej. san-carlos-centro
 │       ├── localidad.geojson
 │       ├── ordenanza-914-2018.pdf  normas municipales vigentes (una o más)
-│       └── reglas.csv
+│       └── reglas.csv              opcional: sin él, las distancias se leen del PDF
 └── normativa-general/
     └── nacional/
         ├── ley-NNNNN-AAAA.pdf
@@ -368,7 +368,7 @@ data/insumos/
   - `norma`: nombre de un PDF de la misma carpeta, sin extensión (`ordenanza-914-2018`). `articulo`: número.
   - `observaciones`: condiciones que el modelo no cubre (aviso previo, horarios, viento). El dictamen las muestra como advertencia.
 - Cada zona protegida pertenece a la localidad de su carpeta, pero la búsqueda de distancias considera también zonas de localidades vecinas dentro del radio.
-- El validador falla con mensajes claros si: a una carpeta de localidad le falta `localidad.geojson`, al menos un PDF o `reglas.csv`; el GeoJSON no tiene exactamente un `limite` o trae un tipo desconocido; una geometría es inválida o cae fuera de Argentina; la `provincia` del límite no coincide con la carpeta de la provincia donde está la localidad; una regla cita una norma que no está en su carpeta; un nombre de archivo o carpeta no respeta la convención.
+- El validador falla con mensajes claros si: a una carpeta de localidad le falta `localidad.geojson` o al menos un PDF; el GeoJSON no tiene exactamente un `limite` o trae un tipo desconocido; una geometría es inválida o cae fuera de Argentina; la `provincia` del límite no coincide con la carpeta de la provincia donde está la localidad; una regla cita una norma que no está en su carpeta; un nombre de archivo o carpeta no respeta la convención.
 - El validador avisa (sin fallar) si: una zona protegida queda a más de `RADIO_BUSQUEDA_ZONAS_M` del límite de su localidad; un PDF no tiene texto extraíble (escaneado, va por OCR).
 - Para desarrollar y testear hay datos sintéticos con la misma estructura en `tests/fixtures/insumos/`, nunca los reales.
 - Los loaders cargan todo al schema `territorio`: los archivos son la fuente, pero las tools consultan la base.

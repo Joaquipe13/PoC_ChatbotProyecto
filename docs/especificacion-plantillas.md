@@ -81,7 +81,7 @@ Es lo que figura en el registro; qué aplicar lo define la receta del ingeniero 
 
 ```
 Para evaluar la receta me faltan 2 datos:
-1. *Ubicación del lote*: mandámela desde 📎 → Ubicación, marcando el lote en el mapa.
+1. *Localidad*: ¿En qué localidad o municipio se va a realizar la aplicación?
 2. *Tipo de aplicación*: elegí una opción.
 [Terrestre] [Aérea]
 ```

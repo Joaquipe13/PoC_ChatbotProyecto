@@ -91,10 +91,18 @@ Con el túnel activo y el número de prueba configurado:
    `operacion.turno` (ver `orquestador/estado.py::registrar_turno`).
 
 Esta prueba es manual, no corre en CI (depende de credenciales reales y del
-túnel) -- documentar el resultado (capturas o transcripción) antes de la
-defensa. Si el túnel falla el día de la defensa, el plan B es
-`notebooks/demo_sin_whatsapp.ipynb` (invoca el orquestador directo, sin
-depender de Meta).
+túnel). Si el túnel falla el día de la defensa, el plan B es
+`notebooks/demo_e2e.ipynb` (invoca el orquestador directo, sin depender de
+Meta).
+
+**Verificada (12/09/2026):** paso 1 confirmado con cloudflared + el número
+de prueba real -- webhook verificado, `POST /webhook` con firma válida,
+respuesta generada por Gemini real y recibida en el teléfono. Dos ajustes
+necesarios que no estaban bien en el `.env` cargado: token de acceso
+vencido (había que regenerar el temporal del panel, o usar uno de System
+User que no venza) y `WHATSAPP_AR_QUITAR_9=true` (con `false` la Graph API
+rechazaba el envío con `131030`, "recipient phone number not in allowed
+list" -- ver `DIFICULTADES.md` para el diagnóstico completo).
 
 ## Errores comunes
 

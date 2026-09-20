@@ -12,7 +12,7 @@ data/insumos/
 │   └── <jurisdiccion_id>/            municipio de esa provincia, p. ej. san-carlos-centro
 │       ├── localidad.geojson         límite + zonas protegidas, EPSG:4326
 │       ├── ordenanza-914-2018.pdf    <tipo>-<numero>-<anio>.pdf
-│       └── reglas.csv
+│       └── reglas.csv                opcional (sin él, se leen del PDF)
 └── normativa-general/
     └── nacional/
         ├── ley-NNNNN-AAAA.pdf
@@ -31,7 +31,9 @@ data/insumos/
 - `limite`: **exactamente una**, `Polygon` o `MultiPolygon`, con propiedades `nombre` y `provincia` (igual al nombre de la carpeta de la provincia que la contiene).
 - `escuela`, `curso_agua`, `zona_urbana` u `otro`: zonas protegidas, con propiedad `nombre`. Pueden ser `Point`, `LineString` o `Polygon` (una escuela como punto, un arroyo como línea); la distancia se calcula igual en cualquier caso.
 
-## `reglas.csv`
+## `reglas.csv` (opcional en cualquier carpeta)
+
+**Sin `reglas.csv`, la fuente es el PDF.** Al cargar (`loader_reglas`) las distancias de esa carpeta se leen del texto de sus artículos, de forma **determinista** (un parser, sin LLM) y solo si son prohibiciones firmes con una única distancia, zona y clases explícitas; excepciones, condiciones, rangos y redacciones ambiguas se descartan. Se guardan con `fuente='pdf_extraido'` y la respuesta avisa que se leyeron del texto de la norma y que hay que verificarlas. Con `reglas.csv` presente, el CSV es la única fuente de esa carpeta (y es la vía para cargar lo que el parser no toma, como las excepciones o las distancias que solo figuran en tablas).
 
 Columnas: `tipo_zona, tipo_aplicacion, bandas, distancia_min_m, norma, articulo, observaciones`.
 
@@ -54,7 +56,7 @@ Implementadas en `src/fitosanitarios/insumos/validador.py` (Fase 3). Dos niveles
 
 | # | Condición |
 |---|---|
-| F1 | A una carpeta de localidad le falta `localidad.geojson`, al menos un PDF, o `reglas.csv`; o a la carpeta de una provincia le falta al menos un PDF de normativa provincial. |
+| F1 | A una carpeta de localidad le falta `localidad.geojson` o al menos un PDF; o a la carpeta de una provincia le falta al menos un PDF de normativa provincial. |
 | F2 | El GeoJSON no tiene exactamente un feature `limite`. |
 | F3 | El GeoJSON trae un `tipo` de feature desconocido (fuera de `limite`, `escuela`, `curso_agua`, `zona_urbana`, `otro`). |
 | F4 | Una geometría es inválida (self-intersecting, coordenadas fuera de rango) o cae fuera del bounding box de Argentina. |
@@ -67,6 +69,7 @@ Implementadas en `src/fitosanitarios/insumos/validador.py` (Fase 3). Dos niveles
 | # | Condición |
 |---|---|
 | A2 | Una zona protegida queda a más de `RADIO_BUSQUEDA_ZONAS_M` del límite de su propia localidad. |
+| A4 | Una carpeta no tiene `reglas.csv`: sus distancias se leerán del texto de los PDF (fuente `pdf_extraido`). |
 | A3 | Un PDF no tiene texto extraíble (escaneado): se marca `requiere_revision=true` en `territorio.articulo` y sigue por OCR (Fase 3). |
 
 ## Datos sintéticos para desarrollo y tests

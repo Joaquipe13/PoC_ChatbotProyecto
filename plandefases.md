@@ -87,6 +87,7 @@ graph TD
 | 8 | Canal WhatsApp | Núcleo | 14–20 |
 | 9 | Extensiones (RF6–RF9) | Extensión, recortable | 20–30 |
 | 10 | Demo, documentación y defensa | Núcleo | 10–16 |
+| 11 | Canal Web (GUI de chat) | Extensión, agregada post-Fase 10 | — (real, ver fase) |
 | | **Total núcleo (0–8, 10)** | | **156–228** |
 | | **Total con extensiones** | | **176–258** |
 
@@ -577,6 +578,46 @@ No avanzar a la fase siguiente sin confirmación del usuario.
 **Resultado:** `docs/guion-demo.md` con los 6 casos obligatorios + 3 adicionales, todos ensayados contra datos reales; `notebooks/demo_e2e.ipynb` corrido de punta a punta con kernel limpio (dos veces, para verificar reproducibilidad). Al armar el guion se encontró y corrigió un bug real arrastrado desde la Fase 7 (`"cm3"` sin el superíndice unicode no se reconocía como unidad de dosis) y un hallazgo operativo sobre repetir demos con el mismo `thread_id` contra un checkpointer real (ver `DIFICULTADES.md`). `pytest` completo en verde; `evals/run_evals.py` da 79 % de exactitud de ruteo (23/29, reproducible en dos corridas), por debajo del objetivo de 90 % -- reportado sin inflar el número, con el análisis de por qué en `DECISIONES.md` (ninguna de las causas es una regresión de esta fase).
 
 No avanzar a la fase siguiente sin confirmación del usuario. (Es la última fase del núcleo; al cerrarla, el proyecto queda listo para entrega.)
+
+---
+
+## Fase 11 — Canal Web (GUI de chat)
+
+> **Actualización 19/09/2026:** el botón de ubicación y los campos `lat`/`lon` del canal web se quitaron: el sistema ya no usa la ubicación del lote, la normativa se elige por localidad (ver DECISIONES.md). Lo de abajo describe el plan original de la fase.
+
+**Sub-planificación confirmada por el usuario (12/09/2026)**, agregada después de cerrar la Fase 10: con los insumos reales de un único municipio ya cargados para probar, el canal WhatsApp resultó poco práctico para iterar (número de prueba con máximo 5 destinatarios verificados, dependencia de un túnel HTTPS activo). El usuario pidió una GUI web como canal de desarrollo/demo, sin tocar el canal WhatsApp existente (queda como implementación futura).
+
+**Objetivo:** exponer el mismo orquestador por una página de chat servida por FastAPI, con paridad funcional con WhatsApp (texto, imagen de receta, ubicación, botones/listas). **RF que cubre:** ninguno nuevo — es un canal de entrega alternativo para RF1–RF5, RF10, RF11 (igual que la Fase 8), no agrega lógica de negocio.
+
+**Depende de:** Fase 7 (orquestador funcionando end-to-end). **Qué habilita:** demo y pruebas manuales sin depender de Meta/WhatsApp; no bloquea nada.
+
+**Decisión de diseño clave:** a diferencia del webhook de WhatsApp (debe responder 200 de inmediato y procesar en background, ver skill "Canal WhatsApp: gotchas"), el navegador espera la respuesta en la misma request — no hace falta cola de background ni deduplicación por `message.id`. Las cuatro modalidades de entrada de WhatsApp se resuelven con equivalentes de navegador sin tocar el orquestador ni el formateador: texto libre, `<input type=file>` + `FileReader` en base64 (mismo camino que la tool `leer_receta` ligada a imagen, Fase 8), `navigator.geolocation` (mismo formato de texto `"Mi ubicación: latitud X, longitud Y"` que arma `webhook.py::texto_e_imagen`), y botones/listas — que WhatsApp igual recibe como texto plano con patrones `[Opción]` / `   - opción` (ver skill "Formato de respuestas") — parseados en el navegador para renderizarse como chips clickeables.
+
+**Entregables:**
+- `src/fitosanitarios/canales/web/canal.py`: `crear_app(settings, procesar_mensaje)` con `GET /` (página de chat) y `POST /api/mensaje`, con `procesar_mensaje` inyectado (igual patrón que `canales/whatsapp/webhook.py`) para poder testear el protocolo sin LLM real.
+- `src/fitosanitarios/canales/web/pagina.py`: HTML+CSS+JS autocontenido (`PAGINA_CHAT`), sin CDN ni dependencias externas.
+- `src/fitosanitarios/canales/web/app_produccion.py`: wiring real (mismo agente Gemini + checkpointer Postgres que WhatsApp), `thread_id = f"web:{session_id}"` para no chocar con números de teléfono en la misma base.
+- `tests/canales/test_web.py`: protocolo HTTP con `procesar_mensaje` stubeado.
+
+**Tareas:**
+1. `crear_app`: endpoint de chat + endpoint de mensaje, con `MensajeEntrante` (`session_id`, `texto`, `imagen_base64`, `lat`/`lon`) y `texto_final` (ubicación como mensaje propio, mismo criterio que WhatsApp).
+2. Página de chat: input de texto, adjuntar imagen con preview (el botón de ubicación se quitó el 19/09/2026: la normativa se elige por localidad, ver DECISIONES.md), render de `*negrita*` y salto de línea, extracción de botones (`[Opción]`) y opciones de lista (`   - opción`) como chips clickeables, botón "Nueva conversación" (nuevo `session_id` → nuevo `thread_id`, evita el hallazgo de la Fase 10 sobre repetir demos con el mismo `thread_id`).
+3. Wiring de producción reusando `orquestador/turno.py::ejecutar_turno`, `orquestador/agente.py::crear_agente` y `ContadorRepreguntas` sin modificarlos.
+4. Tests del protocolo HTTP (texto, imagen, ubicación, mensaje vacío) con `procesar_mensaje` stubeado.
+
+**Criterios de aceptación:**
+- `pytest tests/canales/test_web.py` pasa sin Postgres ni LLM reales.
+- `uv run ruff check .` limpio.
+- Prueba manual: levantar `uv run uvicorn fitosanitarios.canales.web.app_produccion:app --port 8001`, abrir `http://localhost:8001/` y completar un caso de punta a punta (foto de receta → confirmación → dictamen) contra Gemini y Postgres reales.
+- El canal WhatsApp (Fase 8) sigue intacto: `pytest tests/canales/test_webhook.py` y el resto de la suite de WhatsApp sin cambios.
+
+**Casos borde:** mensaje sin texto ni imagen ni ubicación → no llama al procesador, no genera un turno vacío en `operacion.turno`; adjuntar imagen y mandar ubicación en el mismo envío → gana la ubicación (mismo criterio que WhatsApp: no se combinan tipos de mensaje); recargar la página → el `session_id` persiste en `localStorage`, la conversación sigue donde quedó (mismo `thread_id`).
+
+**Riesgos y mitigación:** ninguno nuevo relevante — el canal reusa código ya probado del núcleo y de la Fase 8; el único código nuevo es de transporte (HTTP + HTML/JS), sin lógica de negocio propia.
+
+**Estimación real:** completada en la misma sesión, reusando en su totalidad el orquestador y los patrones de separación webhook/wiring ya establecidos en la Fase 8.
+
+No avanzar a la fase siguiente sin confirmación del usuario.
 
 ---
 

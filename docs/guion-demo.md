@@ -18,44 +18,43 @@ Requisitos antes de arrancar: `docker compose up -d db`, al menos una
 
 ### 1. Dictamen APTA
 
-> "Quiero validar la receta completa: Flyer 10 Ec en soja, 170 cm3/ha, terrestre, lote -32.912,-60.642, contra chinche de la alfalfa"
+> "Quiero validar la receta completa: Flyer 10 Ec en soja, 170 cm3/ha, terrestre, en San Carlos Centro, contra chinche de la alfalfa"
 
-**Esperado:** `tipo=dictamen`, resultado `✅ APTA`, sin observaciones. Cita
-el registro SENASA de Flyer 10 Ec (reg. 41881) aunque cumpla — la skill
-exige citar incluso lo que sí pasa.
+**Esperado:** `tipo=dictamen`, resultado `✅ APTA`, sin observaciones, más las
+*Condiciones de aplicación* de San Carlos Centro: banda II (amarilla) y la
+distancia mínima a cada tipo de zona con la norma que la fija (zona urbana
+300 m, Ley 13740/2017 art. 2; escuela 100 m, Ordenanza 914/2018 art. 8; curso
+de agua 50 m, art. 10). Cita el registro SENASA de Flyer 10 Ec (reg. 41881)
+y cierra ofreciendo más info (banda de cada producto) o agendar.
 
-**Qué señalar:** el producto, el cultivo, la dosis y la ubicación se
-sacaron todos de un solo mensaje en lenguaje natural; el núcleo (no el LLM)
-resolvió el producto contra SENASA, ubicó el lote en San Carlos Centro por
-punto-en-polígono, y comparó la dosis (170 cm³/ha) contra el rango
-registrado (160-180 cm³/ha) para soja + chinche de la alfalfa.
+**Qué señalar:** el producto, el cultivo, la dosis y la localidad se sacaron de
+un solo mensaje en lenguaje natural; el núcleo (no el LLM) resolvió el producto
+contra SENASA, comparó la dosis (170 cm³/ha) contra el rango registrado
+(160-180 cm³/ha) para soja + chinche de la alfalfa, y eligió las reglas de la
+localidad. La distancia **informa** qué exige la norma: ya no se compara contra
+la ubicación exacta del lote.
 
 **Nota (Fase 10):** el "cm3" sin el superíndice "³" (como lo escribe
 cualquier operario desde el celular) recién se reconoce a partir de esta
 fase — antes daba `NO_EVALUABLE` por "unidad no reconocida" (ver
 `DECISIONES.md`). Si por algún motivo el LLM extrae `dosis_unidad` con otra
 grafía no cubierta, el respaldo verificado y determinístico está en
-`tests/tools/test_evaluar_viabilidad_legal.py::test_dictamen_apta_producto_registrado_dosis_ok_lejos_de_zonas`.
+`tests/tools/test_evaluar_viabilidad_legal.py::test_dictamen_apta_producto_registrado_dosis_ok`.
 
-### 2. Dictamen OBSERVADA (distancia insuficiente + dosis fuera de rango)
+### 2. Dictamen OBSERVADA (dosis fuera de rango)
 
-> "Quiero validar la receta completa: Flyer 10 Ec en soja, 500 cm3/ha, terrestre, lote -32.92877865019107,-60.6505, contra chinche de la alfalfa"
+> "Quiero validar la receta completa: Flyer 10 Ec en soja, 500 cm3/ha, terrestre, en San Carlos Centro, contra chinche de la alfalfa"
 
-**Esperado:** `tipo=dictamen`, resultado `❌ OBSERVADA` con **dos**
-observaciones (igual que la plantilla de referencia de la skill):
-1. Distancia a la Escuela N.° 12 insuficiente (~80 m, mínimo 100 m para
-   aplicación terrestre — Ordenanza 914/2018, art. 8).
-2. Dosis muy por encima del rango registrado (500 cm³/ha vs. 160-180).
+**Esperado:** `tipo=dictamen`, resultado `❌ OBSERVADA` por la dosis (500 cm³/ha,
+muy por encima del rango registrado de 160-180). Muestra igual las condiciones
+de aplicación, pero **no** ofrece agendar una receta observada.
 
-**Qué señalar:** el dictamen lista *todas* las observaciones, no se detiene
-en la primera — y sigue citando el registro del producto aunque el
-resultado sea negativo.
+**Qué señalar:** el dictamen sigue citando el registro del producto aunque el
+resultado sea negativo, y lista *todas* las observaciones si hay más de una
+(p. ej. un cultivo no autorizado para el producto).
 
 **Respaldo determinístico:**
-`tests/tools/test_evaluar_viabilidad_legal.py::test_dictamen_observada_por_distancia_insuficiente`
-y `::test_dictamen_observada_por_dosis_fuera_de_rango` (casos separados,
-cada uno con una sola observación, por si conviene mostrarlos por
-separado en vez de combinados).
+`tests/tools/test_evaluar_viabilidad_legal.py::test_dictamen_observada_por_dosis_fuera_de_rango`.
 
 ### 3. Consulta de productos (listado)
 
@@ -75,7 +74,7 @@ cultivo.
 > "Quiero evaluar si puedo aplicar en mi lote"
 
 **Esperado:** `tipo=repregunta`, pide hasta 3 datos agrupados (típicamente
-cultivo, productos y ubicación/tipo de aplicación) en un solo mensaje, cada
+cultivo, productos y localidad/tipo de aplicación) en un solo mensaje, cada
 uno con su pregunta sugerida. Ninguna tool se llama todavía.
 
 **Qué señalar:** la repregunta es agrupada (no una pregunta por turno) y
@@ -92,23 +91,25 @@ vehículos/eventos/agenda), sin llamar ninguna tool.
 **Qué señalar:** es requisito de la plataforma (Meta no admite bots de
 propósito general desde el 15/01/2026), no solo una limitación de producto.
 
-### 6. No resuelto (jurisdicción no cubierta)
+### 6. Localidad sin normativa municipal: respaldo en la provincial
 
-> "Quiero evaluar riesgo para un lote en -34.6, -58.4 (Buenos Aires), Flyer 10 Ec, soja, terrestre, 2 L/ha, contra chinche de la alfalfa"
+> "Quiero evaluar riesgo para una aplicación en Rosario, Santa Fe, Flyer 10 Ec, soja, terrestre, 2 L/ha, contra chinche de la alfalfa"
 
-**Esperado:** `tipo=no_resuelto`, motivo `JURISDICCION_NO_CUBIERTA` ("el
-punto del lote no cae en ningún polígono de localidad cargado").
+**Esperado:** condiciones de aplicación con la distancia mínima a zona urbana
+de la **normativa provincial** (300 m, Ley 13740/2017 art. 2) y una aclaración
+explícita: "⚠️ No se cuenta con la normativa municipal de Rosario: la distancia
+se basa en la normativa provincial".
 
-**Nota:** usar una unidad de dosis inequívoca (`L/ha`) acá a propósito -- el
-punto de este caso es la cobertura geográfica, no la dosis. Con "cm3/ha" en
-este mensaje puntual se observó que el LLM a veces repregunta primero por
-la unidad en vez de evaluar directamente; no es un bug del núcleo (la
-unidad se normaliza igual en el código, ver caso 1), es una elección del
+**Nota:** usar una unidad de dosis inequívoca (`L/ha`) acá a propósito -- con
+"cm3/ha" en este mensaje puntual se observó que el LLM a veces repregunta
+primero por la unidad en vez de evaluar directamente; no es un bug del núcleo
+(la unidad se normaliza igual en el código, ver caso 1), es una elección del
 LLM en ese momento -- variabilidad inherente, no determinística.
 
-**Qué señalar:** el sistema nunca inventa una respuesta cuando no tiene
-cobertura geográfica — dice explícitamente que no puede, en vez de fingir
-un dictamen.
+**Qué señalar:** el sistema nunca inventa una respuesta cuando no tiene la
+normativa local: se apoya en la provincial y **lo dice**. Si no se menciona la
+provincia, la pide (nunca la supone). Con una provincia no cargada ("en
+Córdoba capital, Córdoba") responde `no_resuelto` / `JURISDICCION_NO_CUBIERTA`.
 
 ## Casos adicionales (si el jurado pide más o sobra tiempo)
 
@@ -151,6 +152,13 @@ Muestra `resolver_vehiculo` (interpreta "la mosquito" como "pulverizador
 autopropulsado"), `registrar_evento` (inicio y fin) y `consultar_agenda`.
 Verificado de punta a punta en `notebooks/demo_sin_whatsapp.ipynb`.
 
+### 10. Seguimiento del dictamen: más info y agendar
+
+Después del caso 1: "más info" → banda de cada producto y de la aplicación;
+"sí, agendala" → pregunta la fecha; "agendala para el martes" → muestra la
+agenda de ese día y pregunta el horario; "a las 8:30" → confirma. Las fechas
+y horas las resuelve el código (`servicios/fechas.py`), no el LLM.
+
 ## Modelo de datos (para la parte de arquitectura de la defensa)
 
 Mostrar `docs/modelo-datos.md`:
@@ -167,12 +175,12 @@ Mostrar `docs/modelo-datos.md`:
      activos y usos registrados) + ranking combinado trigram/embedding
      sobre `catalogo.producto.marca` — mostrar cómo el umbral de
      `similarity()` decide `PRODUCTO_NO_ENCONTRADO`.
-   - `evaluar_riesgo`: tres consultas encadenadas (localidad por bbox →
-     zonas protegidas en el radio, incluidas las de localidades vecinas →
-     reglas candidatas por localidad/provincia/nación) con la geometría
-     exacta resuelta en Python (`estimate_utm_crs()`), no en SQL — remarcar
-     que el LLM nunca escribe ni ve este SQL, solo elige la tool y sus
-     argumentos tipados.
+   - `evaluar_riesgo`: localidad resuelta por nombre (o provincia, si la
+     localidad no tiene normativa propia) → reglas candidatas por
+     localidad/provincia/nación con norma y artículo; la banda de la
+     aplicación (la más peligrosa de la mezcla) y la distancia más
+     restrictiva se calculan en Python — remarcar que el LLM nunca escribe
+     ni ve este SQL, solo elige la tool y sus argumentos tipados.
 
 ## Checklist final antes de la entrega
 
