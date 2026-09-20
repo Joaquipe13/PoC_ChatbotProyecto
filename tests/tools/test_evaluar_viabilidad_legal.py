@@ -93,9 +93,9 @@ def test_sin_localidad_pide_la_lista_de_cargadas(conexion, modelo_embeddings):
     assert LOCALIDAD in resultado.faltantes[0].opciones
 
 
-def test_localidad_no_cargada(conexion, modelo_embeddings):
+def test_provincia_no_cargada(conexion, modelo_embeddings):
     args = Args(
-        localidad="Buenos Aires", tipo_aplicacion="terrestre",
+        localidad="Buenos Aires", provincia="Buenos Aires", tipo_aplicacion="terrestre",
         productos=[ProductoDeclarado(nombre="Flyer 10 Ec", dosis_valor=170, dosis_unidad="cm³/ha")],
         cultivo="Soja",
     )

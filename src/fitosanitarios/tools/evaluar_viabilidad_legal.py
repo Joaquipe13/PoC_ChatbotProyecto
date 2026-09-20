@@ -13,7 +13,7 @@ from fitosanitarios.dominio.motivos import MotivoNoResuelto
 from fitosanitarios.servicios.condiciones_aplicacion import calcular_condiciones
 from fitosanitarios.servicios.dictamen import armar_dictamen
 from fitosanitarios.servicios.validacion_producto import resolver_y_validar_producto
-from fitosanitarios.tools._localidad import resolver_localidad_o_cortar
+from fitosanitarios.tools._localidad import resolver_ubicacion_o_cortar
 
 
 class ProductoDeclarado(BaseModel):
@@ -24,6 +24,7 @@ class ProductoDeclarado(BaseModel):
 
 class EvaluarViabilidadLegalArgs(BaseModel):
     localidad: str | None = None
+    provincia: str | None = None  # solo si la localidad no está cargada
     tipo_aplicacion: str  # "terrestre" | "aerea"
     productos: list[ProductoDeclarado]
     cultivo: str
@@ -37,11 +38,11 @@ def evaluar_viabilidad_legal_logica(
     modelo_embeddings,
     tolerancia_pct: float,
 ) -> ResultadoTool:
-    localidad, corte = resolver_localidad_o_cortar(conn, args.localidad)
+    ubicacion, corte = resolver_ubicacion_o_cortar(conn, args.localidad, args.provincia)
     if corte is not None:
         return corte
 
-    reglas = reglas_candidatas(conn, localidad.id, localidad.provincia_id)
+    reglas = reglas_candidatas(conn, ubicacion.localidad_id, ubicacion.provincia_id)
 
     chequeos_producto = []
     chequeos_dosis = []
@@ -78,7 +79,8 @@ def evaluar_viabilidad_legal_logica(
         banda_por_producto[resolucion.marca] = resolucion.banda_toxicologica
 
     condiciones = calcular_condiciones(
-        localidad.nombre, args.tipo_aplicacion, banda_por_producto, reglas
+        ubicacion.nombre, args.tipo_aplicacion, banda_por_producto, reglas,
+        con_normativa_municipal=ubicacion.con_normativa_municipal,
     )
     dictamen = armar_dictamen(chequeos_producto, chequeos_dosis, [], condiciones)
 
@@ -87,7 +89,7 @@ def evaluar_viabilidad_legal_logica(
         estado=estado,
         datos={
             "dictamen": dictamen.model_dump(mode="json"),
-            "jurisdiccion_id": localidad.jurisdiccion_id,
+            "jurisdiccion_id": ubicacion.jurisdiccion_id,
         },
         citas=dictamen.citas,
         advertencias=condiciones.advertencias
@@ -106,6 +108,7 @@ def evaluar_viabilidad_legal(
     productos: list[ProductoDeclarado],
     cultivo: str,
     localidad: str | None = None,
+    provincia: str | None = None,
     adversidad: str | None = None,
     superficie_ha: float | None = None,
 ) -> tuple[str, ResultadoTool]:
@@ -117,6 +120,8 @@ def evaluar_viabilidad_legal(
 
     Args:
         localidad: localidad o municipio donde se va a aplicar.
+        provincia: provincia de la localidad, solo si la tool la pidió porque la
+            localidad no tiene normativa municipal cargada (se usa la provincial).
         tipo_aplicacion: "terrestre" o "aerea".
         productos: lista de productos con su dosis declarada.
         cultivo: cultivo declarado.
@@ -127,7 +132,8 @@ def evaluar_viabilidad_legal(
     from fitosanitarios.tools._recursos import con_conexion_y_modelo
 
     args = EvaluarViabilidadLegalArgs(
-        localidad=localidad, tipo_aplicacion=tipo_aplicacion, productos=productos,
+        localidad=localidad, provincia=provincia, tipo_aplicacion=tipo_aplicacion,
+        productos=productos,
         cultivo=cultivo, adversidad=adversidad, superficie_ha=superficie_ha,
     )
     settings = get_settings()

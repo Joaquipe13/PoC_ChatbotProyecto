@@ -23,6 +23,7 @@ class ReglaCandidata:
     articulo: str | None
     jurisdiccion_id: str | None  # None en reglas provinciales/nacionales
     observaciones: str | None = None
+    fuente: str = "csv"  # "pdf_extraido": leída del texto de la norma, sin reglas.csv
 
 
 @dataclass

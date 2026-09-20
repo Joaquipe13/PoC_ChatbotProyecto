@@ -54,9 +54,36 @@ def test_riesgo_sin_localidad_pide_la_lista_de_cargadas(conexion, modelo_embeddi
     assert "San Carlos Centro" in faltante.opciones
 
 
-def test_riesgo_localidad_no_cargada(conexion, modelo_embeddings):
+def test_riesgo_provincia_no_cargada(conexion, modelo_embeddings):
     resultado = evaluar_riesgo_logica(
-        _args(localidad="Buenos Aires"), conexion, modelo_embeddings, TOLERANCIA_PCT
+        _args(localidad="Buenos Aires", provincia="Buenos Aires"), conexion, modelo_embeddings,
+        TOLERANCIA_PCT,
     )
     assert resultado.estado == "no_resuelto"
     assert resultado.motivo == MotivoNoResuelto.JURISDICCION_NO_CUBIERTA
+
+
+def test_riesgo_localidad_no_cargada_pide_la_provincia_y_no_la_supone(
+    conexion, modelo_embeddings
+):
+    resultado = evaluar_riesgo_logica(
+        _args(localidad="Rosario"), conexion, modelo_embeddings, TOLERANCIA_PCT
+    )
+    assert resultado.estado == "faltan_datos"
+    assert resultado.faltantes[0].campo == "provincia"
+
+
+def test_riesgo_localidad_sin_normativa_local_se_basa_en_la_provincial_y_lo_aclara(
+    conexion, modelo_embeddings
+):
+    resultado = evaluar_riesgo_logica(
+        _args(localidad="Rosario", provincia="santa-fe"), conexion, modelo_embeddings,
+        TOLERANCIA_PCT,
+    )
+    assert resultado.estado == "ok"
+    condiciones = resultado.datos["condiciones"]
+    assert condiciones["sin_normativa_municipal"] is True
+    assert any("No se cuenta con la normativa municipal de Rosario" in a
+               for a in resultado.advertencias)
+    distancias = {d["tipo_zona"]: d["distancia_min_m"] for d in condiciones["distancias_minimas"]}
+    assert distancias == {"zona_urbana": 300}  # solo la regla provincial: sin ordenanza propia

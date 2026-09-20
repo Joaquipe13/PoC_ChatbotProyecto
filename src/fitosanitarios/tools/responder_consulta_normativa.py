@@ -7,7 +7,6 @@ from pydantic import BaseModel
 from fitosanitarios.datos.retrievers.territorio import (
     articulos_por_similitud,
     listar_jurisdicciones_cargadas,
-    obtener_localidad_por_jurisdiccion_id,
 )
 from fitosanitarios.dominio.modelos import CampoFaltante, ResultadoTool
 from fitosanitarios.dominio.motivos import MotivoNoResuelto
@@ -16,11 +15,13 @@ from fitosanitarios.servicios.rag_normativa import (
     filtrar_por_umbral,
     responder_con_fragmentos,
 )
+from fitosanitarios.tools._localidad import resolver_ubicacion_o_cortar
 
 
 class ResponderConsultaNormativaArgs(BaseModel):
     pregunta: str
     jurisdiccion_id: str | None = None
+    provincia: str | None = None  # solo si la localidad no está cargada
     tipo_aplicacion: str | None = None
     tipo_zona: str | None = None
 
@@ -47,13 +48,23 @@ def responder_consulta_normativa_logica(
             ],
         )
 
-    localidad = obtener_localidad_por_jurisdiccion_id(conn, args.jurisdiccion_id)
-    if localidad is None:
-        return ResultadoTool(estado="no_resuelto", motivo=MotivoNoResuelto.JURISDICCION_NO_CUBIERTA)
+    ubicacion, corte = resolver_ubicacion_o_cortar(conn, args.jurisdiccion_id, args.provincia)
+    if corte is not None:
+        return corte
+    # Sin normativa municipal (localidad sin ordenanzas cargadas, o no cargada) la
+    # respuesta se basa en la provincial y nacional: hay que decirlo.
+    aclaracion = (
+        []
+        if ubicacion.con_normativa_municipal
+        else [
+            f"No se cuenta con la normativa municipal de {ubicacion.nombre}: la respuesta "
+            "se basa en la normativa provincial"
+        ]
+    )
 
     embedding_pregunta = modelo_embeddings.encode(args.pregunta).tolist()
     filas = articulos_por_similitud(
-        conn, embedding_pregunta, localidad.id, localidad.provincia_id, top_k=8
+        conn, embedding_pregunta, ubicacion.localidad_id, ubicacion.provincia_id, top_k=8
     )
     fragmentos = [
         FragmentoNormativa(
@@ -65,7 +76,10 @@ def responder_consulta_normativa_logica(
     ]
     relevantes = filtrar_por_umbral(fragmentos, umbral_similitud)
     if not relevantes:
-        return ResultadoTool(estado="no_resuelto", motivo=MotivoNoResuelto.NORMATIVA_SIN_RESPALDO)
+        return ResultadoTool(
+            estado="no_resuelto", motivo=MotivoNoResuelto.NORMATIVA_SIN_RESPALDO,
+            advertencias=aclaracion,
+        )
 
     respuesta = responder_con_fragmentos(args.pregunta, relevantes, cliente_llm)
     if not respuesta.citas:
@@ -73,14 +87,17 @@ def responder_consulta_normativa_logica(
         # recuperados: no se muestra un veredicto sin fuente citable.
         return ResultadoTool(
             estado="no_resuelto", motivo=MotivoNoResuelto.NORMATIVA_SIN_RESPALDO,
-            advertencias=respuesta.advertencias,
+            advertencias=aclaracion + respuesta.advertencias,
         )
 
     return ResultadoTool(
         estado="ok",
-        datos={"veredicto": respuesta.veredicto, "regla": respuesta.regla},
+        datos={
+            "veredicto": respuesta.veredicto, "regla": respuesta.regla,
+            "sin_normativa_municipal": not ubicacion.con_normativa_municipal,
+        },
         citas=respuesta.citas,
-        advertencias=respuesta.advertencias,
+        advertencias=aclaracion + respuesta.advertencias,
     )
 
 
@@ -92,6 +109,7 @@ def responder_consulta_normativa_logica(
 def responder_consulta_normativa(
     pregunta: str,
     jurisdiccion_id: str | None = None,
+    provincia: str | None = None,
     tipo_aplicacion: str | None = None,
     tipo_zona: str | None = None,
 ) -> tuple[str, ResultadoTool]:
@@ -104,6 +122,9 @@ def responder_consulta_normativa(
         pregunta: la pregunta tal como la escribió el operario.
         jurisdiccion_id: localidad de la consulta (explícita o de la receta
             en curso), si se conoce.
+        provincia: provincia de la localidad, solo si la tool la pidió porque
+            la localidad no tiene normativa municipal cargada (se usa la
+            provincial y se aclara).
         tipo_aplicacion: "terrestre" o "aerea", si se mencionó.
         tipo_zona: tipo de zona protegida en cuestión, si se mencionó.
     """
@@ -112,7 +133,7 @@ def responder_consulta_normativa(
     from fitosanitarios.tools._recursos import con_conexion_y_modelo
 
     args = ResponderConsultaNormativaArgs(
-        pregunta=pregunta, jurisdiccion_id=jurisdiccion_id,
+        pregunta=pregunta, jurisdiccion_id=jurisdiccion_id, provincia=provincia,
         tipo_aplicacion=tipo_aplicacion, tipo_zona=tipo_zona,
     )
     settings = get_settings()

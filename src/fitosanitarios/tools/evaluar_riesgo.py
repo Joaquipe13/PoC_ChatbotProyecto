@@ -16,11 +16,12 @@ from fitosanitarios.datos.retrievers.territorio import reglas_candidatas
 from fitosanitarios.dominio.modelos import ResultadoTool
 from fitosanitarios.servicios.condiciones_aplicacion import calcular_condiciones
 from fitosanitarios.servicios.validacion_producto import resolver_y_validar_producto
-from fitosanitarios.tools._localidad import resolver_localidad_o_cortar
+from fitosanitarios.tools._localidad import resolver_ubicacion_o_cortar
 
 
 class EvaluarRiesgoArgs(BaseModel):
     localidad: str | None = None
+    provincia: str | None = None  # solo si la localidad no está cargada
     tipo_aplicacion: str  # "terrestre" | "aerea"
     productos: list[str]
     cultivo: str
@@ -32,11 +33,11 @@ class EvaluarRiesgoArgs(BaseModel):
 def evaluar_riesgo_logica(
     args: EvaluarRiesgoArgs, conn, modelo_embeddings, tolerancia_pct: float
 ) -> ResultadoTool:
-    localidad, corte = resolver_localidad_o_cortar(conn, args.localidad)
+    ubicacion, corte = resolver_ubicacion_o_cortar(conn, args.localidad, args.provincia)
     if corte is not None:
         return corte
 
-    reglas = reglas_candidatas(conn, localidad.id, localidad.provincia_id)
+    reglas = reglas_candidatas(conn, ubicacion.localidad_id, ubicacion.provincia_id)
 
     chequeos_no_realizados = []
     productos_info = []
@@ -73,7 +74,8 @@ def evaluar_riesgo_logica(
                 )
 
     condiciones = calcular_condiciones(
-        localidad.nombre, args.tipo_aplicacion, banda_por_producto, reglas
+        ubicacion.nombre, args.tipo_aplicacion, banda_por_producto, reglas,
+        con_normativa_municipal=ubicacion.con_normativa_municipal,
     )
     chequeos_no_realizados.extend(
         f"{producto}: no figura su banda toxicológica en SENASA; la de la aplicación "
@@ -87,7 +89,7 @@ def evaluar_riesgo_logica(
     return ResultadoTool(
         estado="ok",
         datos={
-            "jurisdiccion_id": localidad.jurisdiccion_id,
+            "jurisdiccion_id": ubicacion.jurisdiccion_id,
             "productos": productos_info,
             "condiciones": condiciones.model_dump(mode="json"),
         },
@@ -104,6 +106,7 @@ def evaluar_riesgo(
     dosis_valor: float,
     dosis_unidad: str,
     localidad: str | None = None,
+    provincia: str | None = None,
     adversidad: str | None = None,
 ) -> tuple[str, ResultadoTool]:
     """Informa la banda toxicológica de la aplicación (la más peligrosa entre
@@ -114,6 +117,8 @@ def evaluar_riesgo(
 
     Args:
         localidad: localidad o municipio donde se va a aplicar.
+        provincia: provincia de la localidad, solo si la tool la pidió porque la
+            localidad no tiene normativa municipal cargada (se usa la provincial).
         tipo_aplicacion: "terrestre" o "aerea".
         productos: nombres de los productos a aplicar.
         cultivo: cultivo declarado.
@@ -125,7 +130,8 @@ def evaluar_riesgo(
     from fitosanitarios.tools._recursos import con_conexion_y_modelo
 
     args = EvaluarRiesgoArgs(
-        localidad=localidad, tipo_aplicacion=tipo_aplicacion, productos=productos,
+        localidad=localidad, provincia=provincia, tipo_aplicacion=tipo_aplicacion,
+        productos=productos,
         cultivo=cultivo, dosis_valor=dosis_valor, dosis_unidad=dosis_unidad,
         adversidad=adversidad,
     )

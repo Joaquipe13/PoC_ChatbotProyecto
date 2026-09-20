@@ -95,8 +95,15 @@ CREATE TABLE IF NOT EXISTS territorio.regla_distancia (
     tipo_aplicacion TEXT NOT NULL CHECK (tipo_aplicacion IN ('terrestre', 'aerea', 'todas')),
     bandas TEXT[] NOT NULL, -- {'todas'} o subconjunto de {Ia,Ib,II,III,IV}
     distancia_min_m NUMERIC NOT NULL,
-    observaciones TEXT
+    observaciones TEXT,
+    -- 'csv': viene de reglas.csv (revisada por una persona). 'pdf_extraido': la
+    -- extrajo el LLM del texto de los artículos porque la carpeta no traía
+    -- reglas.csv; la respuesta avisa que hay que verificarla con la norma.
+    fuente TEXT NOT NULL DEFAULT 'csv' CHECK (fuente IN ('csv', 'pdf_extraido'))
 );
+-- Bases creadas antes de la extracción desde PDF: CREATE TABLE IF NOT EXISTS no agrega la columna.
+ALTER TABLE territorio.regla_distancia
+    ADD COLUMN IF NOT EXISTS fuente TEXT NOT NULL DEFAULT 'csv';
 CREATE INDEX IF NOT EXISTS ix_regla_distancia_norma ON territorio.regla_distancia (norma_id);
 CREATE INDEX IF NOT EXISTS ix_regla_distancia_tipo_zona
     ON territorio.regla_distancia (tipo_zona);

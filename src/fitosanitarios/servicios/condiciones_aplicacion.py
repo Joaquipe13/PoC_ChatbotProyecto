@@ -28,10 +28,16 @@ def calcular_condiciones(
     tipo_aplicacion: str,
     banda_por_producto: dict[str, str | None],
     reglas: list[ReglaCandidata],
+    con_normativa_municipal: bool = True,
 ) -> CondicionesAplicacion:
     banda = banda_de_la_aplicacion(list(banda_por_producto.values()))
     sin_banda = [p for p, b in banda_por_producto.items() if b not in ORDEN_BANDAS]
     advertencias: list[str] = []
+    if not con_normativa_municipal:
+        advertencias.append(
+            f"No se cuenta con la normativa municipal de {localidad}: la distancia "
+            "se basa en la normativa provincial"
+        )
 
     # Sin banda conocida solo aplican las reglas "todas": nunca se asume una banda.
     banda_para_reglas = banda or "todas"
@@ -46,6 +52,7 @@ def calcular_condiciones(
                 tipo_zona=tipo_zona,
                 distancia_min_m=mas_restrictiva.distancia_min_m,
                 norma_limitante=_cita(mas_restrictiva),
+                extraida_de_pdf=mas_restrictiva.fuente == "pdf_extraido",
                 citas=[_cita(r) for r in aplicables],
                 advertencias=[r.observaciones for r in aplicables if r.observaciones],
             )
@@ -66,6 +73,7 @@ def calcular_condiciones(
         banda_color=COLOR_BANDA.get(banda) if banda else None,
         productos_por_banda=banda_por_producto,
         productos_sin_banda=sin_banda,
+        sin_normativa_municipal=not con_normativa_municipal,
         distancias_minimas=distancias,
         advertencias=advertencias,
     )

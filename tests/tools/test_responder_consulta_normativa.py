@@ -20,7 +20,7 @@ def test_pregunta_sin_jurisdiccion_repregunta_con_lista(conexion, modelo_embeddi
     assert "san-carlos-centro" in resultado.faltantes[0].opciones
 
 
-def test_jurisdiccion_no_cubierta(conexion, modelo_embeddings):
+def test_localidad_no_cargada_sin_provincia_pregunta_la_provincia(conexion, modelo_embeddings):
     args = ResponderConsultaNormativaArgs(
         pregunta="¿a qué distancia de una escuela?", jurisdiccion_id="localidad-inexistente"
     )
@@ -28,11 +28,46 @@ def test_jurisdiccion_no_cubierta(conexion, modelo_embeddings):
     resultado = responder_consulta_normativa_logica(
         args, conexion, modelo_embeddings, fake, UMBRAL_SIMILITUD
     )
-    assert resultado.estado == "no_resuelto"
+    assert resultado.estado == "faltan_datos"
+    assert resultado.faltantes[0].campo == "provincia"
+    assert fake.llamadas == []
 
+
+def test_provincia_no_cargada_es_jurisdiccion_no_cubierta(conexion, modelo_embeddings):
+    args = ResponderConsultaNormativaArgs(
+        pregunta="¿a qué distancia de una escuela?", jurisdiccion_id="localidad-inexistente",
+        provincia="provincia-que-no-existe",
+    )
+    resultado = responder_consulta_normativa_logica(
+        args, conexion, modelo_embeddings, ClienteLLMFake(), UMBRAL_SIMILITUD
+    )
     from fitosanitarios.dominio.motivos import MotivoNoResuelto
 
+    assert resultado.estado == "no_resuelto"
     assert resultado.motivo == MotivoNoResuelto.JURISDICCION_NO_CUBIERTA
+
+
+def test_localidad_sin_normativa_local_responde_con_la_provincial_y_lo_aclara(
+    conexion, modelo_embeddings
+):
+    respuesta_llm = json.dumps({
+        "veredicto": "No",
+        "regla": "La distancia minima a la zona urbana es de 300 metros.",
+        "articulos_citados": [{"norma": "ley-13740-2017", "articulo": "2"}],
+    })
+    args = ResponderConsultaNormativaArgs(
+        pregunta="¿a qué distancia de la zona urbana puedo aplicar?",
+        jurisdiccion_id="Rosario", provincia="santa-fe",
+    )
+    resultado = responder_consulta_normativa_logica(
+        args, conexion, modelo_embeddings, ClienteLLMFake(respuestas=[respuesta_llm]),
+        UMBRAL_SIMILITUD,
+    )
+    assert resultado.estado == "ok"
+    assert resultado.citas[0].norma == "ley-13740-2017"
+    assert resultado.datos["sin_normativa_municipal"] is True
+    assert any("No se cuenta con la normativa municipal de Rosario" in a
+               for a in resultado.advertencias)
 
 
 def test_pregunta_sin_respaldo_por_debajo_del_umbral(conexion, modelo_embeddings):

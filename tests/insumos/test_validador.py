@@ -67,7 +67,7 @@ def test_validar_insumos_sobre_fixtures_completas_sin_errores():
 # --- F1: falta algún archivo requerido ---
 
 
-def test_f1_falta_reglas_csv(tmp_path):
+def test_sin_reglas_csv_la_localidad_es_valida_y_avisa_que_se_leera_del_pdf(tmp_path):
     carpeta = tmp_path / "localidad-incompleta"
     carpeta.mkdir()
     propiedades = {"tipo": "limite", "nombre": "X", "provincia": "santa-fe"}
@@ -75,11 +75,11 @@ def test_f1_falta_reglas_csv(tmp_path):
         {"type": "Feature", "properties": propiedades, "geometry": LIMITE_VALIDO},
     ])
     _pdf_con_texto(carpeta / "ordenanza-1-2020.pdf")
-    # sin reglas.csv
+    # sin reglas.csv: las distancias se extraen del texto del PDF al cargar
 
     resultado = validar_carpeta_localidad(carpeta)
-    assert not resultado.es_valido
-    assert any(e.codigo == "F1" for e in resultado.errores)
+    assert resultado.es_valido
+    assert any(a.codigo == "A4" for a in resultado.advertencias)
 
 
 # --- F2: no hay exactamente un límite ---

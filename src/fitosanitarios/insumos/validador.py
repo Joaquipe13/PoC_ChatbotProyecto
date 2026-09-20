@@ -206,7 +206,12 @@ def validar_carpeta_localidad(ruta: Path) -> ResultadoValidacion:
     if not pdfs:
         resultado.errores.append(ErrorValidacion("F1", str(ruta), "falta al menos un PDF de norma"))
     if not reglas_csv.exists():
-        resultado.errores.append(ErrorValidacion("F1", str(ruta), "falta reglas.csv"))
+        # Sin reglas.csv las distancias se extraen del texto de los PDF al cargar.
+        resultado.advertencias.append(
+            AdvertenciaValidacion(
+                "A4", str(ruta), "sin reglas.csv: las distancias se leerán del texto de los PDF"
+            )
+        )
 
     if geojson.exists():
         resultado.extend(validar_geojson(geojson))

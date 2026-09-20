@@ -73,3 +73,44 @@ def test_sin_ninguna_banda_solo_aplican_reglas_para_todas_las_bandas():
     condiciones = calcular_condiciones("El Trébol", "aerea", {"Producto X": None}, REGLAS_EL_TREBOL)
     assert condiciones.banda is None
     assert condiciones.distancias_minimas[0].distancia_min_m == 500
+
+
+def test_sin_normativa_municipal_se_aclara_y_se_usa_la_provincial():
+    provincial = ReglaCandidata(
+        tipo_zona="zona_urbana", tipo_aplicacion="todas", bandas=["todas"],
+        distancia_min_m=300, norma="ley-13740-2017", articulo="2", jurisdiccion_id=None,
+    )
+    condiciones = calcular_condiciones(
+        "Rosario", "terrestre", {"Producto A": "IV"}, [provincial], con_normativa_municipal=False
+    )
+    assert condiciones.sin_normativa_municipal is True
+    assert condiciones.advertencias == [
+        "No se cuenta con la normativa municipal de Rosario: la distancia se basa en la "
+        "normativa provincial"
+    ]
+    (distancia,) = condiciones.distancias_minimas
+    assert distancia.distancia_min_m == 300
+    assert distancia.norma_limitante.norma == "ley-13740-2017"
+
+
+def test_con_normativa_municipal_no_hay_aclaracion():
+    condiciones = calcular_condiciones("El Trébol", "aerea", {"Producto A": "IV"}, REGLAS_EL_TREBOL)
+    assert condiciones.sin_normativa_municipal is False
+    assert condiciones.advertencias == []
+
+
+def test_una_regla_leida_del_pdf_marca_la_distancia_como_extraida():
+    leida = ReglaCandidata(
+        tipo_zona="zona_urbana", tipo_aplicacion="aerea", bandas=["Ia", "Ib", "II"],
+        distancia_min_m=3000, norma="ley-11273-1995", articulo="33", jurisdiccion_id=None,
+        fuente="pdf_extraido",
+    )
+    condiciones = calcular_condiciones("Rosario", "aerea", {"Producto A": "II"}, [leida])
+    (distancia,) = condiciones.distancias_minimas
+    assert distancia.extraida_de_pdf is True
+    assert distancia.norma_limitante.articulo == "33"
+
+
+def test_una_regla_de_csv_no_se_marca_como_extraida():
+    condiciones = calcular_condiciones("El Trébol", "aerea", {"Producto A": "IV"}, REGLAS_EL_TREBOL)
+    assert condiciones.distancias_minimas[0].extraida_de_pdf is False

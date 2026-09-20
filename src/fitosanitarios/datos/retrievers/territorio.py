@@ -83,7 +83,7 @@ def reglas_candidatas(
         cur.execute(
             """
             SELECT rd.tipo_zona, rd.tipo_aplicacion, rd.bandas, rd.distancia_min_m,
-                   n.archivo, a.numero, l.jurisdiccion_id, rd.observaciones
+                   n.archivo, a.numero, l.jurisdiccion_id, rd.observaciones, rd.fuente
             FROM territorio.regla_distancia rd
             JOIN territorio.norma n ON n.id = rd.norma_id
             LEFT JOIN territorio.articulo a ON a.id = rd.articulo_id
@@ -99,7 +99,7 @@ def reglas_candidatas(
         ReglaCandidata(
             tipo_zona=f[0], tipo_aplicacion=f[1], bandas=list(f[2]),
             distancia_min_m=float(f[3]), norma=f[4], articulo=f[5],
-            jurisdiccion_id=f[6], observaciones=f[7],
+            jurisdiccion_id=f[6], observaciones=f[7], fuente=f[8],
         )
         for f in filas
     ]
@@ -128,6 +128,30 @@ def listar_localidades(conn: psycopg.Connection) -> list[Jurisdiccion]:
         )
         return [
             Jurisdiccion(id=f[0], jurisdiccion_id=f[1], nombre=f[2], provincia_id=f[3])
+            for f in cur.fetchall()
+        ]
+
+
+def localidad_tiene_normativa_municipal(conn: psycopg.Connection, localidad_id: int) -> bool:
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT EXISTS (SELECT 1 FROM territorio.norma "
+            "WHERE ambito = 'municipal' AND localidad_id = %s)",
+            (localidad_id,),
+        )
+        return cur.fetchone()[0]
+
+
+def listar_provincias(conn: psycopg.Connection) -> list[Jurisdiccion]:
+    """Provincias con normativa cargada, con la forma de `Jurisdiccion` para
+    reusar `resolver_localidad` (nombre legible: "santa-fe" -> "Santa Fe")."""
+    with conn.cursor() as cur:
+        cur.execute("SELECT id, nombre FROM territorio.provincia ORDER BY nombre")
+        return [
+            Jurisdiccion(
+                id=f[0], jurisdiccion_id=f[1], nombre=f[1].replace("-", " ").title(),
+                provincia_id=f[0],
+            )
             for f in cur.fetchall()
         ]
 

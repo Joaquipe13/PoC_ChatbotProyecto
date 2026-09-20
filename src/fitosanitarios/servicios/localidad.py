@@ -19,6 +19,20 @@ class Jurisdiccion:
 
 
 @dataclass
+class Ubicacion:
+    """Dónde se aplica, para elegir la normativa que corresponde. Si la
+    localidad no está cargada solo se conoce la provincia (`localidad_id`
+    None): se usa la normativa provincial y hay que aclararlo."""
+
+    nombre: str
+    provincia_id: int
+    localidad_id: int | None = None
+    jurisdiccion_id: str | None = None
+    # La localidad existe pero no tiene ordenanzas cargadas, o no existe.
+    con_normativa_municipal: bool = False
+
+
+@dataclass
 class ResolucionLocalidad:
     localidad: Jurisdiccion | None = None
     # Varias localidades coinciden con el texto: hay que preguntar, nunca elegir.
