@@ -55,19 +55,27 @@ TOOLS = [
 ]
 
 
-def crear_modelo_chat_gemini(settings: Settings) -> BaseChatModel:
+def crear_modelo_chat_gemini(
+    settings: Settings, temperature: float | None = None, indice_key: int = 0
+) -> BaseChatModel:
     """Modelo de chat real para el agente (Gemini, multimodal, ver skill).
     No reutiliza `llm/client.py::ClienteGemini` -- ese cliente es para
     llamadas de texto/imagen sueltas (extracción, RAG), no implementa el
     protocolo de tool-calling que `create_agent` necesita. Usa la primera
     key configurada; la rotación ante 429 para el agente completo queda
-    pendiente (ver DECISIONES.md)."""
+    pendiente (ver DECISIONES.md).
+
+    `temperature` e `indice_key` son para las evaluaciones (`evals/chat.py`): fijar la
+    temperatura más baja y repartir los turnos entre las keys. Con los valores por
+    defecto el comportamiento no cambia."""
     from langchain_google_genai import ChatGoogleGenerativeAI
 
     if not settings.gemini_api_keys:
         raise ValueError("Se necesita al menos una GEMINI_API_KEY_* para el agente real")
+    keys = settings.gemini_api_keys
+    opciones = {} if temperature is None else {"temperature": temperature}
     return ChatGoogleGenerativeAI(
-        model=settings.gemini_model, google_api_key=settings.gemini_api_keys[0]
+        model=settings.gemini_model, google_api_key=keys[indice_key % len(keys)], **opciones
     )
 
 

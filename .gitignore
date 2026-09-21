@@ -39,3 +39,6 @@ Thumbs.db
 
 # Borradores de reglas.csv (revisar y renombrar a reglas.csv; ver insumos/borrador_reglas.py)
 reglas.borrador*
+
+# Corridas de evaluación conversacional (logs de conversaciones; ver evals/)
+evals/runs/

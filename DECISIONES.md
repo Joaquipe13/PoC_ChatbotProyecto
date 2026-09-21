@@ -540,3 +540,14 @@ Se quedan en `servicios/` porque los usan varias tools: `eventos`, `fechas`, `re
 **Rutas viejas en este archivo.** Las entradas anteriores de `DECISIONES.md` citan las rutas de entonces (`tools/leer_receta.py`, `servicios/rag_normativa.py`…); se dejaron tal cual como registro histórico y esta tabla dice dónde está cada cosa hoy.
 
 **Sin cambio de comportamiento.** Es un movimiento de código: los tests de plantillas (`test_formateador.py`) y de las tools pasan sin cambiar sus expectativas, y la suite completa corre en verde contra Postgres.
+
+
+## Evaluación conversacional: simulador, invariantes y analista (21/09/2026)
+
+**Qué es.** Una extensión (Fase 12 en `plandefases.md`, ver `evals/README.md`) que conversa con el bot como lo haría un usuario y analiza el resultado. Vive en `evals/` y no en `tests/` porque usa Gemini real (red y cuota).
+
+**Decisiones.** (1) El simulador es un **subagente de Claude Code** y el orquestador del bot sigue siendo Gemini real: la prueba es realista y el simulador no comparte modelo ni contexto con el sistema. Consume la cuota de Claude además de la de Gemini. (2) El harness entra por el mismo camino que el canal de WhatsApp (`ejecutar_turno` con el agente real, el checkpointer de Postgres, `conn_log` y el mismo criterio de botones y listas de `cliente_graph`), sin firma ni Meta; un turno por proceso, así que el contador de repreguntas se persiste en un archivo por conversación (en producción vive en la memoria del servidor). (3) Las corridas usan un **clon de la base** (`<base>_eval`) y el harness se niega a correr contra otra: agendar y registrar eventos escriben. (4) Los artefactos de las tools (`ResultadoTool`) no sobreviven al checkpoint de Postgres: se toman de lo que devuelve `invoke`, como hace producción. (5) Un turno que falla por cuota o red se registra como `infra` y no cuenta como error del bot. (6) Único cambio en código de producción: `crear_modelo_chat_gemini(settings, temperature=None, indice_key=0)`, con el comportamiento por defecto intacto.
+
+**Límites conocidos.** `gemini-3.5-flash-lite` ignora la temperatura pedida (aviso de `langchain-google-genai`): las repeticiones varían. La independencia del simulador (no leer el repositorio) es una regla de su definición, no una restricción técnica. Los agentes de `.claude/agents/` se registran al iniciar Claude Code. "Objetivo logrado" es lo que declara el simulador y no verifica el contenido: en el piloto declaró logrado en las 6 conversaciones y el analista encontró dos hallazgos críticos, así que **esa métrica no alcanza sola**.
+
+**Lo que el piloto encontró que las pruebas anteriores no veían** (`evals/runs/20260921-192037/informe.md`): la consulta de un producto muestra la dosis del primer uso registrado aunque sea de otro cultivo; una receta de foto se evaluó sin que el usuario la confirmara; un mensaje con dos pedidos se contestó a medias; y las tools de producto y riesgo tardan 30 a 60 s por turno.

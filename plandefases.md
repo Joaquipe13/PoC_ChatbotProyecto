@@ -621,6 +621,20 @@ No avanzar a la fase siguiente sin confirmación del usuario.
 
 ---
 
+## Fase 12 — Evaluación conversacional (extensión, posterior a la Fase 11)
+
+**Objetivo:** un loop de evaluación con un simulador que conversa con el bot, logs por conversación, invariantes automáticos y un analista, para encontrar errores que los tests unitarios y las evals de un turno no ven. No toca el núcleo (Fases 0-8, 10).
+
+**Entregables:** `evals/` (ver `evals/README.md`): harness `chat.py` por el camino del webhook, logger, `base_eval.py` (clon de la base), `corrida.py`, `invariantes.py`, `metricas.py`, `escenarios/*.yaml`; los agentes `.claude/agents/simulador-operario.md` y `analista-conversaciones.md`. Todo fuera de `tests/` porque usa el LLM real (red y cuota).
+
+**Alcance acordado:** piloto de 3 escenarios × 2 corridas; el simulador es un subagente de Claude Code y el orquestador del bot, Gemini real; los escenarios que escriben corren sobre un clon de la base. Las piezas restantes (15 escenarios, conjunto `holdout`, ciclo de arreglos) quedan para después de la entrega del 30/09 salvo decisión en contrario.
+
+**Estado (21/09/2026):** harness, logger, invariantes, simulador, analista y una corrida piloto hechos (`evals/runs/20260921-192037/`); el informe está a la espera de decidir qué hallazgos se atacan. No se arregló nada sin esa decisión.
+
+No avanzar sin confirmación del usuario.
+
+---
+
 ## Riesgos transversales
 
 - **Cuotas del LLM (Gemini/Groq).** No verificadas (decisión abierta #6); la POC entera depende de que la cuota gratuita alcance para desarrollo, evals y demo. Mitigación: rotación de keys desde la Fase 0, `USE_FIXTURES=true` como default de desarrollo, y medir consumo real apenas se empiece a usar LLM real en la Fase 2.

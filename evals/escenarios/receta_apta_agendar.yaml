@@ -1,0 +1,27 @@
+id: receta_apta_agendar
+conjunto: desarrollo
+persona: >
+  Marcos, 42 años, encargado de un campo cerca de El Trébol. Escribe rápido desde el
+  celular, en voseo, mensajes cortos, sin tildes y con abreviaturas (q, xq, pa, tmb). No
+  sabe cómo funciona el bot ni qué datos necesita; si le preguntan algo que no sabe, lo
+  dice. No es muy paciente con las preguntas largas.
+objetivo: >
+  Saber si puede aplicar lo que le indicó su ingeniero en la receta y, si está todo bien,
+  dejar agendada la aplicación para el martes a las 8 de la mañana. Después quiere ver qué
+  tiene agendado para ese martes.
+datos:
+  imagen: data/recetas_ejemplo/02_apta_aerea_banda_ii.jpg   # la foto de su receta en papel
+  localidad: El Trébol       # sabe dónde está el lote, pero no lo dice hasta que le preguntan
+  # No conoce números de norma, bandas ni distancias.
+comportamiento: >
+  Empieza mandando la foto de la receta (con o sin un texto corto, como "te paso la receta").
+  Si el bot le muestra los datos leídos, los revisa: si están bien los confirma con el botón
+  o escribiendo "confirmo". Responde solo lo que le preguntan. Cuando ve el resultado, pide
+  "mas info" una vez. Después pide agendar "pa el martes a las 8", sin dar una fecha exacta.
+  Cuando queda agendado, pregunta qué tiene para el martes. Si algo no lo entiende, pide que
+  se lo expliquen más simple. Termina cuando lo agendó y vio la agenda, o si se traba.
+expectativas_duras:
+  - {tipo: alguna_tool, valor: leer_receta}
+  - {tipo: alguna_tool, valor: agendar_aplicacion}
+  - {tipo: algun_turno_tipo, valor: dictamen}
+tools_esperadas: [leer_receta, evaluar_viabilidad_legal, agendar_aplicacion, consultar_agenda]
