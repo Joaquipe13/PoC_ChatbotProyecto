@@ -143,4 +143,4 @@ def consultar_articulo(
         numero_articulo=numero_articulo, norma=norma, localidad=localidad, provincia=provincia
     )
     resultado = con_conexion(lambda conn: consultar_articulo_logica(args, conn))
-    return mensajes.resumen_para_llm(resultado.estado), resultado
+    return mensajes.resumen_para_llm(resultado), resultado

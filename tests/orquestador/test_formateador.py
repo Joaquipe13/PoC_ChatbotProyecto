@@ -898,3 +898,123 @@ def test_un_renglon_sin_puntos_mas_largo_que_el_limite_se_parte_por_palabras():
     partes = partir_por_seccion(largo, limite=120)
     assert all(len(p) <= 120 for p in partes)
     assert " ".join(p.replace("\n", " ") for p in partes).split() == largo.split()
+
+
+# --- las opciones de la tool mandan sobre las que reescribe el LLM ---
+
+
+def test_repregunta_usa_las_opciones_de_la_tool_y_no_las_que_escribio_el_llm():
+    """Bug real (Gemini): la tool ofrecía las 3 normas donde está el artículo y el LLM
+    repreguntó con opciones propias, entre ellas una norma que no existe."""
+    de_la_tool = CampoFaltante(
+        campo="norma", motivo="varias", pregunta_sugerida="¿De cuál?", tipo_entrada="lista",
+        opciones=["Ley 11273/1995 (santa-fe)", "Ordenanza 841/2010 (el-trebol)"],
+    )
+    inventada = CampoFaltante(
+        campo="norma", motivo="varias", pregunta_sugerida="¿De qué norma?", tipo_entrada="lista",
+        opciones=["Ordenanza 841/2010", "Ordenanza 1152/2018"],
+    )
+    texto = _un_mensaje(
+        RespuestaAgente(tipo="repregunta", faltantes=[inventada]),
+        [ResultadoTool(estado="faltan_datos", faltantes=[de_la_tool])],
+    )
+    assert texto == "¿De cuál?\n   - Ley 11273/1995 (santa-fe)\n   - Ordenanza 841/2010 (el-trebol)"
+    assert "1152" not in texto
+
+
+def test_repregunta_sin_tool_usa_lo_que_dijo_el_llm():
+    faltante = CampoFaltante(
+        campo="localidad", motivo="falta", pregunta_sugerida="¿En qué localidad?",
+        tipo_entrada="texto",
+    )
+    assert _un_mensaje(RespuestaAgente(tipo="repregunta", faltantes=[faltante]), []) == (
+        "¿En qué localidad?"
+    )
+
+
+# --- la forma de los datos manda sobre el tipo que eligió el LLM ---
+
+
+def _riesgo_suelto() -> ResultadoTool:
+    return ResultadoTool(
+        estado="ok",
+        datos={"condiciones": {
+            "localidad": "El Trébol", "tipo_aplicacion": "aerea", "banda": "II",
+            "banda_color": "amarilla", "productos_por_banda": {"Flyer 10 Ec": "II"},
+            "distancias_minimas": [{
+                "tipo_zona": "zona_urbana", "distancia_min_m": 3000,
+                "norma_limitante": {"fuente": "normativa", "norma": "ordenanza-841-2010",
+                                    "articulo": "7"},
+            }],
+        }},
+    )
+
+
+def test_si_el_llm_dice_limitaciones_para_un_riesgo_se_muestra_como_dictamen():
+    """Bug real (Gemini): tras `evaluar_riesgo` respondió tipo="limitaciones" y salía un
+    "*Limitaciones en *" vacío."""
+    texto = _un_mensaje(RespuestaAgente(tipo="limitaciones"), [_riesgo_suelto()])
+    assert "*Condiciones de aplicación* — El Trébol" in texto
+    assert "- *Distancia mínima a zona urbana:* 3000 m (Ordenanza 841/2010, art. 7)" in texto
+    assert "Limitaciones en" not in texto
+
+
+def test_si_el_llm_dice_dictamen_para_las_limitaciones_se_muestran_las_limitaciones():
+    resultado = ResultadoTool(
+        estado="ok",
+        datos={"localidad": "Rosario", "distancia_m": None,
+               "prohibiciones": [AEREA_II], "condicionales": []},
+        citas=_citas(AEREA_II),
+    )
+    texto = _un_mensaje(RespuestaAgente(tipo="dictamen"), [resultado])
+    assert texto.startswith("*Limitaciones en Rosario*")
+
+
+def test_si_el_llm_dice_consulta_normativa_para_un_articulo_se_muestra_el_articulo():
+    texto = _un_mensaje(
+        RespuestaAgente(tipo="consulta_normativa"), [_resultado_articulo(["Texto del artículo."])]
+    )
+    assert texto.startswith("*Ley 11273/1995, art. 33 (santa-fe)*")
+
+
+def test_un_tipo_compatible_con_los_datos_no_se_toca():
+    # detalle_bandas usa los mismos datos que un riesgo suelto: no se lo pasa a dictamen.
+    texto = _un_mensaje(RespuestaAgente(tipo="detalle_bandas"), [_riesgo_suelto()])
+    assert texto.startswith("*Banda de cada producto*")
+
+
+def test_los_campos_descriptivos_de_una_receta_no_se_confunden_con_una_forma_propia():
+    # `restricciones` y `condiciones` de una receta leída son texto, no las listas y dicts
+    # de las limitaciones o del riesgo.
+    resultado = ResultadoTool(
+        estado="ok",
+        datos={"cultivo": "soja", "restricciones": "no aplicar con viento",
+               "condiciones": "T < 30 °C", "items": []},
+    )
+    texto = _un_mensaje(RespuestaAgente(tipo="confirmacion_receta"), [resultado])
+    assert texto.startswith("*Leí la receta*")
+
+
+def test_la_pregunta_de_una_tool_no_se_tapa_con_el_listado_vacio_de_otra():
+    """Bug real (Gemini): `validar_producto_registro` preguntó cuál de 5 productos y
+    `consultar_productos` devolvió un listado vacío: salía "No encontré productos"."""
+    pregunta = ResultadoTool(estado="faltan_datos", faltantes=[CampoFaltante(
+        campo="producto_nombre", motivo="varios", tipo_entrada="lista",
+        pregunta_sugerida="Hay varios productos parecidos a 'glifosato'. ¿Cuál es?",
+        opciones=["Glifosato 48 Sl Assa", "Glifosato Full Sigma"],
+    )])
+    listado_vacio = ResultadoTool(estado="ok", datos={"productos": [], "total": 0})
+    texto = _un_mensaje(RespuestaAgente(tipo="consulta_producto"), [pregunta, listado_vacio])
+    assert texto.startswith("Hay varios productos parecidos a 'glifosato'. ¿Cuál es?")
+    assert "   - Glifosato Full Sigma" in texto and "No encontré" not in texto
+
+
+def test_una_receta_leida_con_faltantes_sigue_siendo_una_confirmacion():
+    # leer_receta devuelve faltan_datos CON datos: se confirma lo leído, no se repregunta.
+    resultado = ResultadoTool(
+        estado="faltan_datos", datos={"cultivo": "soja", "items": []},
+        faltantes=[CampoFaltante(campo="lote", motivo="x", pregunta_sugerida="¿Lote?",
+                                 tipo_entrada="texto")],
+    )
+    texto = _un_mensaje(RespuestaAgente(tipo="confirmacion_receta"), [resultado])
+    assert texto.startswith("*Leí la receta*")

@@ -4,8 +4,12 @@ del LLM que redacta la respuesta a partir de los fragmentos recuperados."""
 DESCRIPCION = """\
 Responde una pregunta puntual sobre normativa de aplicación de
 fitosanitarios en una localidad cargada, citando artículo y norma. Usar
-para preguntas de texto ("¿a cuántos metros de una escuela puedo
-aplicar?"), no para el dictamen de una receta (`evaluar_viabilidad_legal`).
+para dudas de contenido ("¿hay que avisar antes de aplicar?", "¿qué
+obligaciones tiene el aplicador?", "¿se puede aplicar de noche?"). No usar para
+preguntas de distancias o limitaciones ("¿a cuántos metros de una escuela puedo
+aplicar?", "¿qué límites hay en X?": `listar_limitaciones`), ni para el texto de un
+artículo por su número (`consultar_articulo`), ni para el dictamen de una receta
+(`evaluar_viabilidad_legal`).
 
 Args:
     pregunta: la pregunta tal como la escribió el operario.

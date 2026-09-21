@@ -30,8 +30,17 @@ def aviso_banda_no_entendida(texto: str) -> str:
     return f"No entendí la banda '{texto}': muestro todas"
 
 
-def resumen_para_llm(estado: str) -> str:
-    return f"listar_limitaciones: estado={estado}"
+def resumen_para_llm(resultado: ResultadoTool) -> str:
+    """Lo que ve el LLM de la tool. Si la tool pidió un dato, se lo dice para que se lo
+    pregunte al operario en vez de volver a llamarla con argumentos inventados."""
+    texto = f"listar_limitaciones: estado={resultado.estado}"
+    if resultado.faltantes:
+        campos = ", ".join(f.campo for f in resultado.faltantes)
+        texto += (
+            f". Falta: {campos}. Preguntáselo al operario y no vuelvas a llamar la tool "
+            "hasta que responda"
+        )
+    return texto
 
 
 # --- plantilla del resultado (tipo de respuesta `limitaciones`) ---

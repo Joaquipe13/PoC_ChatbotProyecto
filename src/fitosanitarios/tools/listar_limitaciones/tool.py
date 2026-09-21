@@ -132,4 +132,4 @@ def listar_limitaciones(
         banda=banda, tipo_zona=tipo_zona, distancia_m=distancia_m,
     )
     resultado = con_conexion(lambda conn: listar_limitaciones_logica(args, conn))
-    return mensajes.resumen_para_llm(resultado.estado), resultado
+    return mensajes.resumen_para_llm(resultado), resultado

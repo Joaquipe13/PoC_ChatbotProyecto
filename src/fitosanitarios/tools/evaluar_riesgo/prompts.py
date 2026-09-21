@@ -7,6 +7,10 @@ sus productos) y la distancia mínima que fija la normativa de la
 localidad, más la dosis contra el rango registrado. No usa la ubicación
 exacta del lote. Usar para consultas sueltas; para el dictamen completo de
 una receta confirmada usar `evaluar_viabilidad_legal`.
+Usar también cuando pregunta a qué distancia tiene que aplicar un producto
+concreto ("quiero aplicar Flyer 10 EC a 170 cm3/ha en El Trébol, ¿a qué distancia
+de la zona urbana?"): esta tool da la distancia que corresponde a la banda de ese
+producto; `listar_limitaciones` es para las limitaciones en general, sin un producto.
 
 Args:
     localidad: localidad o municipio donde se va a aplicar.

@@ -67,7 +67,10 @@ def _plantilla_consulta_producto(
 
 
 def _plantilla_repregunta(respuesta: RespuestaAgente, resultados: list[ResultadoTool]) -> str:
-    faltantes = respuesta.faltantes or (resultados[0].faltantes if resultados else [])
+    # Si una tool de este turno ya dijo qué falta (y con qué opciones), eso manda: el LLM
+    # reescribía las opciones por su cuenta y llegó a inventar una norma que no existe.
+    de_tools = next((r.faltantes for r in resultados if r.faltantes), [])
+    faltantes = de_tools or respuesta.faltantes
     if not faltantes:
         return (
             "Necesito un dato más para continuar, pero no pude identificar cuál. "
@@ -233,14 +236,57 @@ def formatear_respuesta(respuesta: RespuestaAgente, resultados: list[ResultadoTo
     return partir_por_seccion(texto)
 
 
-def _tipo_efectivo(tipo: str, resultados: list[ResultadoTool]) -> str:
-    """El LLM elige el `tipo`, pero si la tool no llegó a evaluar nada (faltó
-    un dato, p. ej. la provincia) no hay dictamen ni bandas que mostrar: se
-    responde lo que la tool devolvió en vez de una plantilla vacía (bug real:
-    `tipo="dictamen"` tras un `faltan_datos` salía como una sola frase)."""
-    if tipo not in ("dictamen", "detalle_bandas", "consulta_articulo", "limitaciones") or any(
-        r.datos for r in resultados
+# Resultados con una forma propia, que solo una plantilla sabe mostrar.
+_FORMAS_PROPIAS = {
+    # Por tipo de valor, no solo por nombre: una receta leída también tiene un campo
+    # `restricciones` y otro `condiciones`, pero son texto.
+    "limitaciones": lambda datos: (
+        isinstance(datos.get("prohibiciones"), list) or isinstance(datos.get("restricciones"), list)
+    ),
+    "consulta_articulo": lambda datos: isinstance(datos.get("partes"), list),
+}
+
+
+def _tipo_segun_los_datos(tipo: str, datos: dict) -> str:
+    """El LLM elige el `tipo`, pero la forma del resultado es inequívoca: si es la de
+    las limitaciones o la de un artículo, esa plantilla es la única que sirve; y si
+    dijo `limitaciones` o `consulta_articulo` para el resultado de otra tool (Gemini lo
+    hizo con `evaluar_riesgo`: salía "*Limitaciones en *" vacío), se muestra como
+    dictamen."""
+    for propio, tiene_esa_forma in _FORMAS_PROPIAS.items():
+        if tiene_esa_forma(datos):
+            return propio
+    if tipo in _FORMAS_PROPIAS and (
+        isinstance(datos.get("dictamen"), dict) or isinstance(datos.get("condiciones"), dict)
     ):
+        return "dictamen"
+    return tipo
+
+
+_TIPOS_DE_CONSULTA = (
+    "consulta_producto", "consulta_normativa", "consulta_articulo", "limitaciones",
+    "dictamen", "detalle_bandas",
+)
+
+
+def _tipo_efectivo(tipo: str, resultados: list[ResultadoTool]) -> str:
+    """El tipo que se usa para elegir la plantilla. Si hay datos, manda su forma
+    (`_tipo_segun_los_datos`). Si la tool no llegó a evaluar nada (faltó un dato, p. ej.
+    la provincia) no hay dictamen ni bandas que mostrar: se responde lo que la tool
+    devolvió en vez de una plantilla vacía (bug real: `tipo="dictamen"` tras un
+    `faltan_datos` salía como una sola frase)."""
+    # Una tool que pidió un dato sin haber evaluado nada manda sobre lo que devolvió otra
+    # en el mismo turno: el operario tiene que contestar eso (bug real de Gemini: llamó a
+    # `validar_producto_registro`, que preguntó cuál de 5 productos, y a `consultar_productos`,
+    # cuyo listado vacío se mostró en su lugar como "No encontré productos").
+    if tipo in _TIPOS_DE_CONSULTA and any(
+        r.estado == "faltan_datos" and r.faltantes and not r.datos for r in resultados
+    ):
+        return "repregunta"
+    datos = primer_dato(resultados)
+    if datos:
+        return _tipo_segun_los_datos(tipo, datos)
+    if tipo not in ("dictamen", "detalle_bandas", "consulta_articulo", "limitaciones"):
         return tipo
     for r in resultados:
         if r.estado == "faltan_datos":

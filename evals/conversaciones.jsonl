@@ -3,8 +3,8 @@
 {"id": "ruteo_03", "categoria": "ruteo", "mensaje": "¿Qué productos hay registrados para yuyo colorado en soja?", "tool_esperada": "consultar_productos"}
 {"id": "ruteo_04", "categoria": "ruteo", "mensaje": "Dame un listado de insecticidas para maíz", "tool_esperada": "consultar_productos"}
 {"id": "ruteo_05", "categoria": "ruteo", "mensaje": "Quiero aplicar Flyer 10 Ec en soja a 170 cm3/ha, terrestre, en San Carlos Centro, contra chinche de la alfalfa. ¿A qué distancia de la zona urbana tengo que aplicar?", "tool_esperada": "evaluar_riesgo"}
-{"id": "ruteo_06", "categoria": "ruteo", "mensaje": "¿A cuántos metros de una escuela puedo aplicar por tierra en San Carlos Centro?", "tool_esperada": "responder_consulta_normativa"}
-{"id": "ruteo_07", "categoria": "ruteo", "mensaje": "¿Puedo aplicar fitosanitarios cerca de un curso de agua en San Carlos Centro?", "tool_esperada": "responder_consulta_normativa"}
+{"id": "ruteo_06", "categoria": "ruteo", "mensaje": "¿A cuántos metros de una escuela puedo aplicar por tierra en San Carlos Centro?", "tool_esperada": "listar_limitaciones"}
+{"id": "ruteo_07", "categoria": "ruteo", "mensaje": "¿Puedo aplicar fitosanitarios cerca de un curso de agua en San Carlos Centro?", "tool_esperada": "listar_limitaciones"}
 {"id": "ruteo_08", "categoria": "ruteo", "mensaje": "¿Hay productos con principio activo glifosato registrados para soja?", "tool_esperada": "consultar_productos"}
 {"id": "ruteo_09", "categoria": "ruteo", "mensaje": "El producto Abril 50 Curasemilla, ¿sirve para trigo?", "tool_esperada": "validar_producto_registro"}
 {"id": "ruteo_10", "categoria": "ruteo", "mensaje": "Quiero validar la receta completa: Flyer 10 Ec en soja, 170 cm3/ha, terrestre, en San Carlos Centro, contra chinche de la alfalfa", "tool_esperada": "evaluar_viabilidad_legal"}

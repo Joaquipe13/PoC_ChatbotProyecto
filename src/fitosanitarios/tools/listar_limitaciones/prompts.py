@@ -10,6 +10,8 @@ artículo dispone el límite?", "¿a cuánto de la zona urbana puedo fumigar con
 avión?", y también "¿puedo aplicar a 1000 metros bajo alguna condición?" (pasar
 `distancia_m`: responde qué está prohibido a esa distancia y qué excepciones
 permitirían aplicar). Para ver el texto de un artículo usar `consultar_articulo`.
+Si el mensaje trae un producto y su dosis para evaluar una aplicación, usar
+`evaluar_riesgo`, no esta.
 
 Args:
     localidad: localidad o municipio de la consulta, si la dijo o si hay una
@@ -20,4 +22,6 @@ Args:
         azul, verde), solo si la mencionó.
     tipo_zona: zona en cuestión ("zona urbana", "escuela", "curso de agua"), solo si
         la mencionó.
-    distancia_m: distancia en metros a la que quiere aplicar, solo si la dio."""
+    distancia_m: distancia en metros entre el lote y la zona (pueblo, escuela, arroyo) a
+        la que quiere aplicar, solo si la dio. Nunca la dosis (cm3/ha, L/ha) ni la
+        superficie ni una cantidad de producto."""
