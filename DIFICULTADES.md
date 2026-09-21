@@ -209,3 +209,16 @@ CI usa `uv sync --dev`, pero la máquina de desarrollo local no lo tenía instal
 ### `ruff` marcó `pytest.raises(Exception)` como demasiado genérico (regla B017)
 
 Los tests que esperaban que `Settings(...)` fallara por falta de una variable requerida usaban `pytest.raises(Exception)`. Se corrigió usando `pydantic.ValidationError`, que es la excepción real que levanta `pydantic-settings` (los `ValueError` de los validadores personalizados en `config.py` también se envuelven en `ValidationError` automáticamente).
+
+### El agente evaluaba datos inventados: `leer_receta` no le pasaba nada de lo leído (20/09/2026)
+
+Probando por WhatsApp con una receta de María Susana, el dictamen salía para "Pergamino", con cultivo Soja y un producto "Glifosato Full" que no existe en SENASA. El historial del agente (checkpoint) mostró la causa: `leer_receta` devolvía al LLM solo el texto "Receta leída correctamente", y los datos iban únicamente en el artifact, que solo ve el formateador. Sin datos, el LLM completaba cultivo, producto, dosis, tipo de aplicación y localidad por su cuenta, y esos valores inventados se repetían en cada llamada posterior. Además la extracción de la receta no tenía campo `localidad`.
+
+**Arreglo:** `leer_receta` le pasa al agente lo leído (con `NO FIGURA` en lo que falta), la extracción y la confirmación incluyen `localidad`, y el prompt prohíbe completar datos que no vinieron de la receta o del usuario. La conversación de prueba anterior quedó contaminada en su checkpoint: conviene empezar con "nueva receta" o una foto nueva.
+
+### Otras causas de respuestas vacías o poco claras (20/09/2026)
+
+- `tipo="dictamen"` tras un `faltan_datos` salía como una sola frase (la plantilla quedaba vacía): el formateador ahora responde según lo que devolvió la tool.
+- `detalle_bandas` salía con el encabezado solo cuando el producto no se resolvía (se descartaba en silencio) y sin distancias.
+- `catalogo.producto.banda_toxicologica` estaba vacía en 7.189 de 7.370 productos (solo los 181 con detalle SENASA la tenían); ahora sale de la clase del listado, que es el mismo valor.
+- Las preguntas ("Para continuar necesito 1 dato: 1. productos: ¿Cuál de estos productos es?") no se entendían solas.
