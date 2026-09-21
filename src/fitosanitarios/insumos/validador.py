@@ -18,10 +18,12 @@ from shapely.validation import explain_validity
 
 from fitosanitarios.config import get_settings
 from fitosanitarios.insumos.estructura import (
+    alcance_de_carpeta,
     carpeta_nacional,
     carpetas_localidad,
     carpetas_provincia,
 )
+from fitosanitarios.insumos.reglas_csv import leer_reglas_csv
 
 NOMBRE_CARPETA_VALIDO = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 NOMBRE_PDF_VALIDO = re.compile(r"^(ordenanza|decreto|resolucion|ley)-[a-z0-9]+-\d{4}\.pdf$")
@@ -143,22 +145,41 @@ def validar_geojson(ruta: Path, radio_busqueda_m: float | None = None) -> Result
     return resultado
 
 
-def validar_reglas_csv(ruta_csv: Path, pdfs_disponibles: set[str]) -> ResultadoValidacion:
-    import csv
+def validar_reglas_csv(
+    ruta_csv: Path, pdfs_por_alcance: dict[tuple[str, ...], set[str]]
+) -> dict[tuple[str, ...] | None, ResultadoValidacion]:
+    """Valida el `reglas.csv` único. `pdfs_por_alcance`: los PDF (sin extensión) de
+    cada carpeta, por `alcance_de_carpeta`. Los errores de una carpeta van bajo su
+    alcance (F5: la norma citada no está entre sus PDF); los que no se pueden
+    atribuir a una carpeta, bajo `None` (F8: fila con formato inválido; F9: la
+    jurisdicción no tiene carpeta)."""
+    resultados: dict[tuple[str, ...] | None, ResultadoValidacion] = {}
 
-    resultado = ResultadoValidacion()
-    with ruta_csv.open(encoding="utf-8") as f:
-        lector = csv.DictReader(f)
-        for i, fila in enumerate(lector, start=2):  # fila 1 = encabezado
-            norma = (fila.get("norma") or "").strip()
-            if norma and norma not in pdfs_disponibles:
-                resultado.errores.append(
-                    ErrorValidacion(
-                        "F5", str(ruta_csv),
-                        f"fila {i}: cita la norma '{norma}', que no está en la misma carpeta",
-                    )
+    def error(alcance, codigo: str, mensaje: str) -> None:
+        resultados.setdefault(alcance, ResultadoValidacion()).errores.append(
+            ErrorValidacion(codigo, str(ruta_csv), mensaje)
+        )
+
+    filas, errores = leer_reglas_csv(ruta_csv)
+    for e in errores:
+        error(None, "F8", e)
+    sin_carpeta: set[tuple[str, ...]] = set()
+    for fila in filas:
+        if fila.alcance not in pdfs_por_alcance:
+            if fila.alcance not in sin_carpeta:
+                sin_carpeta.add(fila.alcance)
+                error(
+                    None, "F9",
+                    f"línea {fila.linea}: no hay una carpeta para la jurisdicción "
+                    f"{'/'.join(fila.alcance)}",
                 )
-    return resultado
+        elif fila.norma not in pdfs_por_alcance[fila.alcance]:
+            error(
+                fila.alcance, "F5",
+                f"línea {fila.linea}: cita la norma '{fila.norma}', que no está en la carpeta "
+                f"de {'/'.join(fila.alcance)}",
+            )
+    return resultados
 
 
 def validar_nombre_carpeta(nombre: str, ruta: Path) -> ResultadoValidacion:
@@ -198,20 +219,12 @@ def validar_carpeta_localidad(ruta: Path) -> ResultadoValidacion:
     resultado.extend(validar_nombre_carpeta(ruta.name, ruta))
 
     geojson = ruta / "localidad.geojson"
-    reglas_csv = ruta / "reglas.csv"
     pdfs = sorted(ruta.glob("*.pdf"))
 
     if not geojson.exists():
         resultado.errores.append(ErrorValidacion("F1", str(ruta), "falta localidad.geojson"))
     if not pdfs:
         resultado.errores.append(ErrorValidacion("F1", str(ruta), "falta al menos un PDF de norma"))
-    if not reglas_csv.exists():
-        # Sin reglas.csv las distancias se extraen del texto de los PDF al cargar.
-        resultado.advertencias.append(
-            AdvertenciaValidacion(
-                "A4", str(ruta), "sin reglas.csv: las distancias se leerán del texto de los PDF"
-            )
-        )
 
     if geojson.exists():
         resultado.extend(validar_geojson(geojson))
@@ -223,9 +236,6 @@ def validar_carpeta_localidad(ruta: Path) -> ResultadoValidacion:
                     "A3", str(pdf), "el PDF no tiene texto extraíble, requiere OCR"
                 )
             )
-    if reglas_csv.exists():
-        nombres_pdf = {p.stem for p in pdfs}
-        resultado.extend(validar_reglas_csv(reglas_csv, nombres_pdf))
 
     return resultado
 
@@ -233,8 +243,7 @@ def validar_carpeta_localidad(ruta: Path) -> ResultadoValidacion:
 def validar_carpeta_normativa_general(ruta: Path) -> ResultadoValidacion:
     """Valida la carpeta de una provincia (`data/insumos/<provincia>/`, sus
     propios PDFs; las subcarpetas de localidad se validan aparte) o
-    `normativa-general/nacional/`. Mismo contrato que una localidad, salvo
-    que `reglas.csv` es opcional."""
+    `normativa-general/nacional/`: al menos un PDF con el nombre de la convención."""
     resultado = ResultadoValidacion()
     pdfs = sorted(ruta.glob("*.pdf"))
     if not pdfs:
@@ -249,11 +258,6 @@ def validar_carpeta_normativa_general(ruta: Path) -> ResultadoValidacion:
                 )
             )
 
-    reglas_csv = ruta / "reglas.csv"
-    if reglas_csv.exists():
-        nombres_pdf = {p.stem for p in pdfs}
-        resultado.extend(validar_reglas_csv(reglas_csv, nombres_pdf))
-
     return resultado
 
 
@@ -266,14 +270,25 @@ def es_clave_de_localidad(clave: str) -> bool:
 def validar_insumos(data_dir: Path) -> dict[str, ResultadoValidacion]:
     """Valida todo `data/insumos/`. Devuelve un resultado por carpeta (clave =
     ruta relativa), para poder reportar y decidir qué localidades/normas
-    entran y cuáles no, en vez de todo-o-nada."""
+    entran y cuáles no, en vez de todo-o-nada. Los errores del `reglas.csv`
+    van en la carpeta a la que se refieren; los que no se pueden atribuir a
+    ninguna (formato de una fila, jurisdicción sin carpeta) van bajo la clave
+    `reglas.csv`."""
     resultados: dict[str, ResultadoValidacion] = {}
+    claves_por_alcance: dict[tuple[str, ...], str] = {}
+    pdfs_por_alcance: dict[tuple[str, ...], set[str]] = {}
+
+    def registrar(clave: str, carpeta: Path) -> None:
+        alcance = alcance_de_carpeta(data_dir, carpeta)
+        claves_por_alcance[alcance] = clave
+        pdfs_por_alcance[alcance] = {p.stem for p in carpeta.glob("*.pdf")}
 
     for provincia_dir in carpetas_provincia(data_dir):
         provincia = provincia_dir.name
         resultado_provincial = validar_carpeta_normativa_general(provincia_dir)
         resultado_provincial.extend(validar_nombre_carpeta(provincia, provincia_dir))
         resultados[provincia] = resultado_provincial
+        registrar(provincia, provincia_dir)
 
         for carpeta in carpetas_localidad(provincia_dir):
             resultado = validar_carpeta_localidad(carpeta)
@@ -289,10 +304,32 @@ def validar_insumos(data_dir: Path) -> dict[str, ResultadoValidacion]:
                         )
                     )
             resultados[f"{provincia}/{carpeta.name}"] = resultado
+            registrar(f"{provincia}/{carpeta.name}", carpeta)
 
     nacional_dir = carpeta_nacional(data_dir)
     if nacional_dir.exists():
         resultados["normativa-general/nacional"] = validar_carpeta_normativa_general(nacional_dir)
+        registrar("normativa-general/nacional", nacional_dir)
+
+    alcances_con_filas: set[tuple[str, ...]] = set()
+    reglas_csv = data_dir / "reglas.csv"
+    if reglas_csv.exists():
+        filas, _ = leer_reglas_csv(reglas_csv)
+        alcances_con_filas = {f.alcance for f in filas}
+        for alcance, resultado in validar_reglas_csv(reglas_csv, pdfs_por_alcance).items():
+            clave = "reglas.csv" if alcance is None else claves_por_alcance[alcance]
+            resultados.setdefault(clave, ResultadoValidacion()).extend(resultado)
+
+    # Sin filas en reglas.csv las distancias se leen del texto de los PDF al cargar
+    # (menos las nacionales: están para consultas, no para el dictamen).
+    for alcance, clave in claves_por_alcance.items():
+        if alcance != ("nacional",) and alcance not in alcances_con_filas:
+            resultados[clave].advertencias.append(
+                AdvertenciaValidacion(
+                    "A4", clave,
+                    "sin filas en reglas.csv: las distancias se leerán del texto de los PDF",
+                )
+            )
 
     return resultados
 

@@ -9,9 +9,10 @@ def test_todos_los_motivos_tienen_descripcion():
 
 def test_son_nueve_motivos_del_nucleo_segun_la_skill_mas_los_de_extensiones():
     # La skill documenta exactamente 9 para el núcleo (RF1-5, RF10, RF11).
-    # Los otros 2 son de la Fase 9 (RF6/RF7, fuera del alcance de la skill,
-    # ver DECISIONES.md) -- no cuentan contra "la skill es la fuente de
-    # verdad" porque la skill nunca definió motivos para esos RF.
+    # Los otros 3 son extensiones: 2 de la Fase 9 (RF6/RF7, fuera del alcance de
+    # la skill, ver DECISIONES.md) y `articulo_no_encontrado`, de la consulta de
+    # artículos por número. No cuentan contra "la skill es la fuente de verdad"
+    # porque la skill nunca definió motivos para esos casos.
     motivos_del_nucleo = {
         "jurisdiccion_no_cubierta", "sin_regla_aplicable", "producto_no_encontrado",
         "sin_usos_registrados", "dosis_no_comparable", "normativa_sin_respaldo",
@@ -20,7 +21,7 @@ def test_son_nueve_motivos_del_nucleo_segun_la_skill_mas_los_de_extensiones():
     todos = {m.value for m in MotivoNoResuelto}
     assert motivos_del_nucleo <= todos
     assert len(motivos_del_nucleo) == 9
-    assert len(todos - motivos_del_nucleo) == 2
+    assert len(todos - motivos_del_nucleo) == 3
 
 
 def test_motivo_es_comparable_con_string():

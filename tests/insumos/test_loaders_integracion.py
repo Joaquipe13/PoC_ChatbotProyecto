@@ -120,7 +120,7 @@ def test_carga_es_idempotente(conexion, modelo_embeddings):
         reglas_2 = cur.fetchone()[0]
 
     assert localidades_1 == localidades_2 == 2
-    assert reglas_1 == reglas_2 == 5
+    assert reglas_1 == reglas_2 == 6  # 5 prohibiciones (N) + 1 condicional (S)
 
 
 def test_regla_provincial_sin_localidad_asociada(conexion, modelo_embeddings):
@@ -130,17 +130,40 @@ def test_regla_provincial_sin_localidad_asociada(conexion, modelo_embeddings):
             """
             SELECT rd.tipo_zona, rd.distancia_min_m FROM territorio.regla_distancia rd
             JOIN territorio.norma n ON n.id = rd.norma_id
-            WHERE n.ambito = 'provincial'
+            WHERE n.ambito = 'provincial' AND NOT rd.permitido
             """
         )
         fila = cur.fetchone()
     assert fila == ("zona_urbana", 300)
 
 
-def test_norma_nacional_sin_reglas_csv_no_rompe_la_carga(conexion, modelo_embeddings):
-    # ley-27302-2016 (nacional) no tiene reglas.csv -- es opcional (ver
-    # docs/contrato-insumos.md). La carga completa no debe fallar por eso.
+def test_la_regla_condicional_se_carga_aparte_con_sus_condiciones(conexion, modelo_embeddings):
+    _cargar_todo(conexion, modelo_embeddings)
+    with conexion.cursor() as cur:
+        cur.execute(
+            """
+            SELECT rd.bandas, rd.distancia_min_m, rd.condiciones, a.numero
+            FROM territorio.regla_distancia rd
+            JOIN territorio.norma n ON n.id = rd.norma_id
+            LEFT JOIN territorio.articulo a ON a.id = rd.articulo_id
+            WHERE n.ambito = 'provincial' AND rd.permitido
+            """
+        )
+        fila = cur.fetchone()
+    assert fila == (["II"], 100, "con autorizacion del municipio", "2")
+
+
+def test_norma_nacional_sin_filas_en_reglas_csv_no_rompe_la_carga_ni_da_reglas(
+    conexion, modelo_embeddings
+):
+    # ley-27302-2016 (nacional) no tiene filas en reglas.csv: la normativa nacional es
+    # para consultas, así que ni siquiera se le leen distancias del PDF.
     _cargar_todo(conexion, modelo_embeddings)
     with conexion.cursor() as cur:
         cur.execute("SELECT count(*) FROM territorio.norma WHERE ambito = 'nacional'")
         assert cur.fetchone()[0] == 1
+        cur.execute(
+            "SELECT count(*) FROM territorio.regla_distancia rd "
+            "JOIN territorio.norma n ON n.id = rd.norma_id WHERE n.ambito = 'nacional'"
+        )
+        assert cur.fetchone()[0] == 0

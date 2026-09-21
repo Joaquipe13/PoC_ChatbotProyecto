@@ -97,13 +97,22 @@ CREATE TABLE IF NOT EXISTS territorio.regla_distancia (
     distancia_min_m NUMERIC NOT NULL,
     observaciones TEXT,
     -- 'csv': viene de reglas.csv (revisada por una persona). 'pdf_extraido': la
-    -- extrajo el LLM del texto de los artículos porque la carpeta no traía
-    -- reglas.csv; la respuesta avisa que hay que verificarla con la norma.
-    fuente TEXT NOT NULL DEFAULT 'csv' CHECK (fuente IN ('csv', 'pdf_extraido'))
+    -- leyó el extractor del texto de los artículos porque la jurisdicción no tenía
+    -- filas en reglas.csv; la respuesta avisa que hay que verificarla con la norma.
+    fuente TEXT NOT NULL DEFAULT 'csv' CHECK (fuente IN ('csv', 'pdf_extraido')),
+    -- false (N): prohibición, dentro de distancia_min_m no se puede; es lo único que
+    -- usan el dictamen y el agendado. true (S): regla condicional, a partir de
+    -- distancia_min_m se puede si se cumplen `condiciones`; solo para consultas.
+    permitido BOOLEAN NOT NULL DEFAULT false,
+    condiciones TEXT
 );
 -- Bases creadas antes de la extracción desde PDF: CREATE TABLE IF NOT EXISTS no agrega la columna.
 ALTER TABLE territorio.regla_distancia
     ADD COLUMN IF NOT EXISTS fuente TEXT NOT NULL DEFAULT 'csv';
+ALTER TABLE territorio.regla_distancia
+    ADD COLUMN IF NOT EXISTS permitido BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE territorio.regla_distancia
+    ADD COLUMN IF NOT EXISTS condiciones TEXT;
 CREATE INDEX IF NOT EXISTS ix_regla_distancia_norma ON territorio.regla_distancia (norma_id);
 CREATE INDEX IF NOT EXISTS ix_regla_distancia_tipo_zona
     ON territorio.regla_distancia (tipo_zona);

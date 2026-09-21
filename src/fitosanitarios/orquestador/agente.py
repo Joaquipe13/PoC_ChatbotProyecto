@@ -25,10 +25,12 @@ from fitosanitarios.dominio.modelos import RespuestaAgente
 from fitosanitarios.orquestador.prompt_sistema import PROMPT_SISTEMA
 from fitosanitarios.tools.agendar_aplicacion import agendar_aplicacion
 from fitosanitarios.tools.consultar_agenda import consultar_agenda
+from fitosanitarios.tools.consultar_articulo import consultar_articulo
 from fitosanitarios.tools.consultar_productos import consultar_productos
 from fitosanitarios.tools.evaluar_riesgo import evaluar_riesgo
 from fitosanitarios.tools.evaluar_viabilidad_legal import evaluar_viabilidad_legal
 from fitosanitarios.tools.leer_receta import crear_tool_leer_receta_ligada, leer_receta
+from fitosanitarios.tools.listar_limitaciones import listar_limitaciones
 from fitosanitarios.tools.registrar_evento import registrar_evento
 from fitosanitarios.tools.resolver_vehiculo import resolver_vehiculo
 from fitosanitarios.tools.responder_consulta_normativa import responder_consulta_normativa
@@ -43,6 +45,8 @@ TOOLS = [
     evaluar_riesgo,
     evaluar_viabilidad_legal,
     responder_consulta_normativa,
+    consultar_articulo,
+    listar_limitaciones,
     # Fase 9 (extensiones):
     resolver_vehiculo,
     registrar_evento,

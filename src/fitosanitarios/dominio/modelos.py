@@ -176,6 +176,10 @@ class RespuestaAgente(BaseModel):  # response_format del agente
         # Seguimiento del dictamen: banda de cada producto y agendado.
         "detalle_bandas",
         "agendar_aplicacion",
+        # Consultas de normativa sin LLM en el texto: artículo por número y
+        # limitaciones de una localidad.
+        "consulta_articulo",
+        "limitaciones",
     ]
     intro: str | None = None  # máximo una línea
     faltantes: list[CampoFaltante] = Field(default_factory=list)  # solo si repregunta sin tools

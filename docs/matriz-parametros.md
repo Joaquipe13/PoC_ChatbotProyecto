@@ -99,6 +99,36 @@ class ConsultarProductosArgs(BaseModel):
 |---|---|---|
 | al menos uno: cultivo, adversidad o principio activo | aptitud, banda máxima | pedir cultivo o plaga |
 
+## `consultar_articulo`
+
+```python
+class ConsultarArticuloArgs(BaseModel):
+    numero_articulo: str        # "33", "art. 33", "5 bis"
+    norma: str | None = None    # "ley 11273", "ordenanza 841/2010" (como lo nombró el usuario)
+    localidad: str | None = None
+    provincia: str | None = None  # solo si la localidad no está cargada
+```
+
+| Requeridos | Opcionales | Si falta |
+|---|---|---|
+| número de artículo | norma, localidad | número: pregunta cuál. Norma (el número está en varias): lista de las normas que lo tienen. Localidad: se busca solo en la normativa provincial y nacional y se avisa |
+
+## `listar_limitaciones`
+
+```python
+class ListarLimitacionesArgs(BaseModel):
+    localidad: str | None = None
+    provincia: str | None = None  # solo si la localidad no está cargada
+    tipo_aplicacion: str | None = None  # "terrestre" | "aerea" (se entiende "con avión", "mosquito")
+    banda: str | None = None            # Ia/Ib/II/III/IV o roja/amarilla/azul/verde
+    tipo_zona: str | None = None        # "escuela", "zona urbana", "curso de agua"
+    distancia_m: float | None = None    # qué está prohibido a esa distancia y qué excepciones hay
+```
+
+| Requeridos | Opcionales | Si falta |
+|---|---|---|
+| localidad | tipo de aplicación, banda, tipo de zona, distancia | localidad: pregunta cuál (lista de las cargadas). Un filtro que no se entiende se ignora y se avisa |
+
 ## Notas de implementación (Fases 4-6)
 
 - Todos los `Args` heredan de `pydantic.BaseModel`; el orquestador (Fase 7) valida contra este schema antes de invocar la tool, nunca completa un campo por suposición.

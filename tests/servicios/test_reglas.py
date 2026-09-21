@@ -1,4 +1,8 @@
-from fitosanitarios.servicios.reglas import ReglaCandidata, evaluar_distancia_zona
+from fitosanitarios.servicios.reglas import (
+    ReglaCandidata,
+    evaluar_distancia_zona,
+    excepciones_aplicables,
+)
 
 
 def _regla_san_carlos_escuela() -> ReglaCandidata:
@@ -114,3 +118,66 @@ def test_observaciones_de_las_reglas_se_propagan_como_advertencias():
     )
     chequeo = evaluar_distancia_zona("escuela", "X", 250, [regla_con_aviso], "aerea", "IV")
     assert chequeo.advertencias == ["Aviso previo a la direccion de la escuela"]
+
+
+# --- Prohibiciones (N) y reglas condicionales (S) ---
+
+
+def _clase_b_aerea_ley_11273() -> list[ReglaCandidata]:
+    """Ley 11.273 art. 33 / decreto art. 51: clase B (II) aérea, prohibida hasta 3.000 m;
+    entre 500 y 3.000 m hay una excepción condicional."""
+    return [
+        ReglaCandidata(
+            tipo_zona="zona_urbana", tipo_aplicacion="aerea", bandas=["II"],
+            distancia_min_m=3000, norma="ley-11273-1995", articulo="33",
+            jurisdiccion_id=None,
+        ),
+        ReglaCandidata(
+            tipo_zona="zona_urbana", tipo_aplicacion="aerea", bandas=["II"],
+            distancia_min_m=500, norma="ley-055297-2017", articulo="51",
+            jurisdiccion_id=None, permitido=True,
+            condiciones="ordenanza municipal; terreno que impida equipos terrestres",
+        ),
+    ]
+
+
+def test_la_regla_condicional_no_bloquea_ni_entra_en_el_dictamen():
+    # A 1.000 m manda la prohibición N (3.000 m); la S (500 m) no la ablanda.
+    chequeo = evaluar_distancia_zona(
+        zona_tipo="zona_urbana", zona_nombre="Casco urbano", distancia_real_m=1000.0,
+        reglas=_clase_b_aerea_ley_11273(), tipo_aplicacion="aerea", banda="II",
+    )
+    assert chequeo.cumple is False
+    assert chequeo.distancia_min_aplicable_m == 3000
+    assert [c.articulo for c in chequeo.citas] == ["33"]  # la S no se cita como límite
+
+
+def test_solo_una_regla_condicional_no_alcanza_para_un_dictamen():
+    solo_condicional = [r for r in _clase_b_aerea_ley_11273() if r.permitido]
+    chequeo = evaluar_distancia_zona(
+        zona_tipo="zona_urbana", zona_nombre="Casco urbano", distancia_real_m=10.0,
+        reglas=solo_condicional, tipo_aplicacion="aerea", banda="II",
+    )
+    assert chequeo is None
+
+
+def test_a_una_distancia_menor_que_la_restriccion_se_ofrecen_las_condiciones():
+    opciones = excepciones_aplicables(
+        _clase_b_aerea_ley_11273(), "zona_urbana", "aerea", "II", distancia_real_m=1000.0
+    )
+    assert [o.articulo for o in opciones] == ["51"]
+    assert "ordenanza" in opciones[0].condiciones
+
+
+def test_por_debajo_de_la_distancia_minima_de_la_condicional_no_hay_opciones():
+    opciones = excepciones_aplicables(
+        _clase_b_aerea_ley_11273(), "zona_urbana", "aerea", "II", distancia_real_m=300.0
+    )
+    assert opciones == []
+
+
+def test_las_opciones_respetan_banda_y_tipo_de_aplicacion():
+    reglas = _clase_b_aerea_ley_11273()
+    assert excepciones_aplicables(reglas, "zona_urbana", "aerea", "Ia", 1000.0) == []
+    assert excepciones_aplicables(reglas, "zona_urbana", "terrestre", "II", 1000.0) == []
+    assert excepciones_aplicables(reglas, "escuela", "aerea", "II", 1000.0) == []

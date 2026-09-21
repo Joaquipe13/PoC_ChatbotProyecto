@@ -67,19 +67,28 @@ def test_validar_insumos_sobre_fixtures_completas_sin_errores():
 # --- F1: falta algún archivo requerido ---
 
 
-def test_sin_reglas_csv_la_localidad_es_valida_y_avisa_que_se_leera_del_pdf(tmp_path):
-    carpeta = tmp_path / "localidad-incompleta"
-    carpeta.mkdir()
+def test_sin_filas_en_reglas_csv_la_localidad_es_valida_y_avisa_que_se_leera_del_pdf(tmp_path):
+    carpeta = tmp_path / "santa-fe" / "localidad-incompleta"
+    carpeta.mkdir(parents=True)
     propiedades = {"tipo": "limite", "nombre": "X", "provincia": "santa-fe"}
     _escribir_geojson(carpeta / "localidad.geojson", [
         {"type": "Feature", "properties": propiedades, "geometry": LIMITE_VALIDO},
     ])
     _pdf_con_texto(carpeta / "ordenanza-1-2020.pdf")
+    _pdf_con_texto(carpeta.parent / "ley-100-2010.pdf")
     # sin reglas.csv: las distancias se extraen del texto del PDF al cargar
 
-    resultado = validar_carpeta_localidad(carpeta)
+    resultado = validar_insumos(tmp_path)["santa-fe/localidad-incompleta"]
     assert resultado.es_valido
     assert any(a.codigo == "A4" for a in resultado.advertencias)
+
+
+def test_la_normativa_nacional_no_avisa_que_se_leera_del_pdf(tmp_path):
+    nacional = tmp_path / "normativa-general" / "nacional"
+    nacional.mkdir(parents=True)
+    _pdf_con_texto(nacional / "ley-27302-2016.pdf")
+    resultado = validar_insumos(tmp_path)["normativa-general/nacional"]
+    assert resultado.es_valido and resultado.advertencias == []
 
 
 # --- F2: no hay exactamente un límite ---
@@ -162,15 +171,59 @@ def test_f4_fuera_de_argentina(tmp_path):
 # --- F5: regla cita una norma que no está en la carpeta ---
 
 
-def test_f5_regla_cita_norma_inexistente(tmp_path):
-    csv_path = tmp_path / "reglas.csv"
-    csv_path.write_text(
-        "tipo_zona,tipo_aplicacion,bandas,distancia_min_m,norma,articulo,observaciones\n"
-        "escuela,terrestre,todas,100,ordenanza-que-no-existe-2020,8,\n",
-        encoding="utf-8",
+PROVINCIAL = ("provincial", "santa-fe")
+
+
+def _csv(tmp_path: Path, *filas: str) -> Path:
+    ruta = tmp_path / "reglas.csv"
+    encabezado = (
+        "provincia,jurisdiccion,tipo_zona,tipo_aplicacion,banda_toxicologica,distancia_min_m,"
+        "permitido,condiciones,norma,articulo,observaciones"
     )
-    resultado = validar_reglas_csv(csv_path, pdfs_disponibles={"ordenanza-1-2020"})
-    assert any(e.codigo == "F5" for e in resultado.errores)
+    ruta.write_text(encabezado + "\n" + "\n".join(filas) + "\n", encoding="utf-8")
+    return ruta
+
+
+def test_f5_regla_cita_norma_inexistente(tmp_path):
+    ruta = _csv(
+        tmp_path, ",santa-fe,escuela,terrestre,todas,100,N,,ordenanza-que-no-existe-2020,8,"
+    )
+    resultados = validar_reglas_csv(ruta, {PROVINCIAL: {"ley-1-2000"}})
+    assert any(e.codigo == "F5" for e in resultados[PROVINCIAL].errores)
+
+
+def test_f5_una_norma_de_otra_carpeta_no_vale(tmp_path):
+    # La misma norma existe, pero en otra jurisdiccion: no es la que corresponde.
+    ruta = _csv(tmp_path, ",santa-fe,escuela,terrestre,todas,100,N,,ordenanza-1-2020,8,")
+    pdfs = {PROVINCIAL: {"ley-1-2000"}, ("municipal", "santa-fe", "pueblo-a"): {"ordenanza-1-2020"}}
+    resultados = validar_reglas_csv(ruta, pdfs)
+    assert any(e.codigo == "F5" for e in resultados[PROVINCIAL].errores)
+
+
+def test_f8_fila_con_formato_invalido_no_se_atribuye_a_una_carpeta(tmp_path):
+    ruta = _csv(tmp_path, ",santa-fe,escuela,terrestre,todas,100,QUIZAS,,ley-1-2000,8,")
+    resultados = validar_reglas_csv(ruta, {PROVINCIAL: {"ley-1-2000"}})
+    assert any(e.codigo == "F8" and "permitido" in e.mensaje for e in resultados[None].errores)
+
+
+def test_f8_encabezado_incompleto(tmp_path):
+    ruta = tmp_path / "reglas.csv"
+    ruta.write_text("tipo_zona,tipo_aplicacion,bandas,distancia_min_m,norma,articulo,observaciones\n",
+                    encoding="utf-8")
+    resultados = validar_reglas_csv(ruta, {PROVINCIAL: {"ley-1-2000"}})
+    errores = resultados[None].errores
+    assert any(e.codigo == "F8" and "faltan las columnas" in e.mensaje for e in errores)
+
+
+def test_f9_jurisdiccion_sin_carpeta(tmp_path):
+    ruta = _csv(tmp_path, "santa-fe,pueblo-fantasma,escuela,terrestre,todas,100,N,,ley-1-2000,8,")
+    resultados = validar_reglas_csv(ruta, {PROVINCIAL: {"ley-1-2000"}})
+    assert any(e.codigo == "F9" for e in resultados[None].errores)
+
+
+def test_una_regla_nacional_se_valida_contra_la_carpeta_nacional(tmp_path):
+    ruta = _csv(tmp_path, ",ARGENTINA,zona_urbana,todas,todas,10,N,,ley-27302-2016,1,")
+    assert validar_reglas_csv(ruta, {("nacional",): {"ley-27302-2016"}}) == {}
 
 
 # --- F6: nombre de archivo/carpeta no respeta la convención ---
@@ -245,9 +298,10 @@ def _armar_provincia(base: Path, provincia: str, provincia_del_limite: str) -> P
          "geometry": LIMITE_VALIDO},
     ])
     _pdf_con_texto(localidad / "ordenanza-1-2020.pdf")
-    (localidad / "reglas.csv").write_text(
-        "tipo_zona,tipo_aplicacion,bandas,distancia_min_m,norma,articulo,observaciones\n"
-        "escuela,terrestre,todas,100,ordenanza-1-2020,1,\n",
+    (base / "reglas.csv").write_text(
+        "provincia,jurisdiccion,tipo_zona,tipo_aplicacion,banda_toxicologica,distancia_min_m,"
+        "permitido,condiciones,norma,articulo,observaciones\n"
+        f"{provincia},pueblo-a,escuela,terrestre,todas,100,N,,ordenanza-1-2020,1,\n",
         encoding="utf-8",
     )
     return localidad

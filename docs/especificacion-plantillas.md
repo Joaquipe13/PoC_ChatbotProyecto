@@ -73,6 +73,58 @@ Es lo que figura en el registro; qué aplicar lo define la receta del ingeniero 
 - Ordenanza 914/2018, art. 8 (San Carlos Centro)
 ```
 
+## `consulta_articulo`
+
+**Cuándo:** resultado de `consultar_articulo` ("¿qué dice el artículo 33?").
+
+**Campos que usa:** artifact `ResultadoTool.datos` (`norma_legible`, `numero`, `jurisdiccion_id`, `partes`). El texto del artículo va **literal** (sin pasar por el LLM), con las líneas cortadas del PDF ya unidas y un renglón por inciso. No lleva la intro del LLM ni sección *Fuentes*: el encabezado ya cita norma, artículo y jurisdicción. Si el PDF trae más de un texto con el mismo número, se muestran todos ("texto 1 de 2"). Una norma con un artículo de más de 4096 caracteres se parte por oraciones en varios mensajes. Con el número en varias normas la tool repregunta cuál (lista); sin el número o sin encontrarlo, `repregunta` / `no_resuelto`.
+
+```
+*Ley 055297/2017, art. 51 (santa-fe)*
+Las excepciones a que refiere el Artículo 33 de la Ley Nº 11.273 podrán establecerse por ordenanza únicamente en los siguientes casos:
+a) La aplicación aérea de productos fitosanitarios de clases toxicológicas C y D podrá realizarse dentro del radio de los quinientos ( 500 ) metros cuando resulte imposible.
+b) La aplicación aérea de clase B solo podrá efectuarse dentro del sector comprendido entre los 500 y los 3.000 metros.
+
+⚠️ Busqué en la normativa provincial y nacional. Si es de una ordenanza, decime la localidad
+```
+
+## `limitaciones`
+
+**Cuándo:** resultado de `listar_limitaciones` ("¿qué limitaciones hay en El Trébol?", "¿puedo aplicar a 1000 m bajo alguna condición?").
+
+**Campos que usa:** artifact `ResultadoTool.datos`, armado con las reglas de `reglas.csv` (no por similitud): `prohibiciones` (`N`), `condicionales` (`S`) y, si se dio una distancia, `restricciones` (cada prohibición que alcanza esa distancia con las excepciones que permitirían aplicar). Una excepción de una norma más general no se ofrece contra la prohibición de una norma más local (la excepción de la ley provincial "por ordenanza" no levanta la prohibición de la ordenanza). Las reglas leídas del PDF llevan un aviso de verificación.
+
+Sin distancia:
+
+```
+*Limitaciones en Rosario*
+
+⚠️ No se cuenta con la normativa municipal de Rosario: las limitaciones son las de la normativa provincial
+
+*Aplicación aérea*
+- Zona urbana · banda II: a menos de 3000 m no se puede aplicar (Ley 11273/1995, art. 33)
+
+*Aplicación terrestre*
+- Zona urbana · bandas Ia, Ib, II: a menos de 500 m no se puede aplicar (Ley 11273/1995, art. 34)
+
+*Excepciones*
+- Zona urbana · aérea · banda II: se puede aplicar desde 500 m, si: <condiciones> (Ley 055297/2017, art. 51)
+
+*Fuentes*
+- Ley 11273/1995, art. 33 (santa-fe)
+...
+```
+
+Con distancia (`distancia_m`):
+
+```
+*A 1000 m en Rosario*
+
+- Zona urbana · aérea · banda II: a menos de 3000 m no se puede aplicar (Ley 11273/1995, art. 33)
+  *Excepciones posibles:*
+  - Zona urbana · aérea · banda II: se puede aplicar desde 500 m, si: <condiciones> (Ley 055297/2017, art. 51)
+```
+
 ## `repregunta`
 
 **Cuándo:** faltan parámetros requeridos (con o sin tool ejecutada — si no se ejecutó ninguna tool, `RespuestaAgente.faltantes` viene poblado directamente).
@@ -120,7 +172,7 @@ Solo puedo ayudarte con recetas de fitosanitarios: leer y validar recetas, verif
 Hola 👋 Soy el asistente de recetas fitosanitarias. Puedo:
 - Leer una foto de tu receta y decirte si es apta para aplicar.
 - Buscar si un producto está registrado en SENASA.
-- Responder dudas sobre la normativa de aplicación de tu localidad.
+- Responder dudas sobre la normativa de aplicación de tu localidad, mostrarte el texto de un artículo o decirte qué limitaciones tiene.
 Mandame una foto de receta o contame qué necesitás.
 ```
 

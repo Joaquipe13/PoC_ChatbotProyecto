@@ -15,6 +15,7 @@ import re
 
 from fitosanitarios.dominio.modelos import Cita, RespuestaAgente, ResultadoTool
 from fitosanitarios.dominio.motivos import DESCRIPCION_MOTIVO, MotivoNoResuelto
+from fitosanitarios.servicios.normas import norma_legible as _norma_legible
 
 LIMITE_CARACTERES_WHATSAPP = 4096
 
@@ -36,15 +37,6 @@ def _num(valor) -> str:
     if isinstance(valor, int) or (isinstance(valor, float) and float(valor).is_integer()):
         return str(int(valor))
     return f"{valor}".replace(".", ",")
-
-
-def _norma_legible(norma: str) -> str:
-    """"ordenanza-841-2010" (nombre del PDF) -> "Ordenanza 841/2010"."""
-    m = re.fullmatch(r"(ordenanza|decreto|resolucion|ley)-(\w+)-(\d{4})", norma)
-    if not m:
-        return norma
-    tipo = "Resolución" if m[1] == "resolucion" else m[1].capitalize()
-    return f"{tipo} {m[2]}/{m[3]}"
 
 
 def _cita_norma(cita: Cita) -> str:
@@ -188,8 +180,8 @@ def _bloque_condiciones(condiciones: dict | None) -> str:
             zona = _NOMBRE_ZONA.get(d["tipo_zona"], d["tipo_zona"])
             fuente = _cita_norma(Cita.model_validate(d["norma_limitante"]))
             lineas.append(
-                f"⚠️ La distancia a {zona} se leyó del texto de {fuente} (la norma no "
-                "tiene reglas.csv): verificala con la norma."
+                f"⚠️ La distancia a {zona} se leyó del texto de {fuente} (no hay reglas "
+                "cargadas a mano para esa jurisdicción): verificala con la norma."
             )
         lineas.extend(f"⚠️ {a}" for a in d.get("advertencias", []))
     lineas.extend(f"⚠️ {a}" for a in condiciones.get("advertencias", []))
@@ -431,6 +423,135 @@ def _plantilla_consulta_normativa(
     )
 
 
+# --- consulta_articulo ---
+
+
+def _plantilla_consulta_articulo(
+    respuesta: RespuestaAgente, resultados: list[ResultadoTool]
+) -> str:
+    """El texto del artículo va literal (sin pasar por el LLM), con su norma y
+    jurisdicción en el encabezado."""
+    datos = _primer_dato(resultados) or {}
+    partes = datos.get("partes", [])
+    encabezado = f"{datos.get('norma_legible', 'Norma')}, art. {datos.get('numero', '')}"
+    if datos.get("jurisdiccion_id"):
+        encabezado += f" ({datos['jurisdiccion_id']})"
+    bloques = []
+    for i, parte in enumerate(partes, start=1):
+        titulo = encabezado + (f" — texto {i} de {len(partes)}" if len(partes) > 1 else "")
+        bloques.append(f"*{titulo}*\n{parte['texto']}")
+    avisos = "\n".join(f"⚠️ {a}" for r in resultados for a in r.advertencias)
+    return _unir_secciones(*bloques, avisos)
+
+
+# --- limitaciones ---
+
+_ORDEN_APLICACION = ("aerea", "terrestre", "todas")
+_TITULO_APLICACION = {
+    "aerea": "*Aplicación aérea*", "terrestre": "*Aplicación terrestre*",
+    "todas": "*Cualquier tipo de aplicación*",
+}
+_NOMBRE_APLICACION = {"aerea": "aérea", "terrestre": "terrestre", "todas": "cualquier aplicación"}
+
+
+def _zona_legible(tipo_zona: str) -> str:
+    nombre = _NOMBRE_ZONA.get(tipo_zona, tipo_zona.replace("_", " "))
+    return nombre[0].upper() + nombre[1:]
+
+
+def _bandas_legibles(bandas: list[str]) -> str:
+    if bandas == ["todas"]:
+        return "todas las bandas"
+    return ("banda " if len(bandas) == 1 else "bandas ") + ", ".join(bandas)
+
+
+def _referencia(regla: dict) -> str:
+    return _cita_norma(
+        Cita(fuente="normativa", norma=regla.get("norma"), articulo=regla.get("articulo"))
+    )
+
+
+def _aviso_pdf(regla: dict) -> str:
+    return (
+        "  ⚠️ Distancia leída del texto de la norma: verificala con la norma."
+        if regla.get("extraida_de_pdf") else ""
+    )
+
+
+def _linea_prohibicion(r: dict, con_aplicacion: bool = False) -> list[str]:
+    detalle = [_zona_legible(r["tipo_zona"])]
+    if con_aplicacion:
+        detalle.append(_NOMBRE_APLICACION[r["tipo_aplicacion"]])
+    detalle.append(_bandas_legibles(r["bandas"]))
+    lineas = [
+        f"- {' · '.join(detalle)}: a menos de {_num(r['distancia_min_m'])} m no se puede "
+        f"aplicar ({_referencia(r)})"
+    ]
+    if r.get("observaciones"):
+        lineas.append(f"  ⚠️ {r['observaciones']}")
+    if _aviso_pdf(r):
+        lineas.append(_aviso_pdf(r))
+    return lineas
+
+
+def _linea_condicional(r: dict) -> list[str]:
+    detalle = " · ".join(
+        [_zona_legible(r["tipo_zona"]), _NOMBRE_APLICACION[r["tipo_aplicacion"]],
+         _bandas_legibles(r["bandas"])]
+    )
+    desde = f"desde {_num(r['distancia_min_m'])} m, " if r["distancia_min_m"] else ""
+    cond = r.get("condiciones") or "según la norma"
+    lineas = [f"- {detalle}: se puede aplicar {desde}si: {cond} ({_referencia(r)})"]
+    if r.get("observaciones"):
+        lineas.append(f"  ⚠️ {r['observaciones']}")
+    return lineas
+
+
+def _plantilla_limitaciones(respuesta: RespuestaAgente, resultados: list[ResultadoTool]) -> str:
+    datos = _primer_dato(resultados) or {}
+    aclaracion = "\n".join(
+        f"⚠️ {a}" for r in resultados for a in r.advertencias
+    )
+    fuentes = _seccion_fuentes(_todas_las_citas(resultados))
+
+    if datos.get("distancia_m") is not None:
+        titulo = f"*A {_num(datos['distancia_m'])} m en {datos['localidad']}*"
+        restricciones = datos.get("restricciones", [])
+        if not restricciones:
+            cuerpo = "A esa distancia no hay ninguna prohibición para lo consultado."
+        else:
+            lineas: list[str] = []
+            for x in restricciones:
+                lineas.extend(_linea_prohibicion(x["prohibicion"], con_aplicacion=True))
+                if x["excepciones"]:
+                    lineas.append("  *Excepciones posibles:*")
+                    for e in x["excepciones"]:
+                        lineas.extend(f"  {renglon}" for renglon in _linea_condicional(e))
+                else:
+                    lineas.append("  No hay excepciones cargadas para esa distancia.")
+            cuerpo = "\n".join(lineas)
+        return _unir_secciones(titulo, aclaracion, cuerpo, fuentes)
+
+    titulo = f"*Limitaciones en {datos.get('localidad', '')}*"
+    secciones = [titulo, aclaracion]
+    prohibiciones = datos.get("prohibiciones", [])
+    for aplicacion in _ORDEN_APLICACION:
+        reglas = [r for r in prohibiciones if r["tipo_aplicacion"] == aplicacion]
+        if reglas:
+            lineas = [_TITULO_APLICACION[aplicacion]]
+            for r in reglas:
+                lineas.extend(_linea_prohibicion(r))
+            secciones.append("\n".join(lineas))
+    condicionales = datos.get("condicionales", [])
+    if condicionales:
+        lineas = ["*Excepciones*"]
+        for r in condicionales:
+            lineas.extend(_linea_condicional(r))
+        secciones.append("\n".join(lineas))
+    secciones.append(fuentes)
+    return _unir_secciones(*secciones)
+
+
 # --- repregunta ---
 
 
@@ -552,7 +673,8 @@ def _plantilla_ayuda(respuesta: RespuestaAgente, resultados: list[ResultadoTool]
         "Hola 👋 Soy el asistente de recetas fitosanitarias. Puedo:\n"
         "- Leer una foto de tu receta y decirte si es apta para aplicar.\n"
         "- Buscar si un producto está registrado en SENASA.\n"
-        "- Responder dudas sobre la normativa de aplicación de tu localidad.\n"
+        "- Responder dudas sobre la normativa de aplicación de tu localidad, mostrarte el "
+        "texto de un artículo o decirte qué limitaciones tiene.\n"
         "- Registrar cuando empezás y terminás de aplicar.\n"
         "- Contarte tu agenda del día.\n"
         "Mandame una foto de receta o contame qué necesitás."
@@ -584,15 +706,52 @@ _PLANTILLAS = {
     "agenda": _plantilla_agenda,
     "detalle_bandas": _plantilla_detalle_bandas,
     "agendar_aplicacion": _plantilla_agendar_aplicacion,
+    "consulta_articulo": _plantilla_consulta_articulo,
+    "limitaciones": _plantilla_limitaciones,
 }
+
+
+def _partir_bloque_largo(bloque: str, limite: int) -> list[str]:
+    """Un bloque más largo que el límite (un artículo de ley, por ejemplo): se
+    parte por renglones, y si un renglón solo lo supera, por oraciones y en último
+    caso por palabras. Nunca corta a mitad de una palabra."""
+    unidades: list[str] = []
+    for renglon in bloque.split("\n"):
+        if len(renglon) <= limite:
+            unidades.append(renglon)
+            continue
+        for oracion in re.split(r"(?<=[.;:])\s+", renglon):
+            while len(oracion) > limite:
+                corte = oracion.rfind(" ", 0, limite)
+                corte = corte if corte > 0 else limite
+                unidades.append(oracion[:corte])
+                oracion = oracion[corte:].lstrip()
+            unidades.append(oracion)
+    partes: list[str] = []
+    actual = ""
+    for unidad in unidades:
+        candidato = f"{actual}\n{unidad}" if actual else unidad
+        if len(candidato) > limite and actual:
+            partes.append(actual)
+            actual = unidad
+        else:
+            actual = candidato
+    if actual:
+        partes.append(actual)
+    return partes
 
 
 def partir_por_seccion(texto: str, limite: int = LIMITE_CARACTERES_WHATSAPP) -> list[str]:
     """Parte un mensaje largo por sección (separadas por línea en blanco),
-    nunca a mitad de una lista (ver skill, "Formato de respuestas")."""
+    nunca a mitad de una lista (ver skill, "Formato de respuestas"). Una sola
+    sección que supera el límite se parte aparte (`_partir_bloque_largo`)."""
     if len(texto) <= limite:
         return [texto]
-    secciones = texto.split("\n\n")
+    secciones = [
+        parte
+        for seccion in texto.split("\n\n")
+        for parte in (_partir_bloque_largo(seccion, limite) if len(seccion) > limite else [seccion])
+    ]
     mensajes: list[str] = []
     actual = ""
     for seccion in secciones:
@@ -617,7 +776,7 @@ def formatear_respuesta(respuesta: RespuestaAgente, resultados: list[ResultadoTo
     # una intro del LLM ("¿querés ver las bandas?") la contradice. Si el tipo
     # se corrigió, la intro hablaba de otra cosa.
     sin_intro = ("fuera_de_dominio", "ayuda", "error", "consulta_producto",
-                 "dictamen", "detalle_bandas")
+                 "dictamen", "detalle_bandas", "consulta_articulo", "limitaciones")
     if respuesta.intro and tipo == respuesta.tipo and tipo not in sin_intro:
         texto = f"{respuesta.intro}\n\n{texto}"
     return partir_por_seccion(texto)
@@ -628,7 +787,9 @@ def _tipo_efectivo(tipo: str, resultados: list[ResultadoTool]) -> str:
     un dato, p. ej. la provincia) no hay dictamen ni bandas que mostrar: se
     responde lo que la tool devolvió en vez de una plantilla vacía (bug real:
     `tipo="dictamen"` tras un `faltan_datos` salía como una sola frase)."""
-    if tipo not in ("dictamen", "detalle_bandas") or any(r.datos for r in resultados):
+    if tipo not in ("dictamen", "detalle_bandas", "consulta_articulo", "limitaciones") or any(
+        r.datos for r in resultados
+    ):
         return tipo
     for r in resultados:
         if r.estado == "faltan_datos":

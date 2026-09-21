@@ -119,6 +119,8 @@ erDiagram
         text tipo_aplicacion
         text_array bandas
         numeric distancia_min_m
+        boolean permitido "false = prohibicion (N); true = condicional (S)"
+        text condiciones
     }
 
     RECETA {
@@ -227,14 +229,16 @@ WHERE zp.bbox_min_lon <= :lon + :radio_grados AND zp.bbox_max_lon >= :lon - :rad
   AND zp.bbox_min_lat <= :lat + :radio_grados AND zp.bbox_max_lat >= :lat - :radio_grados;
 
 -- 3) Reglas candidatas: de la localidad del lote, su provincia y las nacionales
+-- (:permitido = false para el dictamen y el agendado; true trae las condicionales, para consultas)
 SELECT rd.tipo_zona, rd.tipo_aplicacion, rd.bandas, rd.distancia_min_m, rd.observaciones,
-       n.ambito, n.archivo AS norma, a.numero AS articulo
+       rd.permitido, rd.condiciones, n.ambito, n.archivo AS norma, a.numero AS articulo
 FROM territorio.regla_distancia rd
 JOIN territorio.norma n ON n.id = rd.norma_id
 LEFT JOIN territorio.articulo a ON a.id = rd.articulo_id
-WHERE (n.ambito = 'municipal' AND n.localidad_id = :localidad_id)
-   OR (n.ambito = 'provincial' AND n.provincia_id = :provincia_id)
-   OR (n.ambito = 'nacional');
+WHERE rd.permitido = :permitido
+  AND ((n.ambito = 'municipal' AND n.localidad_id = :localidad_id)
+    OR (n.ambito = 'provincial' AND n.provincia_id = :provincia_id)
+    OR (n.ambito = 'nacional'));
 ```
 
 `:radio_grados` es una conversión aproximada de `RADIO_BUSQUEDA_ZONAS_M` a grados (varía con la latitud); solo sirve de prefiltro amplio, nunca para decidir la distancia final. Sin resultados en la consulta 1 → `JURISDICCION_NO_CUBIERTA`. Consulta 3 vacía para el tipo de zona/aplicación del caso → `SIN_REGLA_APLICABLE`.

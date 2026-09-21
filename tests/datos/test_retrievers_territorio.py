@@ -71,9 +71,25 @@ def test_reglas_candidatas_no_mezcla_reglas_de_otra_localidad(conexion):
 
 def test_reglas_candidatas_sin_localidad_ni_provincia_solo_trae_nacionales(conexion):
     reglas = reglas_candidatas(conexion, localidad_id=None, provincia_id=None)
-    # ley-27302-2016 (nacional) no tiene reglas.csv (ver Fase 3), así que la
+    # ley-27302-2016 (nacional) no tiene filas en reglas.csv (ver Fase 3), así que la
     # lista puede quedar vacía; lo que sí hay que garantizar es que no
     # aparezca nada de san-carlos-centro ni colonia-vecina.
     normas = {r.norma for r in reglas}
     assert "ordenanza-914-2018" not in normas
     assert "ordenanza-45-2019" not in normas
+
+
+def test_reglas_candidatas_solo_trae_prohibiciones_salvo_que_se_pidan_las_condicionales(conexion):
+    with conexion.cursor() as cur:
+        cur.execute(
+            "SELECT id, provincia_id FROM territorio.localidad WHERE jurisdiccion_id = %s",
+            ("san-carlos-centro",),
+        )
+        localidad_id, provincia_id = cur.fetchone()
+
+    prohibiciones = reglas_candidatas(conexion, localidad_id, provincia_id)
+    assert prohibiciones and not any(r.permitido for r in prohibiciones)
+
+    condicionales = reglas_candidatas(conexion, localidad_id, provincia_id, permitido=True)
+    assert condicionales and all(r.permitido for r in condicionales)
+    assert all(r.condiciones for r in condicionales)

@@ -1,0 +1,7 @@
+provincia,jurisdiccion,tipo_zona,tipo_aplicacion,banda_toxicologica,distancia_min_m,permitido,condiciones,norma,articulo,observaciones
+santa-fe,san-carlos-centro,escuela,terrestre,todas,100,N,,ordenanza-914-2018,8,
+santa-fe,san-carlos-centro,escuela,aerea,todas,200,N,,ordenanza-914-2018,9,Aviso previo a la direccion de la escuela
+santa-fe,san-carlos-centro,curso_agua,todas,todas,50,N,,ordenanza-914-2018,10,
+santa-fe,colonia-vecina,escuela,terrestre,todas,150,N,,ordenanza-45-2019,5,
+,santa-fe,zona_urbana,todas,todas,300,N,,ley-13740-2017,2,
+,santa-fe,zona_urbana,aerea,II,100,S,"con autorizacion del municipio",ley-13740-2017,2,

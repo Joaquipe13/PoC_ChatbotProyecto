@@ -75,24 +75,31 @@ def zonas_protegidas_en_radio(
 
 
 def reglas_candidatas(
-    conn: psycopg.Connection, localidad_id: int | None, provincia_id: int | None
+    conn: psycopg.Connection,
+    localidad_id: int | None,
+    provincia_id: int | None,
+    permitido: bool = False,
 ) -> list[ReglaCandidata]:
     """Reglas de la localidad del lote + provinciales de su provincia +
-    nacionales (ver skill, "Geo": reglas candidatas)."""
+    nacionales (ver skill, "Geo": reglas candidatas). Por defecto solo las
+    prohibiciones (`permitido=False`, las del dictamen); `permitido=True` trae las
+    condicionales, para consultas."""
     with conn.cursor() as cur:
         cur.execute(
             """
             SELECT rd.tipo_zona, rd.tipo_aplicacion, rd.bandas, rd.distancia_min_m,
-                   n.archivo, a.numero, l.jurisdiccion_id, rd.observaciones, rd.fuente
+                   n.archivo, a.numero, l.jurisdiccion_id, rd.observaciones, rd.fuente,
+                   rd.permitido, rd.condiciones
             FROM territorio.regla_distancia rd
             JOIN territorio.norma n ON n.id = rd.norma_id
             LEFT JOIN territorio.articulo a ON a.id = rd.articulo_id
             LEFT JOIN territorio.localidad l ON l.id = n.localidad_id
-            WHERE (n.ambito = 'municipal' AND n.localidad_id = %(localidad_id)s)
-               OR (n.ambito = 'provincial' AND n.provincia_id = %(provincia_id)s)
-               OR (n.ambito = 'nacional')
+            WHERE rd.permitido = %(permitido)s
+              AND ((n.ambito = 'municipal' AND n.localidad_id = %(localidad_id)s)
+                OR (n.ambito = 'provincial' AND n.provincia_id = %(provincia_id)s)
+                OR (n.ambito = 'nacional'))
             """,
-            {"localidad_id": localidad_id, "provincia_id": provincia_id},
+            {"localidad_id": localidad_id, "provincia_id": provincia_id, "permitido": permitido},
         )
         filas = cur.fetchall()
     return [
@@ -100,6 +107,7 @@ def reglas_candidatas(
             tipo_zona=f[0], tipo_aplicacion=f[1], bandas=list(f[2]),
             distancia_min_m=float(f[3]), norma=f[4], articulo=f[5],
             jurisdiccion_id=f[6], observaciones=f[7], fuente=f[8],
+            permitido=f[9], condiciones=f[10],
         )
         for f in filas
     ]
@@ -215,6 +223,61 @@ def articulos_por_similitud(
                 "emb": embedding, "localidad_id": localidad_id,
                 "provincia_id": provincia_id, "top_k": top_k,
             },
+        )
+        columnas = [d.name for d in cur.description]
+        return [dict(zip(columnas, fila, strict=True)) for fila in cur.fetchall()]
+
+
+_ALCANCE_NORMAS = """
+    ((n.ambito = 'municipal' AND n.localidad_id = %(localidad_id)s)
+  OR (n.ambito = 'provincial' AND n.provincia_id = %(provincia_id)s)
+  OR (n.ambito = 'nacional'))
+"""
+
+
+def articulos_por_numero(
+    conn: psycopg.Connection, numero: str, localidad_id: int | None, provincia_id: int | None
+) -> list[dict]:
+    """Los artículos con ese número en la normativa que corresponde (municipal de
+    la localidad + provincial + nacional). Búsqueda exacta, no por similitud: un
+    mismo número puede estar en varias normas y hasta repetirse dentro de una (el
+    PDF trae anexos con numeración propia), así que devuelve todos, en el orden en
+    que se cargaron."""
+    with conn.cursor() as cur:
+        cur.execute(
+            f"""
+            SELECT a.id, a.numero, a.texto, a.pagina, a.requiere_revision, n.archivo, n.ambito,
+                   COALESCE(l.jurisdiccion_id, pr.nombre, 'nacional') AS jurisdiccion_id
+            FROM territorio.articulo a
+            JOIN territorio.norma n ON n.id = a.norma_id
+            LEFT JOIN territorio.localidad l ON l.id = n.localidad_id
+            LEFT JOIN territorio.provincia pr ON pr.id = n.provincia_id
+            WHERE lower(a.numero) = lower(%(numero)s) AND {_ALCANCE_NORMAS}
+            ORDER BY n.id, a.id
+            """,
+            {"numero": numero, "localidad_id": localidad_id, "provincia_id": provincia_id},
+        )
+        columnas = [d.name for d in cur.description]
+        return [dict(zip(columnas, fila, strict=True)) for fila in cur.fetchall()]
+
+
+def normas_de_alcance(
+    conn: psycopg.Connection, localidad_id: int | None, provincia_id: int | None
+) -> list[dict]:
+    """Las normas cargadas que corresponden a esa localidad y provincia, más las
+    nacionales: `archivo`, `ambito` y `jurisdiccion_id`."""
+    with conn.cursor() as cur:
+        cur.execute(
+            f"""
+            SELECT n.archivo, n.ambito,
+                   COALESCE(l.jurisdiccion_id, pr.nombre, 'nacional') AS jurisdiccion_id
+            FROM territorio.norma n
+            LEFT JOIN territorio.localidad l ON l.id = n.localidad_id
+            LEFT JOIN territorio.provincia pr ON pr.id = n.provincia_id
+            WHERE {_ALCANCE_NORMAS}
+            ORDER BY n.id
+            """,
+            {"localidad_id": localidad_id, "provincia_id": provincia_id},
         )
         columnas = [d.name for d in cur.description]
         return [dict(zip(columnas, fila, strict=True)) for fila in cur.fetchall()]

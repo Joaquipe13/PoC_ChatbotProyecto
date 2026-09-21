@@ -23,6 +23,8 @@ class MotivoNoResuelto(StrEnum):
     # mismo patrón, ver DECISIONES.md.
     VEHICULO_NO_ENCONTRADO = "vehiculo_no_encontrado"
     SIN_EVENTO_EN_CURSO = "sin_evento_en_curso"
+    # Consulta de un artículo por número (`consultar_articulo`).
+    ARTICULO_NO_ENCONTRADO = "articulo_no_encontrado"
 
 
 DESCRIPCION_MOTIVO: dict[MotivoNoResuelto, str] = {
@@ -63,5 +65,8 @@ DESCRIPCION_MOTIVO: dict[MotivoNoResuelto, str] = {
     ),
     MotivoNoResuelto.SIN_EVENTO_EN_CURSO: (
         "Se pidió finalizar una aplicación pero no hay ninguna en curso para este operario."
+    ),
+    MotivoNoResuelto.ARTICULO_NO_ENCONTRADO: (
+        "No hay un artículo con ese número en la normativa cargada para esa consulta."
     ),
 }

@@ -2,7 +2,8 @@
 
 ```
 data/insumos/
-├── <provincia>/                 normativa provincial: PDFs y reglas.csv acá
+├── reglas.csv                   las reglas de distancia de todas las carpetas
+├── <provincia>/                 normativa provincial: PDFs
 │   └── <localidad>/             normativa municipal + localidad.geojson
 └── normativa-general/nacional/
 ```
@@ -45,3 +46,17 @@ def localidades(data_dir: Path) -> list[tuple[Path, Path]]:
 
 def carpeta_nacional(data_dir: Path) -> Path:
     return data_dir / CARPETA_GENERAL / "nacional"
+
+
+def alcance_de_carpeta(data_dir: Path, carpeta: Path) -> tuple[str, ...]:
+    """A qué jurisdicción pertenece una carpeta, con la misma forma que
+    `FilaRegla.alcance` (`insumos/reglas_csv.py`): `("nacional",)`,
+    `("provincial", provincia)` o `("municipal", provincia, localidad)`."""
+    partes = carpeta.relative_to(data_dir).parts
+    if partes == (CARPETA_GENERAL, "nacional"):
+        return ("nacional",)
+    if len(partes) == 1:
+        return ("provincial", partes[0])
+    if len(partes) == 2:
+        return ("municipal", partes[0], partes[1])
+    raise ValueError(f"{carpeta} no es una carpeta de insumos")

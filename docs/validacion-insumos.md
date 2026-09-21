@@ -6,10 +6,11 @@ Reporte de la primera carga real del pipeline de insumos (Fase 3). **No hay insu
 
 ## Insumos usados (sintéticos)
 
-- `santa-fe/san-carlos-centro/`: límite, 3 zonas protegidas (escuela, curso de agua, zona urbana), `ordenanza-914-2018.pdf` (3 artículos), `reglas.csv` (3 filas). Mismos nombres que usan los ejemplos de referencia de la skill (Ordenanza 914/2018, art. 8, escuela a distancia mínima de 100 m) para tener continuidad con esos casos en fases futuras.
-- `santa-fe/colonia-vecina/`: límite, 1 zona protegida (escuela), `ordenanza-45-2019.pdf` (1 artículo), `reglas.csv` (1 fila). Localidad limítrofe, para tener un segundo caso y poder probar más adelante (Fase 5) el filtro por jurisdicción y las zonas de localidades vecinas.
-- `santa-fe/` (normativa provincial, en la carpeta de la provincia): `ley-13740-2017.pdf` (3 artículos), `reglas.csv` (1 fila, regla de zona urbana sin localidad asociada).
-- `normativa-general/nacional/`: `ley-27302-2016.pdf` (2 artículos), **sin** `reglas.csv` — a propósito, para probar que el caso opcional no rompe la carga.
+- `santa-fe/san-carlos-centro/`: límite, 3 zonas protegidas (escuela, curso de agua, zona urbana), `ordenanza-914-2018.pdf` (3 artículos), 3 filas en `reglas.csv`. Mismos nombres que usan los ejemplos de referencia de la skill (Ordenanza 914/2018, art. 8, escuela a distancia mínima de 100 m) para tener continuidad con esos casos en fases futuras.
+- `santa-fe/colonia-vecina/`: límite, 1 zona protegida (escuela), `ordenanza-45-2019.pdf` (1 artículo), 1 fila en `reglas.csv`. Localidad limítrofe, para tener un segundo caso y poder probar más adelante (Fase 5) el filtro por jurisdicción y las zonas de localidades vecinas.
+- `santa-fe/` (normativa provincial, en la carpeta de la provincia): `ley-13740-2017.pdf` (3 artículos), 2 filas en `reglas.csv` (una prohibición N de zona urbana y una condicional S, sin localidad asociada).
+- `normativa-general/nacional/`: `ley-27302-2016.pdf` (2 artículos), sin filas en `reglas.csv` — a propósito: la normativa nacional es solo para consultas y no aporta reglas al dictamen.
+- `reglas.csv` (raíz de `data/insumos/`, uno solo para todas las jurisdicciones): 6 filas, 5 prohibiciones (N) y 1 condicional (S). Ver `docs/contrato-insumos.md`.
 
 Todo el contenido de estos PDFs es ficticio (generado para esta fixture), no transcribe normativa real.
 

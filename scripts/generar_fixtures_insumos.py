@@ -103,14 +103,6 @@ def main() -> None:
         ],
     )
 
-    (BASE / "santa-fe" / "san-carlos-centro" / "reglas.csv").write_text(
-        "tipo_zona,tipo_aplicacion,bandas,distancia_min_m,norma,articulo,observaciones\n"
-        "escuela,terrestre,todas,100,ordenanza-914-2018,8,\n"
-        "escuela,aerea,todas,200,ordenanza-914-2018,9,Aviso previo a la direccion de la escuela\n"
-        "curso_agua,todas,todas,50,ordenanza-914-2018,10,\n",
-        encoding="utf-8",
-    )
-
     # --- Colonia Vecina (Santa Fe), localidad limitrofe mas simple ---
 
     localidad_cv = {
@@ -150,12 +142,6 @@ def main() -> None:
         ],
     )
 
-    (BASE / "santa-fe" / "colonia-vecina" / "reglas.csv").write_text(
-        "tipo_zona,tipo_aplicacion,bandas,distancia_min_m,norma,articulo,observaciones\n"
-        "escuela,terrestre,todas,150,ordenanza-45-2019,5,\n",
-        encoding="utf-8",
-    )
-
     # --- Provincial: Santa Fe ---
 
     escribir_pdf(
@@ -173,13 +159,7 @@ def main() -> None:
         ],
     )
 
-    (BASE / "santa-fe" / "reglas.csv").write_text(
-        "tipo_zona,tipo_aplicacion,bandas,distancia_min_m,norma,articulo,observaciones\n"
-        "zona_urbana,todas,todas,300,ley-13740-2017,2,\n",
-        encoding="utf-8",
-    )
-
-    # --- Nacional (sin reglas.csv, para probar el caso opcional) ---
+    # --- Nacional (sin filas en reglas.csv: es solo para consultas) ---
 
     escribir_pdf(
         BASE / "normativa-general" / "nacional" / "ley-27302-2016.pdf",
@@ -190,6 +170,22 @@ def main() -> None:
             ("2", "Las provincias y municipios conservan la facultad de dictar normas "
                   "complementarias mas restrictivas."),
         ],
+    )
+
+    # Un solo reglas.csv para todas las jurisdicciones (ver docs/contrato-insumos.md).
+    # La provincial trae una fila S (condicional) para probar que se carga aparte.
+    (BASE / "reglas.csv").write_text(
+        "provincia,jurisdiccion,tipo_zona,tipo_aplicacion,banda_toxicologica,distancia_min_m,"
+        "permitido,condiciones,norma,articulo,observaciones\n"
+        "santa-fe,san-carlos-centro,escuela,terrestre,todas,100,N,,ordenanza-914-2018,8,\n"
+        "santa-fe,san-carlos-centro,escuela,aerea,todas,200,N,,ordenanza-914-2018,9,"
+        "Aviso previo a la direccion de la escuela\n"
+        "santa-fe,san-carlos-centro,curso_agua,todas,todas,50,N,,ordenanza-914-2018,10,\n"
+        "santa-fe,colonia-vecina,escuela,terrestre,todas,150,N,,ordenanza-45-2019,5,\n"
+        ",santa-fe,zona_urbana,todas,todas,300,N,,ley-13740-2017,2,\n"
+        ",santa-fe,zona_urbana,aerea,II,100,S,\"con autorizacion del municipio\","
+        "ley-13740-2017,2,\n",
+        encoding="utf-8",
     )
 
     print("fixtures generadas en", BASE)

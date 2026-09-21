@@ -675,7 +675,7 @@ def test_dictamen_avisa_cuando_la_distancia_se_leyo_del_texto_de_la_norma():
     assert "- *Distancia mínima a zona urbana:* 3000 m (Ley 11273/1995, art. 33)" in texto
     assert (
         "⚠️ La distancia a zona urbana se leyó del texto de Ley 11273/1995, art. 33 "
-        "(la norma no tiene reglas.csv): verificala con la norma."
+        "(no hay reglas cargadas a mano para esa jurisdicción): verificala con la norma."
     ) in texto
 
 
@@ -689,3 +689,212 @@ def test_repregunta_de_un_dato_es_solo_la_pregunta_con_sus_opciones():
         "Hay varios productos parecidos a 'Glifosato'. ¿Cuál es?" + chr(10)
         + "   - Glifosato 48 Kemsure" + chr(10) + "   - Glifosato 48 Sem"
     )
+
+
+# --- consulta_articulo ---
+
+
+def _resultado_articulo(partes, **extra):
+    return ResultadoTool(
+        estado="ok",
+        datos={
+            "numero": "33", "norma": "ley-11273-1995", "norma_legible": "Ley 11273/1995",
+            "jurisdiccion_id": "santa-fe", "partes": [{"texto": t, "pagina": 1} for t in partes],
+        },
+        citas=[Cita(fuente="normativa", jurisdiccion_id="santa-fe", norma="ley-11273-1995",
+                    articulo="33")],
+        **extra,
+    )
+
+
+def test_consulta_articulo_muestra_el_texto_literal_con_su_encabezado():
+    texto = _un_mensaje(
+        RespuestaAgente(tipo="consulta_articulo", intro="Acá está."),
+        [_resultado_articulo(["Prohíbese la aplicación aérea dentro de 3.000 metros."])],
+    )
+    assert texto == (
+        "*Ley 11273/1995, art. 33 (santa-fe)*\n"
+        "Prohíbese la aplicación aérea dentro de 3.000 metros."
+    )  # sin la intro del LLM: el texto de la norma va solo
+
+
+def test_consulta_articulo_con_varios_textos_para_el_mismo_numero():
+    texto = _un_mensaje(
+        RespuestaAgente(tipo="consulta_articulo"), [_resultado_articulo(["Uno.", "Dos."])]
+    )
+    assert texto == (
+        "*Ley 11273/1995, art. 33 (santa-fe) — texto 1 de 2*\nUno.\n\n"
+        "*Ley 11273/1995, art. 33 (santa-fe) — texto 2 de 2*\nDos."
+    )
+
+
+def test_consulta_articulo_muestra_las_advertencias():
+    texto = _un_mensaje(
+        RespuestaAgente(tipo="consulta_articulo"),
+        [_resultado_articulo(["Texto."], advertencias=["Busqué en la normativa provincial"])],
+    )
+    assert texto.endswith("⚠️ Busqué en la normativa provincial")
+
+
+def test_consulta_articulo_que_repregunta_la_norma_muestra_la_lista():
+    resultado = ResultadoTool(
+        estado="faltan_datos",
+        faltantes=[CampoFaltante(
+            campo="norma", motivo="varias",
+            pregunta_sugerida="El artículo 33 está en varias normas. ¿De cuál?",
+            tipo_entrada="lista",
+            opciones=["Ley 11273/1995 (santa-fe)", "Ordenanza 841/2010 (el-trebol)"],
+        )],
+    )
+    texto = _un_mensaje(RespuestaAgente(tipo="consulta_articulo"), [resultado])
+    assert texto == (
+        "El artículo 33 está en varias normas. ¿De cuál?\n"
+        "   - Ley 11273/1995 (santa-fe)\n"
+        "   - Ordenanza 841/2010 (el-trebol)"
+    )
+
+
+def test_consulta_articulo_no_encontrado_usa_el_no_resuelto():
+    resultado = ResultadoTool(
+        estado="no_resuelto", motivo=MotivoNoResuelto.ARTICULO_NO_ENCONTRADO,
+        advertencias=["No hay un artículo 999 en la normativa consultada"],
+    )
+    texto = _un_mensaje(RespuestaAgente(tipo="consulta_articulo"), [resultado])
+    assert "No pude completar la consulta" in texto
+    assert "No hay un artículo con ese número" in texto and "artículo 999" in texto
+
+
+# --- limitaciones ---
+
+
+def _regla(zona, aplicacion, bandas, distancia, norma, articulo, **extra):
+    return {
+        "tipo_zona": zona, "tipo_aplicacion": aplicacion, "bandas": bandas,
+        "distancia_min_m": distancia, "norma": norma, "articulo": articulo,
+        "jurisdiccion_id": "santa-fe", "observaciones": None, "condiciones": None,
+        "extraida_de_pdf": False, **extra,
+    }
+
+
+AEREA_II = _regla("zona_urbana", "aerea", ["II"], 3000, "ley-11273-1995", "33")
+TERRESTRE = _regla("zona_urbana", "terrestre", ["Ia", "Ib", "II"], 500, "ley-11273-1995", "34")
+EXCEPCION = _regla(
+    "zona_urbana", "aerea", ["II"], 500, "ley-055297-2017", "51",
+    condiciones="ordenanza que la autorice",
+)
+
+
+def _citas(*reglas):
+    return [Cita(fuente="normativa", jurisdiccion_id="santa-fe", norma=r["norma"],
+                 articulo=r["articulo"]) for r in reglas]
+
+
+def test_limitaciones_agrupa_por_aplicacion_y_lista_las_excepciones():
+    resultado = ResultadoTool(
+        estado="ok",
+        datos={
+            "localidad": "Rosario", "distancia_m": None,
+            "prohibiciones": [TERRESTRE, AEREA_II], "condicionales": [EXCEPCION],
+        },
+        citas=_citas(TERRESTRE, AEREA_II, EXCEPCION),
+        advertencias=["No se cuenta con la normativa municipal de Rosario: las limitaciones "
+                      "son las de la normativa provincial"],
+    )
+    texto = _un_mensaje(RespuestaAgente(tipo="limitaciones"), [resultado])
+    assert texto == (
+        "*Limitaciones en Rosario*\n\n"
+        "⚠️ No se cuenta con la normativa municipal de Rosario: las limitaciones son las de la "
+        "normativa provincial\n\n"
+        "*Aplicación aérea*\n"
+        "- Zona urbana · banda II: a menos de 3000 m no se puede aplicar (Ley 11273/1995, art. 33)"
+        "\n\n"
+        "*Aplicación terrestre*\n"
+        "- Zona urbana · bandas Ia, Ib, II: a menos de 500 m no se puede aplicar "
+        "(Ley 11273/1995, art. 34)\n\n"
+        "*Excepciones*\n"
+        "- Zona urbana · aérea · banda II: se puede aplicar desde 500 m, si: ordenanza que la "
+        "autorice (Ley 055297/2017, art. 51)\n\n"
+        "*Fuentes*\n"
+        "- Ley 11273/1995, art. 34 (santa-fe)\n"
+        "- Ley 11273/1995, art. 33 (santa-fe)\n"
+        "- Ley 055297/2017, art. 51 (santa-fe)"
+    )
+
+
+def test_limitaciones_a_una_distancia_muestra_la_prohibicion_y_sus_excepciones():
+    resultado = ResultadoTool(
+        estado="ok",
+        datos={
+            "localidad": "Rosario", "distancia_m": 1000,
+            "restricciones": [
+                {"prohibicion": AEREA_II, "excepciones": [EXCEPCION]},
+                {"prohibicion": TERRESTRE, "excepciones": []},
+            ],
+        },
+        citas=_citas(AEREA_II, EXCEPCION, TERRESTRE),
+    )
+    texto = _un_mensaje(RespuestaAgente(tipo="limitaciones"), [resultado])
+    assert texto.startswith("*A 1000 m en Rosario*\n\n")
+    assert (
+        "- Zona urbana · aérea · banda II: a menos de 3000 m no se puede aplicar "
+        "(Ley 11273/1995, art. 33)\n"
+        "  *Excepciones posibles:*\n"
+        "  - Zona urbana · aérea · banda II: se puede aplicar desde 500 m, si: ordenanza que la "
+        "autorice (Ley 055297/2017, art. 51)"
+    ) in texto
+    assert "  No hay excepciones cargadas para esa distancia." in texto
+
+
+def test_limitaciones_a_una_distancia_que_cumple_todo():
+    resultado = ResultadoTool(
+        estado="ok", datos={"localidad": "Rosario", "distancia_m": 5000, "restricciones": []},
+    )
+    texto = _un_mensaje(RespuestaAgente(tipo="limitaciones"), [resultado])
+    assert texto == (
+        "*A 5000 m en Rosario*\n\nA esa distancia no hay ninguna prohibición para lo consultado."
+    )
+
+
+def test_limitaciones_marca_lo_leido_del_pdf_y_las_observaciones():
+    regla = _regla("zona_urbana", "aerea", ["todas"], 500, "ley-1-2000", "3",
+                   extraida_de_pdf=True, observaciones="Aviso previo")
+    resultado = ResultadoTool(
+        estado="ok",
+        datos={
+            "localidad": "X", "distancia_m": None, "prohibiciones": [regla], "condicionales": [],
+        },
+    )
+    texto = _un_mensaje(RespuestaAgente(tipo="limitaciones"), [resultado])
+    assert "  ⚠️ Aviso previo" in texto
+    assert "  ⚠️ Distancia leída del texto de la norma: verificala con la norma." in texto
+
+
+def test_limitaciones_sin_datos_por_falta_de_localidad_repregunta():
+    resultado = ResultadoTool(
+        estado="faltan_datos",
+        faltantes=[CampoFaltante(
+            campo="localidad", motivo="falta", pregunta_sugerida="¿En qué localidad se aplica?",
+            tipo_entrada="texto",
+        )],
+    )
+    assert _un_mensaje(RespuestaAgente(tipo="limitaciones"), [resultado]) == (
+        "¿En qué localidad se aplica?"
+    )
+
+
+# --- mensajes largos ---
+
+
+def test_un_articulo_mas_largo_que_el_limite_se_parte_por_oraciones_sin_cortar_palabras():
+    oracion = "Prohíbese la aplicación de productos fitosanitarios en las inmediaciones."
+    largo = " ".join([oracion] * 12)  # un solo renglón, sin línea en blanco
+    partes = partir_por_seccion(largo, limite=200)
+    assert len(partes) > 1 and all(len(p) <= 200 for p in partes)
+    assert " ".join(p.replace("\n", " ") for p in partes) == largo  # no se pierde nada
+
+
+def test_un_renglon_sin_puntos_mas_largo_que_el_limite_se_parte_por_palabras():
+    largo = " ".join(["palabra"] * 100)
+    partes = partir_por_seccion(largo, limite=120)
+    assert all(len(p) <= 120 for p in partes)
+    assert " ".join(p.replace("\n", " ") for p in partes).split() == largo.split()

@@ -1,4 +1,0 @@
-tipo_zona,tipo_aplicacion,bandas,distancia_min_m,norma,articulo,observaciones
-zona_urbana,aerea,Ia;Ib;II,3000,ley-11273-1995,33,
-zona_urbana,terrestre,Ia;Ib;II,500,ley-11273-1995,34,
-zona_urbana,aerea,III;IV,500,ley-11273-1995,33,"Prohibicion implicita: el art. 33 solo admite excepcionalmente clases C y D dentro de 500 m si existe ordenanza municipal o comunal que lo autorice"

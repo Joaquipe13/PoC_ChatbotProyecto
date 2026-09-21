@@ -1,0 +1,10 @@
+provincia,jurisdiccion,tipo_zona,tipo_aplicacion,banda_toxicologica,distancia_min_m,permitido,condiciones,norma,articulo,observaciones
+,santa-fe,zona_urbana,aerea,Ia;Ib,3000,N,,ley-11273-1995,33,
+,santa-fe,zona_urbana,aerea,II,3000,N,,ley-11273-1995,33,
+,santa-fe,zona_urbana,aerea,II,500,S,"Excepcion para clase B entre 500 y 3000 m: ordenanza municipal o comunal que la autorice (art. 33 de la Ley 11.273); terreno o estado del cultivo que impidan aplicar con equipos terrestres y ausencia de productos equivalentes de clase C o D; no procede con centros educativos, de salud, recreativos o habitacionales en las inmediaciones",ley-055297-2017,51,
+,santa-fe,zona_urbana,aerea,III;IV,500,N,,ley-11273-1995,33,"Prohibicion implicita: el art. 33 solo admite excepcionalmente clases C y D dentro de 500 m si existe ordenanza municipal o comunal que lo autorice"
+,santa-fe,zona_urbana,aerea,III;IV,0,S,"Excepcion dentro de 500 m: ordenanza municipal o comunal que la autorice (art. 33 de la Ley 11.273); terreno o estado del cultivo que impidan aplicar con equipos terrestres; no procede con centros educativos, de salud, recreativos o habitacionales en las inmediaciones",ley-055297-2017,51,"La norma no fija una distancia minima dentro de los 500 m"
+,santa-fe,zona_urbana,terrestre,Ia;Ib;II,500,N,,ley-11273-1995,34,
+,santa-fe,zona_urbana,terrestre,III;IV,0,S,"Conforme a la reglamentacion (art. 34 de la Ley 11.273); no procede con equipos de arrastre o autopropulsados si hay centros de ensenanza, de salud o recreativos en las inmediaciones (art. 40 del decreto); el municipio o comuna debe fijar los limites de la planta urbana si no estan en una ordenanza (art. 53 del decreto)",ley-11273-1995,34,"La ley no fija una distancia minima para clases C y D en aplicacion terrestre"
+santa-fe,el-trebol,zona_urbana,aerea,todas,500,N,,ordenanza-841-2010,6,
+santa-fe,el-trebol,zona_urbana,aerea,II,3000,N,,ordenanza-841-2010,7,

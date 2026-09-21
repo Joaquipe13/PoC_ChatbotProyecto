@@ -23,7 +23,11 @@ class ReglaCandidata:
     articulo: str | None
     jurisdiccion_id: str | None  # None en reglas provinciales/nacionales
     observaciones: str | None = None
-    fuente: str = "csv"  # "pdf_extraido": leída del texto de la norma, sin reglas.csv
+    fuente: str = "csv"  # "pdf_extraido": leída del texto de la norma, sin filas en reglas.csv
+    # False (N): prohibición, es la única que usa el dictamen. True (S): regla
+    # condicional, solo para consultas (ver `excepciones_aplicables`).
+    permitido: bool = False
+    condiciones: str | None = None
 
 
 @dataclass
@@ -37,15 +41,40 @@ class ChequeoDistanciaZona:
     advertencias: list[str]
 
 
+def _coincide(r: ReglaCandidata, tipo_zona: str, tipo_aplicacion: str, banda: str) -> bool:
+    return (
+        r.tipo_zona == tipo_zona
+        and r.tipo_aplicacion in (tipo_aplicacion, "todas")
+        and (r.bandas == ["todas"] or banda in r.bandas)
+    )
+
+
 def reglas_aplicables(
     reglas: list[ReglaCandidata], tipo_zona: str, tipo_aplicacion: str, banda: str
 ) -> list[ReglaCandidata]:
+    """Solo las prohibiciones (N): las condicionales (S) no bloquean nada."""
     return [
-        r
-        for r in reglas
-        if r.tipo_zona == tipo_zona
-        and r.tipo_aplicacion in (tipo_aplicacion, "todas")
-        and (r.bandas == ["todas"] or banda in r.bandas)
+        r for r in reglas
+        if not r.permitido and _coincide(r, tipo_zona, tipo_aplicacion, banda)
+    ]
+
+
+def excepciones_aplicables(
+    reglas: list[ReglaCandidata],
+    tipo_zona: str,
+    tipo_aplicacion: str,
+    banda: str,
+    distancia_real_m: float,
+) -> list[ReglaCandidata]:
+    """Reglas condicionales (S) que habilitan aplicar a `distancia_real_m`: las
+    que aplican a esa zona, aplicación y banda y cuya distancia mínima ya se
+    respeta. Cada una trae sus `condiciones`. Para responder "¿puedo aplicar a X
+    metros bajo alguna condición?"; el dictamen no las usa."""
+    return [
+        r for r in reglas
+        if r.permitido
+        and _coincide(r, tipo_zona, tipo_aplicacion, banda)
+        and distancia_real_m >= r.distancia_min_m
     ]
 
 
