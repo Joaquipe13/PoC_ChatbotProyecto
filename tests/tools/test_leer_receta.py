@@ -112,3 +112,28 @@ def test_base64_decodifica_a_los_mismos_bytes():
     original = b"contenido de imagen de prueba"
     codificado = base64.b64encode(original).decode()
     assert base64.b64decode(codificado) == original
+
+
+# --- lo que ve el agente ---
+
+
+def test_el_agente_recibe_los_datos_leidos_y_la_localidad():
+    """Bug real: el LLM del agente solo veía "Receta leída correctamente" y
+    completaba cultivo, producto, dosis y localidad por su cuenta (una receta de
+    María Susana se evaluó como "Pergamino")."""
+    from fitosanitarios.tools.leer_receta import _resumen_para_llm
+
+    respuesta = json.loads(RESPUESTA_COMPLETA) | {"localidad": "María Susana"}
+    resultado = leer_receta_logica(b"img", ClienteLLMFake(respuestas=[json.dumps(respuesta)]))
+    assert resultado.datos["localidad"] == "María Susana"
+    resumen = _resumen_para_llm(resultado)
+    for dato in ("cultivo=Soja", "localidad=María Susana", "Glifosato 48% (dosis: 2 L/ha)",
+                 "tipo_aplicacion=terrestre", "superficie_ha=35"):
+        assert dato in resumen
+
+
+def test_un_dato_que_no_figura_se_le_marca_al_agente_para_que_no_lo_invente():
+    from fitosanitarios.tools.leer_receta import _resumen_para_llm
+
+    resultado = leer_receta_logica(b"img", ClienteLLMFake(respuestas=[RESPUESTA_COMPLETA]))
+    assert "localidad=NO FIGURA" in _resumen_para_llm(resultado)

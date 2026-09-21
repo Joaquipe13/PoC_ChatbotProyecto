@@ -41,7 +41,35 @@ def leer_receta_logica(
     return ResultadoTool(estado="ok", datos=receta.model_dump(mode="json"))
 
 
+def _datos_para_llm(datos: dict) -> str:
+    """Lo leído, en texto: es lo ÚNICO que el agente sabe de la receta (el
+    formateador arma el mensaje al usuario desde el artifact, no desde acá).
+    Sin esto el LLM completaba cultivo, producto, dosis y localidad por su
+    cuenta y evaluaba datos inventados (bug real, ver DIFICULTADES.md)."""
+    productos = "; ".join(
+        f"{i['producto_nombre']} (dosis: {i.get('dosis_declarada') or 'NO FIGURA'})"
+        for i in datos.get("items", [])
+    )
+    campos = {
+        "cultivo": datos.get("cultivo"), "lote": datos.get("lote"),
+        "superficie_ha": datos.get("superficie_ha"),
+        "tipo_aplicacion": datos.get("tipo_aplicacion"),
+        "localidad": datos.get("localidad"), "adversidad": datos.get("adversidad"),
+        "productos": productos or None,
+    }
+    return "; ".join(f"{k}={v if v not in (None, '') else 'NO FIGURA'}" for k, v in campos.items())
+
+
 def _resumen_para_llm(resultado: ResultadoTool) -> str:
+    if resultado.estado in ("ok", "faltan_datos") and resultado.datos:
+        texto = (
+            "Receta leída. Datos de la receta (usá solo estos; un dato que dice NO FIGURA "
+            f"no lo inventes ni lo supongas): {_datos_para_llm(resultado.datos)}."
+        )
+        if resultado.faltantes:
+            campos = ", ".join(f.campo for f in resultado.faltantes)
+            texto += f" No se leyeron con confianza: {campos}."
+        return texto
     if resultado.estado == "ok":
         return "Receta leída correctamente, todos los campos con confianza suficiente."
     if resultado.estado == "faltan_datos":

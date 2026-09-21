@@ -33,7 +33,7 @@ _PREGUNTA_POR_CAMPO = {
     "cultivo": "¿Qué cultivo es?",
     "lote": "¿Cuál es el número o nombre del lote?",
     "superficie_ha": "¿Cuántas hectáreas tiene el lote?",
-    "productos": "¿Qué producto(s) y dosis indica la receta?",
+    "productos": "¿Qué producto y dosis indica la receta?",
 }
 
 
@@ -69,6 +69,7 @@ class RecetaExtraidaLLM(BaseModel):
     confianza_superficie_ha: float = 0.0
     tipo_aplicacion: str | None = None  # "terrestre" | "aerea" | None
     caudal: str | None = None
+    localidad: str | None = None  # localidad/municipio/comuna donde se aplica el lote
     ubic_poblado: str | None = None
     condiciones: str | None = None
     restricciones: str | None = None
@@ -107,6 +108,9 @@ PROMPT_SISTEMA_EXTRACCION = (
     '  "superficie_ha": numero o null, "confianza_superficie_ha": 0 a 1,\n'
     '  "tipo_aplicacion": "terrestre" | "aerea" | null,\n'
     '  "caudal": string o null (caudal/volumen de aplicación, ej. "100 L/ha"),\n'
+    '  "localidad": string o null (localidad, municipio o comuna donde se '
+    'aplica el lote, tal como figura; NO el domicilio del productor ni del '
+    'ingeniero),\n'
     '  "ubic_poblado": string o null (ubicación del lote respecto de zonas '
     'pobladas cercanas),\n'
     '  "condiciones": string o null (condiciones ambientales indicadas para '
@@ -271,6 +275,7 @@ def convertir_a_receta_y_faltantes(
         superficie_ha=superficie_ha,
         tipo_aplicacion=extraccion.tipo_aplicacion,
         caudal=extraccion.caudal,
+        localidad=extraccion.localidad,
         ubic_poblado=extraccion.ubic_poblado,
         condiciones=extraccion.condiciones,
         restricciones=extraccion.restricciones,

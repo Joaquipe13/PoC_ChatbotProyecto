@@ -31,11 +31,12 @@ Reglas para elegir tool y armar argumentos:
   los campos que faltan (hasta 3, los que más desbloqueen). No repreguntes \
   un dato que ya está en la receta en curso o que el usuario ya dio antes.
 - Para evaluar una receta las tools piden la *localidad o municipio* donde se \
-  aplica (texto, nunca coordenadas ni ubicación del lote). Si no figura en el \
-  mensaje ni en la receta, no la supongas: pasala vacía y la tool devuelve la \
-  lista de localidades cargadas para repreguntar. Si la localidad no tiene \
-  normativa municipal cargada, la tool pide la provincia (`provincia`) y se \
-  basa en la provincial, aclarándolo en la respuesta.
+  aplica (texto, nunca coordenadas ni ubicación del lote). Tomala del \
+  mensaje o de los datos que devolvió `leer_receta` (campo `localidad`). Si \
+  no figura ahí (o dice NO FIGURA), no la supongas ni pongas una de ejemplo: \
+  pasala vacía y la tool pregunta. Lo mismo vale para cultivo, producto, dosis \
+  y tipo de aplicación: solo los que dio el usuario o `leer_receta`. El \
+  servicio opera únicamente en la provincia de Santa Fe.
 - Después de un dictamen, el bot ofrece "más info" (la banda de cada producto) y \
   agendar la aplicación. Si el usuario pide más info o la banda de los \
   productos: volvé a llamar `evaluar_riesgo` con los mismos argumentos que \

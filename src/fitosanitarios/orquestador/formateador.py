@@ -117,6 +117,7 @@ def _plantilla_confirmacion_receta(
     lineas = [f"*Leí la receta{numero_txt}*. Confirmá los datos:"]
     lineas.append(f"- *Cultivo:* {datos.get('cultivo') or 'no figura ⚠️'}")
     lineas.append(f"- *Lote:* {datos.get('lote') or 'no figura ⚠️'}")
+    lineas.append(f"- *Localidad:* {datos.get('localidad') or 'no figura ⚠️'}")
     lineas.append(
         f"- *Superficie:* {_num(datos['superficie_ha'])} ha"
         if datos.get("superficie_ha") is not None

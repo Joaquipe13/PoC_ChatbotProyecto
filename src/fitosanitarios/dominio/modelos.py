@@ -71,6 +71,7 @@ class Receta(BaseModel):
     superficie_ha: float | None = None
     tipo_aplicacion: TipoAplicacion | None = None
     caudal: str | None = None  # texto libre, ej. "100 L/ha"
+    localidad: str | None = None  # localidad/municipio/comuna donde se aplica
     ubic_poblado: str | None = None  # ubicación del lote respecto de zonas pobladas
     condiciones: str | None = None  # condiciones ambientales al momento de aplicar
     restricciones: str | None = None  # restricciones de uso indicadas en la receta
