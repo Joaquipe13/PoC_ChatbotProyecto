@@ -128,13 +128,16 @@ def _upsert_producto(cur, item: ProductoListado, detalle: DetalleProducto | None
     texto_embedding = f"{marca} {sustancias_limpias}".strip() or marca or item.numero_inscripcion
     embedding = _vector_literal(modelo_embeddings.encode(texto_embedding).tolist())
 
-    banda = None
+    # Sin el detalle de SENASA (que trae la banda normalizada) la banda sale de
+    # la clase del listado: es el mismo valor (Ia/Ib/II/III/IV), y sin ella la
+    # banda quedaba vacía en los ~7.200 productos no crawleados con detalle.
+    banda = normalizar_banda(item.clase_toxicologica)
     estado_producto = None
     toxicidad: dict = {}
     crudo_api: dict = {}
     if detalle is not None:
         clase_tox = detalle.clase_toxicologica.clase_tox if detalle.clase_toxicologica else None
-        banda = normalizar_banda(clase_tox)
+        banda = normalizar_banda(clase_tox) or banda
         estado_producto = (
             detalle.estado_producto.descripcion if detalle.estado_producto else None
         )
