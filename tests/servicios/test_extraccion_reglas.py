@@ -81,6 +81,10 @@ def test_es_determinista():
     "plantas urbanas.",
     # una distancia que no es de una zona a proteger
     "Prohíbese el almacenamiento de fitosanitarios a menos de 300 metros del depósito.",
+    # "8 km/hora" es la velocidad del viento, no una distancia (Ordenanza 841/2010, art. 4:
+    # se leía como una regla falsa de 8.000 m)
+    "Prohíbese las pulverizaciones de cualquier tipo en aquellas zonas que, por efecto de "
+    "vientos de una intensidad mayor a 8 km/hora, puedan producir derivas hacia la planta urbana.",
 ])
 def test_lo_ambiguo_condicionado_o_incompleto_no_se_extrae(texto):
     assert extraer_reglas_de_articulo("ley-1-2000", "1", texto) == []

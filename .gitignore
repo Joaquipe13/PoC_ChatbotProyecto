@@ -36,3 +36,6 @@ data/recetas_ejemplo/*
 .idea/
 .DS_Store
 Thumbs.db
+
+# Borradores de reglas.csv (revisar y renombrar a reglas.csv; ver insumos/borrador_reglas.py)
+reglas.borrador*
