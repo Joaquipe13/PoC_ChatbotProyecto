@@ -18,6 +18,13 @@ LOCALIDADES = [
 PROVINCIAS = [
     Jurisdiccion(id=10, jurisdiccion_id="santa-fe", nombre="Santa Fe", provincia_id=10),
 ]
+MUNICIPIOS = [
+    Jurisdiccion(id=101, jurisdiccion_id="Rosario", nombre="Rosario", provincia_id=10),
+    Jurisdiccion(id=102, jurisdiccion_id="San Carlos Norte", nombre="San Carlos Norte",
+                 provincia_id=10),
+    Jurisdiccion(id=103, jurisdiccion_id="San Carlos Sud", nombre="San Carlos Sud",
+                 provincia_id=10),
+]
 CON_ORDENANZAS = {1}
 
 
@@ -25,6 +32,7 @@ CON_ORDENANZAS = {1}
 def base_falsa(monkeypatch):
     monkeypatch.setattr(modulo, "listar_localidades", lambda conn: LOCALIDADES)
     monkeypatch.setattr(modulo, "listar_provincias", lambda conn: PROVINCIAS)
+    monkeypatch.setattr(modulo, "listar_municipios", lambda conn: MUNICIPIOS)
     monkeypatch.setattr(
         modulo, "localidad_tiene_normativa_municipal", lambda conn, id_: id_ in CON_ORDENANZAS
     )
@@ -56,14 +64,28 @@ def test_la_provincia_puede_venir_en_el_mismo_texto():
     assert corte is None and ubicacion.provincia_id == 10
 
 
-def test_localidad_no_cargada_sin_provincia_la_pregunta_nunca_la_supone():
-    ubicacion, corte = resolver_ubicacion_o_cortar(None, "Rosario")
+def test_municipio_conocido_no_pide_la_provincia():
+    ubicacion, corte = resolver_ubicacion_o_cortar(None, "rosario")
+    assert corte is None
+    assert ubicacion.nombre == "Rosario" and ubicacion.provincia_id == 10
+    assert ubicacion.localidad_id is None and ubicacion.con_normativa_municipal is False
+
+
+def test_localidad_desconocida_se_vuelve_a_pedir_y_nunca_se_supone():
+    """Bug real: una receta de María Susana se evaluó como "Pergamino"."""
+    ubicacion, corte = resolver_ubicacion_o_cortar(None, "Pergamino")
     assert ubicacion is None
     assert corte.estado == "faltan_datos"
     (faltante,) = corte.faltantes
-    assert faltante.campo == "provincia"
-    assert faltante.opciones == ["Santa Fe"]
-    assert "Rosario" in faltante.pregunta_sugerida
+    assert faltante.campo == "localidad" and faltante.tipo_entrada == "texto"
+    assert "Pergamino" in faltante.pregunta_sugerida and "Santa Fe" in faltante.pregunta_sugerida
+
+
+def test_nombre_que_coincide_con_varios_municipios_pregunta_cual():
+    ubicacion, corte = resolver_ubicacion_o_cortar(None, "San Carlos")
+    assert ubicacion is None
+    (faltante,) = corte.faltantes
+    assert faltante.opciones == ["San Carlos Norte", "San Carlos Sud"]
 
 
 def test_provincia_no_cargada_es_no_resuelto():

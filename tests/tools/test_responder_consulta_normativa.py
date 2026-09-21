@@ -20,7 +20,7 @@ def test_pregunta_sin_jurisdiccion_repregunta_con_lista(conexion, modelo_embeddi
     assert "san-carlos-centro" in resultado.faltantes[0].opciones
 
 
-def test_localidad_no_cargada_sin_provincia_pregunta_la_provincia(conexion, modelo_embeddings):
+def test_localidad_desconocida_se_vuelve_a_pedir(conexion, modelo_embeddings):
     args = ResponderConsultaNormativaArgs(
         pregunta="¿a qué distancia de una escuela?", jurisdiccion_id="localidad-inexistente"
     )
@@ -29,7 +29,7 @@ def test_localidad_no_cargada_sin_provincia_pregunta_la_provincia(conexion, mode
         args, conexion, modelo_embeddings, fake, UMBRAL_SIMILITUD
     )
     assert resultado.estado == "faltan_datos"
-    assert resultado.faltantes[0].campo == "provincia"
+    assert resultado.faltantes[0].campo == "localidad"
     assert fake.llamadas == []
 
 

@@ -3,14 +3,15 @@ dónde se aplica (texto del usuario o de la receta) y qué normativa le
 corresponde. Devuelve la `Ubicacion` o el `ResultadoTool` con el que la tool
 debe cortar.
 
-Si la localidad no tiene normativa municipal cargada (o no está cargada), se
-usa la provincial, y `Ubicacion.con_normativa_municipal` queda en False para
-que la respuesta lo aclare. Nunca se supone la provincia: si no se sabe, se
-pregunta.
+Si la localidad no tiene normativa municipal cargada pero es un municipio o
+comuna conocido (`territorio.municipio`), se usa la provincial, y
+`Ubicacion.con_normativa_municipal` queda en False para que la respuesta lo
+aclare. Una localidad desconocida se vuelve a pedir: nunca se adivina.
 """
 
 from fitosanitarios.datos.retrievers.territorio import (
     listar_localidades,
+    listar_municipios,
     listar_provincias,
     localidad_tiene_normativa_municipal,
 )
@@ -39,32 +40,36 @@ def resolver_ubicacion_o_cortar(
         ), None
     if resolucion.ambiguas:
         return None, _pedir_localidad(
-            f"'{texto}' coincide con más de una localidad", resolucion.ambiguas
+            f"'{texto}' coincide con más de una localidad", resolucion.ambiguas,
+            "Hay varias con ese nombre. ¿Cuál es?",
         )
 
-    # Localidad sin normativa propia cargada: se recurre a la provincial.
-    provincias = listar_provincias(conn)
-    if not provincias:
+    # Sin normativa propia cargada: si es un municipio o comuna conocido de una
+    # provincia con normativa, se usa la provincial. El servicio opera solo en
+    # esas provincias, así que no se pregunta cuál es: un nombre que no figura
+    # se vuelve a pedir.
+    if provincia and resolver_localidad(provincia, listar_provincias(conn)).localidad is None:
         return None, _no_cubierta()
-    buscada = resolver_localidad(provincia or texto, provincias)
-    if buscada.localidad is not None:
-        return Ubicacion(nombre=texto.strip(), provincia_id=buscada.localidad.id), None
-    if provincia:
-        return None, _no_cubierta()
+    municipios = resolver_localidad(texto, listar_municipios(conn))
+    if municipios.localidad is not None:
+        m = municipios.localidad
+        return Ubicacion(nombre=m.nombre, provincia_id=m.provincia_id), None
+    if municipios.ambiguas:
+        return None, _pedir_localidad(
+            f"'{texto}' coincide con más de una localidad", municipios.ambiguas,
+            "Hay varias con ese nombre. ¿Cuál es?",
+        )
     return None, ResultadoTool(
         estado="faltan_datos",
         faltantes=[
             CampoFaltante(
-                campo="provincia",
-                motivo=(
-                    f"no se cuenta con la normativa municipal de '{texto.strip()}'; "
-                    "se puede usar la provincial"
-                ),
+                campo="localidad",
+                motivo=f"'{texto.strip()}' no figura entre los municipios y comunas cargados",
                 pregunta_sugerida=(
-                    f"No tengo la normativa municipal de {texto.strip()}. ¿En qué provincia "
-                    "queda? Con eso me baso en la normativa provincial."
+                    f"No encontré '{texto.strip()}' entre las localidades de Santa Fe "
+                    "(solo opero ahí). ¿En qué localidad se aplica?"
                 ),
-                tipo_entrada="lista", opciones=[p.nombre for p in provincias],
+                tipo_entrada="texto",
             )
         ],
     )
@@ -74,13 +79,15 @@ def _no_cubierta() -> ResultadoTool:
     return ResultadoTool(estado="no_resuelto", motivo=MotivoNoResuelto.JURISDICCION_NO_CUBIERTA)
 
 
-def _pedir_localidad(motivo: str, opciones: list[Jurisdiccion]) -> ResultadoTool:
+def _pedir_localidad(
+    motivo: str, opciones: list[Jurisdiccion], pregunta: str = "¿En qué localidad se aplica?"
+) -> ResultadoTool:
     return ResultadoTool(
         estado="faltan_datos",
         faltantes=[
             CampoFaltante(
                 campo="localidad", motivo=motivo,
-                pregunta_sugerida="¿En qué localidad o municipio se va a realizar la aplicación?",
+                pregunta_sugerida=pregunta,
                 tipo_entrada="lista", opciones=[o.nombre for o in opciones],
             )
         ],

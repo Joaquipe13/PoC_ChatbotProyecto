@@ -63,14 +63,22 @@ def test_riesgo_provincia_no_cargada(conexion, modelo_embeddings):
     assert resultado.motivo == MotivoNoResuelto.JURISDICCION_NO_CUBIERTA
 
 
-def test_riesgo_localidad_no_cargada_pide_la_provincia_y_no_la_supone(
+def test_riesgo_municipio_de_santa_fe_sin_ordenanzas_no_pide_la_provincia(
     conexion, modelo_embeddings
 ):
     resultado = evaluar_riesgo_logica(
         _args(localidad="Rosario"), conexion, modelo_embeddings, TOLERANCIA_PCT
     )
+    assert resultado.estado == "ok"
+    assert resultado.datos["condiciones"]["sin_normativa_municipal"] is True
+
+
+def test_riesgo_localidad_desconocida_se_vuelve_a_pedir(conexion, modelo_embeddings):
+    resultado = evaluar_riesgo_logica(
+        _args(localidad="Pergamino"), conexion, modelo_embeddings, TOLERANCIA_PCT
+    )
     assert resultado.estado == "faltan_datos"
-    assert resultado.faltantes[0].campo == "provincia"
+    assert resultado.faltantes[0].campo == "localidad"
 
 
 def test_riesgo_localidad_sin_normativa_local_se_basa_en_la_provincial_y_lo_aclara(

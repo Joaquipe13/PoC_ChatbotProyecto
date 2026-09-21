@@ -156,6 +156,24 @@ def listar_provincias(conn: psycopg.Connection) -> list[Jurisdiccion]:
         ]
 
 
+def listar_municipios(conn: psycopg.Connection) -> list[Jurisdiccion]:
+    """Municipios y comunas de las provincias con normativa cargada (catálogo
+    `territorio.municipio`), con la forma de `Jurisdiccion` para reusar
+    `resolver_localidad`. Solo los de provincias que existen en
+    `territorio.provincia`: sin normativa provincial no hay a qué recurrir."""
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT m.id, m.provincia, m.nombre, p.id FROM territorio.municipio m "
+            "JOIN territorio.provincia p ON p.nombre = m.provincia ORDER BY m.nombre"
+        )
+        return [
+            # `jurisdiccion_id` = el nombre: con el de la provincia, "Santa Fe"
+            # coincidiría con todos los municipios a la vez.
+            Jurisdiccion(id=f[0], jurisdiccion_id=f[2], nombre=f[2], provincia_id=f[3])
+            for f in cur.fetchall()
+        ]
+
+
 def listar_jurisdicciones_cargadas(conn: psycopg.Connection) -> list[str]:
     """Localidades disponibles para repreguntar cuando la consulta normativa
     no trae jurisdicción explícita (ver skill, matriz de parámetros de
