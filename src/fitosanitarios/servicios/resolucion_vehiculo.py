@@ -15,6 +15,7 @@ opciones (igual que un producto ambiguo)."""
 from dataclasses import dataclass
 
 from fitosanitarios.datos.vectores import vector_literal
+from fitosanitarios.dominio.modelos import CampoFaltante
 from fitosanitarios.dominio.motivos import MotivoNoResuelto
 
 UMBRAL_SIMILITUD_RAG = 0.5
@@ -88,3 +89,15 @@ def resolver_vehiculo(conn, modelo_embeddings, descripcion: str) -> ResolucionVe
     if not nombres:
         return ResolucionVehiculo(motivo_no_resuelto=MotivoNoResuelto.VEHICULO_NO_ENCONTRADO)
     return ResolucionVehiculo(opciones_ambiguas=nombres)
+
+
+def faltante_vehiculo_no_identificado(descripcion: str, opciones: list[str]) -> CampoFaltante:
+    """Lo que se le pregunta al operario cuando la descripción del vehículo no
+    coincide con nada: común a `resolver_vehiculo` y `registrar_evento`."""
+    return CampoFaltante(
+        campo="vehiculo",
+        motivo="la descripción no coincide con ningún vehículo del catálogo",
+        pregunta_sugerida=f"No identifiqué '{descripcion}'. ¿Cuál de estos es?",
+        tipo_entrada="lista",
+        opciones=opciones,
+    )

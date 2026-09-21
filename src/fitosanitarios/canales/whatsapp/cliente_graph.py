@@ -221,7 +221,7 @@ def obtener_url_media(settings: Settings, media_id: str) -> str:
 
 def descargar_media(settings: Settings, media_id: str) -> bytes:
     """Descarga JPEG/PNG hasta 5 MB (ver skill). El tipo de contenido no se
-    valida acá contra JPEG/PNG -- lo valida `extraccion_receta.py` al
+    valida acá contra JPEG/PNG -- lo valida `tools/leer_receta/utils.py` al
     intentar leer la imagen; acá solo se corta por tamaño para no cargar en
     memoria un archivo desproporcionado."""
     url = obtener_url_media(settings, media_id)

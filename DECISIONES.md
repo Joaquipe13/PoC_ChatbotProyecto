@@ -499,3 +499,44 @@ Implementación: `servicios/localidad.py::Ubicacion` y `tools/_localidad.py::res
 **Nombres de norma.** La ley 055297/2017 se muestra como "Ley 055297/2017" porque así se llama el PDF (`ley-055297-2017.pdf`, aunque es el decreto reglamentario 552/97); un usuario que escriba "decreto 552/97" no la encuentra por nombre (sí por "ley 55297" o por número de artículo). Conviene renombrar el PDF con su tipo real cuando se cargue la normativa nacional.
 
 **Pendiente.** Las tools están probadas con dobles de los accesos a datos y con un agente simulado (`tests/orquestador/test_ruteo_consultas_normativa.py`), no contra Postgres ni con Gemini: falta probar con frases mal escritas de verdad (la interpretación es del LLM) y contra la base cargada. La respuesta de limitaciones lista todas las reglas de la jurisdicción sin colapsar las que se pisan (una ordenanza más estricta y la ley provincial figuran las dos, cada una con su cita).
+
+## Estructura de `tools/`: una carpeta por tool (21/09/2026)
+
+**Convención.** Cada tool es una carpeta de `src/fitosanitarios/tools/`:
+
+```
+tools/<tool>/
+    __init__.py   exporta la tool, sus argumentos y su lógica
+    tool.py       el script base: argumentos, lógica y la tool de LangChain
+    prompts.py    lo que lee un LLM: la descripción de la tool (`DESCRIPCION`) y, si los tiene, sus prompts
+    mensajes.py   lo que lee el operario: preguntas, avisos y la plantilla de la respuesta
+    utils.py      los auxiliares que solo usa esta tool (si los tiene)
+```
+
+Lo que usan varias tools sale de `tools/` y va a `servicios/`; **una tool no importa de otra**. `tests/tools/test_estructura.py` verifica la convención (archivos, que la descripción que ve el LLM sea la de `prompts.py`, que no haya scripts sueltos en `tools/` ni imports entre tools). Los tests siguen la misma forma: `tests/tools/<tool>/test_tool.py` y `test_utils.py`.
+
+**Qué se movió y de dónde.**
+
+| Antes | Ahora |
+|---|---|
+| `tools/_recursos.py` | `servicios/recursos.py` |
+| `tools/_localidad.py` | `servicios/ubicacion.py` |
+| `thread_id_de_config` (estaba en `tools/registrar_evento.py`, la usaban 3 tools) | `servicios/conversacion.py` |
+| helpers de formato privados de `orquestador/formateador.py` (`_num`, `_cita_norma`, `_seccion_fuentes`, `_bloque_condiciones`, `_lineas_agenda`…) | `servicios/formato.py` (los usan las plantillas de varias tools) |
+| vehículo no identificado (lo armaban `resolver_vehiculo` y `registrar_evento`) | `servicios/resolucion_vehiculo.py::faltante_vehiculo_no_identificado` |
+| `servicios/extraccion_receta.py` | `tools/leer_receta/utils.py` (el prompt de extracción, a `prompts.py`) |
+| `servicios/rag_normativa.py` | `tools/responder_consulta_normativa/utils.py` (los prompts, a `prompts.py`) |
+| `servicios/agendamiento.py` | `tools/agendar_aplicacion/utils.py` |
+| `servicios/limitaciones.py` | `tools/listar_limitaciones/utils.py` |
+| `servicios/normas.py` | `tools/consultar_articulo/utils.py` (`norma_legible`, que también usan las plantillas, a `servicios/formato.py`) |
+| `_BANDAS_HASTA` de `tools/consultar_productos.py` | `tools/consultar_productos/utils.py` |
+
+Se quedan en `servicios/` porque los usan varias tools: `eventos`, `fechas`, `resolucion_vehiculo`, `validacion_producto`, `condiciones_aplicacion`, `dictamen`, `dosis`, `matching`, `reglas`, `localidad`.
+
+**Prompts y mensajes aparte.** La descripción de cada tool (lo que el orquestador lee para decidir cuándo usarla y cómo completar sus argumentos) era el docstring de la función; ahora es `DESCRIPCION` en `prompts.py` y el decorador la recibe con `description=`. Se comprobó, contra el commit anterior, que las 13 tools (incluida la variante de `leer_receta` con la imagen ligada) mantienen **la misma descripción y el mismo esquema de argumentos**. Los textos que la tool le dice al operario (preguntas de repregunta, motivos, avisos) están en `mensajes.py` como constantes o funciones; también su **plantilla de respuesta**, cuando el tipo de respuesta es de una sola tool (`plantilla_<tipo>`).
+
+**Plantillas de tipos con más de una tool.** `orquestador/formateador.py` quedó como registro (`_PLANTILLAS`): reúne las plantillas de cada tool y conserva las comunes (repregunta, fuera de dominio, no resuelto, ayuda, error) y el corte de mensajes largos. `dictamen` lo arma `evaluar_viabilidad_legal` cuando hay veredicto y `evaluar_riesgo` cuando no (un riesgo suelto); `consulta_producto` lo arma `consultar_productos` (listado) o `validar_producto_registro` (producto puntual), según la forma del resultado. Los seguimientos ("¿querés más info…?") y el bloque de condiciones de aplicación, que comparten `dictamen` y `detalle_bandas`, están en `servicios/formato.py`.
+
+**Rutas viejas en este archivo.** Las entradas anteriores de `DECISIONES.md` citan las rutas de entonces (`tools/leer_receta.py`, `servicios/rag_normativa.py`…); se dejaron tal cual como registro histórico y esta tabla dice dónde está cada cosa hoy.
+
+**Sin cambio de comportamiento.** Es un movimiento de código: los tests de plantillas (`test_formateador.py`) y de las tools pasan sin cambiar sus expectativas, y la suite completa corre en verde contra Postgres.

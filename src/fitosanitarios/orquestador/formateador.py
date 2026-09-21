@@ -5,551 +5,62 @@ corrieron en el turno -- nunca del texto libre del LLM (ver skill,
 ejecutadas en el turno actual, así el LLM no puede alterar números ni
 citas", y "Formato de respuestas").
 
-Una función `_plantilla_<tipo>` por cada valor de `RespuestaAgente.tipo`
-(ver docs/especificacion-plantillas.md), reunidas en un solo módulo en vez
-de una carpeta `plantillas/` -- son 9 funciones chicas, no ameritan
-subpaquete propio (ver DECISIONES.md).
+Cada tool define en `tools/<tool>/mensajes.py` la plantilla del tipo de respuesta
+que produce; acá se las reúne en `_PLANTILLAS` y quedan las comunes (repregunta,
+fuera de dominio, no resuelto, ayuda y error), más el corte de mensajes largos.
+Los tipos que producen varias tools se reparten según la forma del resultado (ver
+`_plantilla_dictamen` y `_plantilla_consulta_producto`). Lo que se repite entre
+plantillas (citas, números, *Fuentes*) está en `servicios/formato.py`
+(ver docs/especificacion-plantillas.md).
 """
 
 import re
 
-from fitosanitarios.dominio.modelos import Cita, RespuestaAgente, ResultadoTool
+from fitosanitarios.dominio.modelos import RespuestaAgente, ResultadoTool
 from fitosanitarios.dominio.motivos import DESCRIPCION_MOTIVO, MotivoNoResuelto
-from fitosanitarios.servicios.normas import norma_legible as _norma_legible
+from fitosanitarios.servicios.formato import primer_dato
+from fitosanitarios.tools.agendar_aplicacion.mensajes import plantilla_agendar_aplicacion
+from fitosanitarios.tools.consultar_agenda.mensajes import plantilla_agenda
+from fitosanitarios.tools.consultar_articulo.mensajes import plantilla_consulta_articulo
+from fitosanitarios.tools.consultar_productos.mensajes import plantilla_listado
+from fitosanitarios.tools.evaluar_riesgo.mensajes import plantilla_detalle_bandas, plantilla_riesgo
+from fitosanitarios.tools.evaluar_viabilidad_legal.mensajes import plantilla_dictamen
+from fitosanitarios.tools.leer_receta.mensajes import plantilla_confirmacion_receta
+from fitosanitarios.tools.listar_limitaciones.mensajes import plantilla_limitaciones
+from fitosanitarios.tools.registrar_evento.mensajes import plantilla_evento_registrado
+from fitosanitarios.tools.resolver_vehiculo.mensajes import plantilla_consulta_vehiculo
+from fitosanitarios.tools.responder_consulta_normativa.mensajes import (
+    plantilla_consulta_normativa,
+)
+from fitosanitarios.tools.validar_producto_registro.mensajes import plantilla_producto
 
 LIMITE_CARACTERES_WHATSAPP = 4096
 
-_ICONO_DICTAMEN = {"APTA": "✅", "OBSERVADA": "❌", "NO_EVALUABLE": "⚠️"}
 
-_NOMBRE_ZONA = {
-    "zona_urbana": "zona urbana",
-    "escuela": "escuelas",
-    "curso_agua": "cursos de agua",
-    "otro": "otras zonas protegidas",
-}
-
-
-def _num(valor) -> str:
-    if valor is None:
-        return "no figura"
-    if isinstance(valor, bool):
-        return str(valor)
-    if isinstance(valor, int) or (isinstance(valor, float) and float(valor).is_integer()):
-        return str(int(valor))
-    return f"{valor}".replace(".", ",")
-
-
-def _cita_norma(cita: Cita) -> str:
-    """Norma y artículo sin la jurisdicción: "Ordenanza 841/2010, art. 7"."""
-    partes = [
-        p for p in (
-            _norma_legible(cita.norma) if cita.norma else None,
-            f"art. {cita.articulo}" if cita.articulo else None,
-        ) if p
-    ]
-    return ", ".join(partes) if partes else "normativa"
-
-
-def _texto_cita(cita: Cita) -> str:
-    if cita.fuente == "normativa":
-        texto = _cita_norma(cita)
-        if cita.jurisdiccion_id:
-            texto += f" ({cita.jurisdiccion_id})"
-        return texto
-    partes = [p for p in (
-        f"Reg. {cita.registro_senasa}" if cita.registro_senasa else None,
-        f"({cita.documento})" if cita.documento else None,
-    ) if p]
-    return "SENASA" + (", " + " ".join(partes) if partes else "")
-
-
-def _seccion_fuentes(citas: list[Cita]) -> str:
-    if not citas:
-        return ""
-    vistas: list[str] = []
-    for c in citas:
-        texto = _texto_cita(c)
-        if texto not in vistas:
-            vistas.append(texto)
-    return "\n".join(["*Fuentes*"] + [f"- {v}" for v in vistas])
-
-
-def _unir_secciones(*secciones: str) -> str:
-    return "\n\n".join(s for s in secciones if s.strip())
-
-
-def _primer_dato(resultados: list[ResultadoTool]) -> dict | None:
-    for r in resultados:
-        if r.datos:
-            return r.datos
-    return None
-
-
-def _todas_las_citas(resultados: list[ResultadoTool]) -> list[Cita]:
-    citas: list[Cita] = []
-    for r in resultados:
-        citas.extend(r.citas)
-    return citas
-
-
-# --- confirmacion_receta ---
-
-
-def _plantilla_confirmacion_receta(
-    respuesta: RespuestaAgente, resultados: list[ResultadoTool]
-) -> str:
-    """`cultivo`, `lote`, `superficie`, `producto` y `tipo_aplicacion` son los
-    campos que alimentan un chequeo legal más adelante (el tipo define la banda
-    y la distancia mínima que se informan; ver `servicios/extraccion_receta.py`):
-    si faltan se muestran igual, con ⚠️. El resto de los campos (ver
-    `Receta`, DECISIONES.md) son descriptivos de la receta real -- se
-    muestran solo si se pudieron leer, sin ⚠️ ni bloquear la confirmación."""
-    datos = _primer_dato(resultados) or {}
-    numero_txt = f" N.° {datos['numero']}" if datos.get("numero") else ""
-    lineas = [f"*Leí la receta{numero_txt}*. Confirmá los datos:"]
-    lineas.append(f"- *Cultivo:* {datos.get('cultivo') or 'no figura ⚠️'}")
-    lineas.append(f"- *Lote:* {datos.get('lote') or 'no figura ⚠️'}")
-    lineas.append(f"- *Localidad:* {datos.get('localidad') or 'no figura ⚠️'}")
-    lineas.append(
-        f"- *Superficie:* {_num(datos['superficie_ha'])} ha"
-        if datos.get("superficie_ha") is not None
-        else "- *Superficie:* no figura ⚠️"
-    )
-    if datos.get("adversidad"):
-        lineas.append(f"- *Adversidad:* {datos['adversidad']}")
-    for item in datos.get("items", []):
-        producto = item.get("producto_nombre", "producto sin nombre")
-        dosis = item.get("dosis_declarada") or "sin dosis"
-        detalle = " · ".join(
-            p for p in (item.get("principio_activo"), item.get("clase_toxicologica")) if p
-        )
-        sufijo = f" ({detalle})" if detalle else ""
-        lineas.append(f"- *Producto:* {producto} — {dosis}{sufijo}")
-        if item.get("adversidad"):
-            lineas.append(f"  Plaga/maleza: {item['adversidad']}")
-    if not datos.get("items"):
-        lineas.append("- *Producto:* no figura ⚠️")
-    lineas.append(f"- *Tipo de aplicación:* {datos.get('tipo_aplicacion') or 'no figura ⚠️'}")
-    if datos.get("caudal"):
-        lineas.append(f"- *Caudal:* {datos['caudal']}")
-    if datos.get("ubic_poblado"):
-        lineas.append(f"- *Ubicación respecto de zonas pobladas:* {datos['ubic_poblado']}")
-    if datos.get("condiciones"):
-        lineas.append(f"- *Condiciones de aplicación:* {datos['condiciones']}")
-    if datos.get("restricciones"):
-        lineas.append(f"- *Restricciones:* {datos['restricciones']}")
-    if datos.get("observaciones"):
-        lineas.append(f"- *Observaciones:* {datos['observaciones']}")
-    if datos.get("fecha_emision"):
-        lineas.append(f"- *Fecha de emisión:* {datos['fecha_emision']}")
-    if datos.get("validez_dias") is not None:
-        lineas.append(f"- *Validez:* {_num(datos['validez_dias'])} días")
-    lineas.append("[Confirmar] [Corregir]")
-    return "\n".join(lineas)
-
-
-# --- dictamen ---
-
-_SEGUIMIENTO_COMPLETO = (
-    "¿Querés más info (la banda de cada producto) o que agende la aplicación?"
-)
-_SEGUIMIENTO_SOLO_INFO = "¿Querés más info (la banda de cada producto)?"
-
-
-def _bloque_condiciones(condiciones: dict | None) -> str:
-    """Lo más concreto posible: distancia mínima y la norma que la fija. La
-    banda de cada producto queda para cuando el usuario pide más info. No
-    compara contra la ubicación del lote."""
-    if not condiciones:
-        return ""
-    tipo = "aérea" if condiciones["tipo_aplicacion"] == "aerea" else condiciones["tipo_aplicacion"]
-    banda = condiciones.get("banda")
-    if banda:
-        color = f" ({condiciones['banda_color']})" if condiciones.get("banda_color") else ""
-        detalle = f"{tipo} · banda {banda}{color}"
-    else:
-        detalle = f"{tipo} · banda no determinada ⚠️"
-    lineas = [f"*Condiciones de aplicación* — {condiciones['localidad']} · {detalle}"]
-    for d in condiciones.get("distancias_minimas", []):
-        zona = _NOMBRE_ZONA.get(d["tipo_zona"], d["tipo_zona"])
-        limitante = d.get("norma_limitante")
-        norma = f" ({_cita_norma(Cita.model_validate(limitante))})" if limitante else ""
-        lineas.append(f"- *Distancia mínima a {zona}:* {_num(d['distancia_min_m'])} m{norma}")
-    for d in condiciones.get("distancias_minimas", []):
-        if d.get("extraida_de_pdf") and d.get("norma_limitante"):
-            zona = _NOMBRE_ZONA.get(d["tipo_zona"], d["tipo_zona"])
-            fuente = _cita_norma(Cita.model_validate(d["norma_limitante"]))
-            lineas.append(
-                f"⚠️ La distancia a {zona} se leyó del texto de {fuente} (no hay reglas "
-                "cargadas a mano para esa jurisdicción): verificala con la norma."
-            )
-        lineas.extend(f"⚠️ {a}" for a in d.get("advertencias", []))
-    lineas.extend(f"⚠️ {a}" for a in condiciones.get("advertencias", []))
-    return "\n".join(lineas)
-
-
-def _citas_no_mostradas_inline(citas: list[Cita], condiciones: dict | None) -> list[Cita]:
-    """La norma que limita cada distancia ya va en su línea: en *Fuentes*
-    queda el resto (SENASA, otras reglas que aplican) sin repetirla."""
-    if not condiciones:
-        return citas
-    inline = [
-        Cita.model_validate(d["norma_limitante"])
-        for d in condiciones.get("distancias_minimas", []) if d.get("norma_limitante")
-    ]
-    return [c for c in citas if c not in inline]
+# --- tipos de respuesta que producen varias tools ---
 
 
 def _plantilla_dictamen(respuesta: RespuestaAgente, resultados: list[ResultadoTool]) -> str:
-    datos = _primer_dato(resultados) or {}
-    dictamen = datos.get("dictamen")
-    if dictamen is None:
-        # `evaluar_riesgo` suelto: solo condiciones de aplicación, sin veredicto.
-        condiciones = datos.get("condiciones")
-        no_realizados = [c for r in resultados for c in r.chequeos_no_realizados]
-        bloque_no_realizados = (
-            "\n".join(["*No se pudo verificar*"] + [f"- {c}" for c in no_realizados])
-            if no_realizados else ""
-        )
-        citas = _citas_no_mostradas_inline(_todas_las_citas(resultados), condiciones)
-        return _unir_secciones(
-            _bloque_condiciones(condiciones), bloque_no_realizados, _seccion_fuentes(citas),
-            _SEGUIMIENTO_COMPLETO if condiciones else "",
-        )
-    resultado = dictamen.get("resultado", "NO_EVALUABLE")
-    condiciones = dictamen.get("condiciones")
-    lugar = (condiciones or {}).get("localidad") or datos.get("jurisdiccion_id", "")
-    icono = _ICONO_DICTAMEN.get(resultado, "⚠️")
-
-    titulo = f"*Dictamen*{' — ' + lugar if lugar else ''}"
-    encabezado = f"{titulo}\n*Resultado:* {icono} {resultado}"
-
-    observaciones = dictamen.get("observaciones", [])
-    bloque_observaciones = ""
-    if observaciones:
-        lineas = ["*Observaciones*"]
-        lineas += [f"{i}. {o['descripcion']}" for i, o in enumerate(observaciones, start=1)]
-        bloque_observaciones = "\n".join(lineas)
-
-    no_realizados = dictamen.get("chequeos_no_realizados", [])
-    bloque_no_realizados = ""
-    if no_realizados:
-        lineas = ["*No se pudo verificar*"]
-        lineas += [f"- {c}" for c in no_realizados]
-        bloque_no_realizados = "\n".join(lineas)
-
-    citas = [Cita.model_validate(c) for c in dictamen.get("citas", [])]
-    seguimiento = ""
-    if condiciones:
-        # Una receta observada no se ofrece para agendar.
-        seguimiento = _SEGUIMIENTO_SOLO_INFO if resultado == "OBSERVADA" else _SEGUIMIENTO_COMPLETO
-    return _unir_secciones(
-        encabezado, bloque_observaciones, bloque_no_realizados,
-        _bloque_condiciones(condiciones),
-        _seccion_fuentes(_citas_no_mostradas_inline(citas, condiciones)),
-        seguimiento,
-    )
-
-
-# --- detalle_bandas ---
-
-
-_COLOR_BANDA = {"Ia": "roja", "Ib": "roja", "II": "amarilla", "III": "azul", "IV": "verde"}
-
-
-def _plantilla_detalle_bandas(respuesta: RespuestaAgente, resultados: list[ResultadoTool]) -> str:
-    """Banda toxicológica de cada producto a aplicar (lo que se ofrece tras el
-    dictamen). Sale de la evaluación de riesgo del turno, no del LLM."""
-    datos = _primer_dato(resultados) or {}
-    condiciones = datos.get("condiciones") or (datos.get("dictamen") or {}).get("condiciones")
-    if not condiciones:
-        return "No pude obtener la banda de los productos."
-    registros = {p.get("nombre"): p.get("numero_inscripcion") for p in datos.get("productos", [])}
-    productos = condiciones.get("productos_por_banda") or {}
-
-    lineas = ["*Banda de cada producto*"]
-    for producto, banda in productos.items():
-        reg = f" · Reg. SENASA {registros[producto]}" if registros.get(producto) else ""
-        if banda:
-            lineas.append(f"- {producto}{reg}: {banda} ({_COLOR_BANDA.get(banda, 'sin color')})")
-        else:
-            lineas.append(f"- {producto}{reg}: no figura en SENASA ⚠️")
-    if not productos:
-        lineas.append("- No pude identificar ningún producto en el registro de SENASA ⚠️")
-    if condiciones.get("banda"):
-        color = _COLOR_BANDA.get(condiciones["banda"], "")
-        lineas.append(
-            f"La aplicación se rige por la más peligrosa: {condiciones['banda']}"
-            + (f" ({color})." if color else ".")
-        )
-
-    # Las restricciones (distancias mínimas y sus avisos) van en el mismo
-    # mensaje: quien pide la banda pide también qué exige la norma.
-    no_realizados = [c for r in resultados for c in r.chequeos_no_realizados]
-    bloque_no_realizados = (
-        "\n".join(["*No se pudo verificar*"] + [f"- {c}" for c in no_realizados])
-        if no_realizados else ""
-    )
-    return _unir_secciones(
-        "\n".join(lineas), _bloque_condiciones(condiciones), bloque_no_realizados,
-        "¿Querés que agende la aplicación?" if productos else "",
-    )
-
-
-# --- agendar_aplicacion ---
-
-
-def _lineas_agenda(tareas: list[dict]) -> list[str]:
-    _ICONO_TAREA = {"pendiente": "⏳", "en_curso": "🚜", "finalizada": "✅"}
-    lineas = []
-    for i, t in enumerate(tareas, start=1):
-        icono = _ICONO_TAREA.get(t.get("estado_tarea"), "⚠️")
-        hora = f"{t['hora']} — " if t.get("hora") else ""
-        cultivo = t.get("cultivo") or "sin cultivo"
-        lote = t.get("lote") or "sin lote"
-        lineas.append(f"{i}. {icono} {hora}{cultivo} — lote {lote} ({t.get('estado_tarea')})")
-    return lineas
-
-
-def _plantilla_agendar_aplicacion(
-    respuesta: RespuestaAgente, resultados: list[ResultadoTool]
-) -> str:
-    resultado = resultados[0] if resultados else None
-    datos = (resultado.datos if resultado else None) or {}
-
-    if resultado is not None and resultado.estado == "ok":
-        lineas = [f"✅ *Aplicación agendada* — {datos['fecha_legible']}, {datos['hora']} hs"]
-        if datos.get("cultivo"):
-            lineas.append(f"- *Cultivo:* {datos['cultivo']}")
-        if datos.get("lote"):
-            lineas.append(f"- *Lote:* {datos['lote']}")
-        lineas.extend(f"⚠️ {a}" for a in resultado.advertencias)
-        return "\n".join(lineas)
-
-    faltante = resultado.faltantes[0] if resultado and resultado.faltantes else None
-    if faltante is None:
-        return "No pude agendar la aplicación. ¿Me decís de nuevo el día y el horario?"
-
-    if faltante.campo == "hora":
-        tareas = datos.get("tareas", [])
-        if tareas:
-            agenda = "\n".join(
-                [f"*Agenda del {datos['fecha_legible']}* ({len(tareas)})"] + _lineas_agenda(tareas)
-            )
-        else:
-            agenda = f"No tenés nada agendado para el {datos['fecha_legible']}."
-        pregunta = f"{faltante.pregunta_sugerida} Por ejemplo: 8:30 o 3 de la tarde."
-        return _unir_secciones(agenda, pregunta)
-
-    aviso = ""
-    if not faltante.motivo.startswith("no se indicó"):
-        aviso = f"{faltante.motivo[0].upper()}{faltante.motivo[1:]}. "
-    return (
-        f"{aviso}{faltante.pregunta_sugerida} Podés decirme un día (por ejemplo "
-        "\"martes\" o \"mañana\") o una fecha (por ejemplo 25/09)."
-    )
-
-
-# --- consulta_producto ---
+    """Con veredicto es el dictamen de `evaluar_viabilidad_legal`; sin él, un
+    `evaluar_riesgo` suelto (solo las condiciones de aplicación)."""
+    datos = primer_dato(resultados) or {}
+    if datos.get("dictamen") is None:
+        return plantilla_riesgo(respuesta, resultados)
+    return plantilla_dictamen(respuesta, resultados)
 
 
 def _plantilla_consulta_producto(
     respuesta: RespuestaAgente, resultados: list[ResultadoTool]
 ) -> str:
-    """Sin intro del LLM ni sección *Fuentes* aparte (ver `formatear_respuesta`
-    y DECISIONES.md): acá la única Cita que arman las tools es un marcador
-    genérico ("SENASA, (vademécum)" o "SENASA, Reg. NNNN (detalle API)") que
-    no agrega nada sobre lo que ya va en la línea del producto (el propio
-    n.° de registro), así que mostrarla aparte es puro ruido. La Cita real
-    sigue viajando en `ResultadoTool.citas` y quedando logueada por turno;
-    esto solo cambia qué se le muestra al usuario en el chat."""
-    datos = _primer_dato(resultados) or {}
-
-    if "productos" in datos:  # consultar_productos: listado
-        productos = datos["productos"]
-        total = datos.get("total", len(productos))
-        if not productos:
-            return "No encontré productos registrados con esos filtros."
-        lineas = [f"*Productos registrados* ({len(productos)} de {total})"]
-        for i, p in enumerate(productos[:10], start=1):
-            dosis = p.get("dosis") or {}
-            dosis_txt = dosis.get("texto_original", "sin dosis registrada")
-            marca = p.get("marca", "(sin marca)")
-            registro = p.get("numero_inscripcion", "-")
-            banda = p.get("banda_toxicologica") or "S/D"
-            lineas.append(f"{i}. *{marca}* · Reg. SENASA {registro} · Banda {banda} · {dosis_txt}")
-        lineas.append(
-            "Es lo que figura en el registro; qué aplicar lo define la receta "
-            "del ingeniero agrónomo."
-        )
-        return "\n".join(lineas)
-
-    # validar_producto_registro: producto puntual
-    autorizado = (
-        "✅ autorizado" if datos.get("cultivo_autorizado") else "⚠️ no autorizado para ese cultivo"
-    )
-    nombre = datos.get("producto", "(sin nombre)")
-    registro = datos.get("numero_inscripcion", "-")
-    banda = datos.get("banda_toxicologica") or "S/D"
-    lineas = [f"*{nombre}* · Reg. SENASA {registro} · Banda {banda} · {autorizado}"]
-    dosis_txt = next(
-        (
-            (uso.get("dosis") or {}).get("texto_original")
-            for uso in datos.get("usos_registrados") or []
-            if (uso.get("dosis") or {}).get("texto_original")
-        ),
-        None,
-    )
-    if dosis_txt:
-        lineas.append(f"Dosis registrada: {dosis_txt}")
-    return "\n".join(lineas)
+    """Un listado (`consultar_productos`) o un producto puntual
+    (`validar_producto_registro`), según la forma del resultado."""
+    datos = primer_dato(resultados) or {}
+    if "productos" in datos:
+        return plantilla_listado(respuesta, resultados)
+    return plantilla_producto(respuesta, resultados)
 
 
-# --- consulta_normativa ---
-
-
-def _plantilla_consulta_normativa(
-    respuesta: RespuestaAgente, resultados: list[ResultadoTool]
-) -> str:
-    datos = _primer_dato(resultados) or {}
-    veredicto = datos.get("veredicto", "Depende")
-    regla = datos.get("regla", "")
-    cuerpo = f"*{veredicto}.* {regla}"
-    aclaracion = "\n".join(
-        f"⚠️ {a}" for r in resultados for a in r.advertencias if a.startswith("No se cuenta con")
-    )
-    return _unir_secciones(
-        cuerpo, aclaracion, _seccion_fuentes(_todas_las_citas(resultados))
-    )
-
-
-# --- consulta_articulo ---
-
-
-def _plantilla_consulta_articulo(
-    respuesta: RespuestaAgente, resultados: list[ResultadoTool]
-) -> str:
-    """El texto del artículo va literal (sin pasar por el LLM), con su norma y
-    jurisdicción en el encabezado."""
-    datos = _primer_dato(resultados) or {}
-    partes = datos.get("partes", [])
-    encabezado = f"{datos.get('norma_legible', 'Norma')}, art. {datos.get('numero', '')}"
-    if datos.get("jurisdiccion_id"):
-        encabezado += f" ({datos['jurisdiccion_id']})"
-    bloques = []
-    for i, parte in enumerate(partes, start=1):
-        titulo = encabezado + (f" — texto {i} de {len(partes)}" if len(partes) > 1 else "")
-        bloques.append(f"*{titulo}*\n{parte['texto']}")
-    avisos = "\n".join(f"⚠️ {a}" for r in resultados for a in r.advertencias)
-    return _unir_secciones(*bloques, avisos)
-
-
-# --- limitaciones ---
-
-_ORDEN_APLICACION = ("aerea", "terrestre", "todas")
-_TITULO_APLICACION = {
-    "aerea": "*Aplicación aérea*", "terrestre": "*Aplicación terrestre*",
-    "todas": "*Cualquier tipo de aplicación*",
-}
-_NOMBRE_APLICACION = {"aerea": "aérea", "terrestre": "terrestre", "todas": "cualquier aplicación"}
-
-
-def _zona_legible(tipo_zona: str) -> str:
-    nombre = _NOMBRE_ZONA.get(tipo_zona, tipo_zona.replace("_", " "))
-    return nombre[0].upper() + nombre[1:]
-
-
-def _bandas_legibles(bandas: list[str]) -> str:
-    if bandas == ["todas"]:
-        return "todas las bandas"
-    return ("banda " if len(bandas) == 1 else "bandas ") + ", ".join(bandas)
-
-
-def _referencia(regla: dict) -> str:
-    return _cita_norma(
-        Cita(fuente="normativa", norma=regla.get("norma"), articulo=regla.get("articulo"))
-    )
-
-
-def _aviso_pdf(regla: dict) -> str:
-    return (
-        "  ⚠️ Distancia leída del texto de la norma: verificala con la norma."
-        if regla.get("extraida_de_pdf") else ""
-    )
-
-
-def _linea_prohibicion(r: dict, con_aplicacion: bool = False) -> list[str]:
-    detalle = [_zona_legible(r["tipo_zona"])]
-    if con_aplicacion:
-        detalle.append(_NOMBRE_APLICACION[r["tipo_aplicacion"]])
-    detalle.append(_bandas_legibles(r["bandas"]))
-    lineas = [
-        f"- {' · '.join(detalle)}: a menos de {_num(r['distancia_min_m'])} m no se puede "
-        f"aplicar ({_referencia(r)})"
-    ]
-    if r.get("observaciones"):
-        lineas.append(f"  ⚠️ {r['observaciones']}")
-    if _aviso_pdf(r):
-        lineas.append(_aviso_pdf(r))
-    return lineas
-
-
-def _linea_condicional(r: dict) -> list[str]:
-    detalle = " · ".join(
-        [_zona_legible(r["tipo_zona"]), _NOMBRE_APLICACION[r["tipo_aplicacion"]],
-         _bandas_legibles(r["bandas"])]
-    )
-    desde = f"desde {_num(r['distancia_min_m'])} m, " if r["distancia_min_m"] else ""
-    cond = r.get("condiciones") or "según la norma"
-    lineas = [f"- {detalle}: se puede aplicar {desde}si: {cond} ({_referencia(r)})"]
-    if r.get("observaciones"):
-        lineas.append(f"  ⚠️ {r['observaciones']}")
-    return lineas
-
-
-def _plantilla_limitaciones(respuesta: RespuestaAgente, resultados: list[ResultadoTool]) -> str:
-    datos = _primer_dato(resultados) or {}
-    aclaracion = "\n".join(
-        f"⚠️ {a}" for r in resultados for a in r.advertencias
-    )
-    fuentes = _seccion_fuentes(_todas_las_citas(resultados))
-
-    if datos.get("distancia_m") is not None:
-        titulo = f"*A {_num(datos['distancia_m'])} m en {datos['localidad']}*"
-        restricciones = datos.get("restricciones", [])
-        if not restricciones:
-            cuerpo = "A esa distancia no hay ninguna prohibición para lo consultado."
-        else:
-            lineas: list[str] = []
-            for x in restricciones:
-                lineas.extend(_linea_prohibicion(x["prohibicion"], con_aplicacion=True))
-                if x["excepciones"]:
-                    lineas.append("  *Excepciones posibles:*")
-                    for e in x["excepciones"]:
-                        lineas.extend(f"  {renglon}" for renglon in _linea_condicional(e))
-                else:
-                    lineas.append("  No hay excepciones cargadas para esa distancia.")
-            cuerpo = "\n".join(lineas)
-        return _unir_secciones(titulo, aclaracion, cuerpo, fuentes)
-
-    titulo = f"*Limitaciones en {datos.get('localidad', '')}*"
-    secciones = [titulo, aclaracion]
-    prohibiciones = datos.get("prohibiciones", [])
-    for aplicacion in _ORDEN_APLICACION:
-        reglas = [r for r in prohibiciones if r["tipo_aplicacion"] == aplicacion]
-        if reglas:
-            lineas = [_TITULO_APLICACION[aplicacion]]
-            for r in reglas:
-                lineas.extend(_linea_prohibicion(r))
-            secciones.append("\n".join(lineas))
-    condicionales = datos.get("condicionales", [])
-    if condicionales:
-        lineas = ["*Excepciones*"]
-        for r in condicionales:
-            lineas.extend(_linea_condicional(r))
-        secciones.append("\n".join(lineas))
-    secciones.append(fuentes)
-    return _unir_secciones(*secciones)
+# --- comunes ---
 
 
 # --- repregunta ---
@@ -605,66 +116,6 @@ def _plantilla_no_resuelto(respuesta: RespuestaAgente, resultados: list[Resultad
     return "\n".join(lineas)
 
 
-# --- consulta_vehiculo (Fase 9) ---
-
-
-def _plantilla_consulta_vehiculo(
-    respuesta: RespuestaAgente, resultados: list[ResultadoTool]
-) -> str:
-    datos = _primer_dato(resultados) or {}
-    vehiculo = datos.get("vehiculo", "(sin identificar)")
-    tipo_aplic = datos.get("tipo_aplicacion", "")
-    return f"*Vehículo:* {vehiculo}" + (f" ({tipo_aplic})" if tipo_aplic else "")
-
-
-# --- evento_registrado (Fase 9) ---
-
-
-def _plantilla_evento_registrado(
-    respuesta: RespuestaAgente, resultados: list[ResultadoTool]
-) -> str:
-    datos = _primer_dato(resultados) or {}
-    resultado = resultados[0] if resultados else None
-
-    if resultado is not None and resultado.estado == "observado":
-        lineas = ["⚠️ *Ya hay una aplicación en curso*"]
-        lineas.extend(f"- {a}" for a in resultado.advertencias)
-        return "\n".join(lineas)
-
-    if datos.get("fecha_fin"):
-        lineas = ["✅ *Aplicación finalizada*"]
-        if datos.get("lote"):
-            lineas.append(f"- *Lote:* {datos['lote']}")
-        lineas.append(f"- *Inicio:* {datos.get('fecha_inicio', 'no figura')}")
-        lineas.append(f"- *Fin:* {datos['fecha_fin']}")
-        return "\n".join(lineas)
-
-    lineas = ["✅ *Aplicación iniciada*"]
-    if datos.get("vehiculo"):
-        lineas.append(f"- *Vehículo:* {datos['vehiculo']}")
-    if datos.get("lote"):
-        lineas.append(f"- *Lote:* {datos['lote']}")
-    lineas.append(f"- *Inicio:* {datos.get('fecha_inicio', 'no figura')}")
-    return "\n".join(lineas)
-
-
-# --- agenda (Fase 9) ---
-
-
-def _plantilla_agenda(respuesta: RespuestaAgente, resultados: list[ResultadoTool]) -> str:
-    datos = _primer_dato(resultados) or {}
-    fecha = datos.get("fecha", "")
-    tareas = datos.get("tareas", [])
-
-    if not tareas:
-        if fecha:
-            return f"No tenés tareas agendadas para el {datos.get('fecha_legible') or fecha}."
-        return "No tenés tareas agendadas."
-
-    fecha = datos.get("fecha_legible") or fecha
-    return "\n".join([f"*Agenda del {fecha}* ({len(tareas)})"] + _lineas_agenda(tareas))
-
-
 # --- ayuda ---
 
 
@@ -692,22 +143,22 @@ def _plantilla_error(respuesta: RespuestaAgente, resultados: list[ResultadoTool]
 
 
 _PLANTILLAS = {
-    "confirmacion_receta": _plantilla_confirmacion_receta,
+    "confirmacion_receta": plantilla_confirmacion_receta,
     "dictamen": _plantilla_dictamen,
     "consulta_producto": _plantilla_consulta_producto,
-    "consulta_normativa": _plantilla_consulta_normativa,
+    "consulta_normativa": plantilla_consulta_normativa,
     "repregunta": _plantilla_repregunta,
     "fuera_de_dominio": _plantilla_fuera_de_dominio,
     "no_resuelto": _plantilla_no_resuelto,
     "ayuda": _plantilla_ayuda,
     "error": _plantilla_error,
-    "consulta_vehiculo": _plantilla_consulta_vehiculo,
-    "evento_registrado": _plantilla_evento_registrado,
-    "agenda": _plantilla_agenda,
-    "detalle_bandas": _plantilla_detalle_bandas,
-    "agendar_aplicacion": _plantilla_agendar_aplicacion,
-    "consulta_articulo": _plantilla_consulta_articulo,
-    "limitaciones": _plantilla_limitaciones,
+    "consulta_vehiculo": plantilla_consulta_vehiculo,
+    "evento_registrado": plantilla_evento_registrado,
+    "agenda": plantilla_agenda,
+    "detalle_bandas": plantilla_detalle_bandas,
+    "agendar_aplicacion": plantilla_agendar_aplicacion,
+    "consulta_articulo": plantilla_consulta_articulo,
+    "limitaciones": plantilla_limitaciones,
 }
 
 

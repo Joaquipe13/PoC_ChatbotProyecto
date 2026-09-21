@@ -10,7 +10,7 @@ Usa el modelo de embeddings REAL (fixture compartida `modelo_embeddings` de
 tests/conftest.py), no uno fake: este archivo hace un DELETE completo de
 `territorio.*` y recarga desde las fixtures, y esa base es la misma que se
 usa para verificación manual y para los tests de la Fase 6
-(`tests/tools/test_responder_consulta_normativa.py`, que necesitan
+(`tests/tools/responder_consulta_normativa/test_tool.py`, que necesitan
 similitud vectorial real). Usar un modelo fake acá corrompía esos datos con
 embeddings dummy cada vez que corría la suite completa (ver DIFICULTADES.md).
 """

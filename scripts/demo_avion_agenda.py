@@ -31,7 +31,7 @@ import psycopg
 from fitosanitarios.config import get_settings
 from fitosanitarios.llm.client import ClienteGemini
 from fitosanitarios.orquestador.estado import guardar_receta_en_curso
-from fitosanitarios.tools._recursos import con_conexion, con_conexion_y_modelo
+from fitosanitarios.servicios.recursos import con_conexion, con_conexion_y_modelo
 from fitosanitarios.tools.consultar_agenda import ConsultarAgendaArgs, consultar_agenda_tool_logica
 from fitosanitarios.tools.leer_receta import leer_receta_logica
 from fitosanitarios.tools.registrar_evento import RegistrarEventoArgs, registrar_evento_logica

@@ -74,7 +74,7 @@ def crear_modelo_chat_gemini(settings: Settings) -> BaseChatModel:
 def construir_tools(imagen_base64: str | None = None) -> list:
     """`TOOLS` con `leer_receta` reemplazada por la variante ligada a la
     imagen del turno cuando el canal (WhatsApp, Fase 8) ya la descargó -- ver
-    `tools/leer_receta.py::crear_tool_leer_receta_ligada`. Sin imagen (turnos
+    `tools/leer_receta/tool.py::crear_tool_leer_receta_ligada`. Sin imagen (turnos
     de solo texto, y todos los tests existentes) se usa la `leer_receta`
     original."""
     if imagen_base64 is None:

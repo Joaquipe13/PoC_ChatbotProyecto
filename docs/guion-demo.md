@@ -39,7 +39,7 @@ cualquier operario desde el celular) recién se reconoce a partir de esta
 fase — antes daba `NO_EVALUABLE` por "unidad no reconocida" (ver
 `DECISIONES.md`). Si por algún motivo el LLM extrae `dosis_unidad` con otra
 grafía no cubierta, el respaldo verificado y determinístico está en
-`tests/tools/test_evaluar_viabilidad_legal.py::test_dictamen_apta_producto_registrado_dosis_ok`.
+`tests/tools/evaluar_viabilidad_legal/test_tool.py::test_dictamen_apta_producto_registrado_dosis_ok`.
 
 ### 2. Dictamen OBSERVADA (dosis fuera de rango)
 
@@ -54,7 +54,7 @@ resultado sea negativo, y lista *todas* las observaciones si hay más de una
 (p. ej. un cultivo no autorizado para el producto).
 
 **Respaldo determinístico:**
-`tests/tools/test_evaluar_viabilidad_legal.py::test_dictamen_observada_por_dosis_fuera_de_rango`.
+`tests/tools/evaluar_viabilidad_legal/test_tool.py::test_dictamen_observada_por_dosis_fuera_de_rango`.
 
 ### 3. Consulta de productos (listado)
 
@@ -141,7 +141,7 @@ es sensible a la redacción exacta con la que el LLM orquestador arma el
 argumento `pregunta` de la tool — no siempre es idéntica a como lo escribió
 el operario (ver `DECISIONES.md`, Fase 8). Si no devuelve cita en el primer
 intento, repetir la pregunta casi textual a la de arriba, o mostrar
-`tests/tools/test_responder_consulta_normativa.py::test_pregunta_con_respaldo_devuelve_cita_verificada`
+`tests/tools/responder_consulta_normativa/test_tool.py::test_pregunta_con_respaldo_devuelve_cita_verificada`
 como respaldo determinístico (misma pregunta, `jurisdiccion_id` explícito).
 
 ### 9. Extensiones (Fase 9)

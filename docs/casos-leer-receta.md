@@ -17,7 +17,7 @@ Catálogo de las imágenes sintéticas de `tests/fixtures/recetas/` (generadas c
 
 ## Reglas de conversión (confianza → campo vs. faltante)
 
-Implementadas en `servicios/extraccion_receta.py::convertir_a_receta_y_faltantes`:
+Implementadas en `tools/leer_receta/utils.py::convertir_a_receta_y_faltantes`:
 
 - Cada campo viene del LLM con su propio valor y su propia confianza (0 a 1).
 - Confianza `< UMBRAL_CONFIANZA_CAMPO` (0,6 por defecto) o valor `null` → el campo no entra en la `Receta`, entra como `CampoFaltante` con pregunta sugerida y `tipo_entrada` (texto, botones, etc.).

@@ -12,9 +12,9 @@ Uso: uv run python evals/run_evals.py [--limite N]
 Sobre las otras dos metas de la Fase 7 ("0 citas inventadas", "100% de
 dictámenes por plantilla"): no se miden acá porque están garantizadas por
 construcción, no por comportamiento del LLM en cada corrida:
-- Las citas nunca vienen del texto libre del LLM: `rag_normativa.py`
+- Las citas nunca vienen del texto libre del LLM: `tools/responder_consulta_normativa/utils.py`
   descarta en código cualquier cita que no esté entre los fragmentos
-  recuperados (ver tests/servicios/test_rag_normativa.py, Fase 6).
+  recuperados (ver tests/tools/responder_consulta_normativa/test_utils.py, Fase 6).
 - Todo `RespuestaAgente.tipo == "dictamen"` pasa siempre por
   `_plantilla_dictamen` (`formateador.py`): no hay otro camino para
   mostrar un dictamen. Ver tests/orquestador/test_formateador.py.

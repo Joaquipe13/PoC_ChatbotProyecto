@@ -9,11 +9,11 @@ import pytest
 from fitosanitarios.orquestador.agente import crear_agente
 from fitosanitarios.orquestador.estado import ContadorRepreguntas
 from fitosanitarios.orquestador.turno import ejecutar_turno
+from fitosanitarios.servicios import recursos as _recursos
 from fitosanitarios.servicios.localidad import Jurisdiccion, Ubicacion
 from fitosanitarios.servicios.reglas import ReglaCandidata
-from fitosanitarios.tools import _recursos
-from fitosanitarios.tools import consultar_articulo as mod_articulo
-from fitosanitarios.tools import listar_limitaciones as mod_limitaciones
+from fitosanitarios.tools.consultar_articulo import tool as mod_articulo
+from fitosanitarios.tools.listar_limitaciones import tool as mod_limitaciones
 from tests.orquestador.fake_chat_model import (
     ChatModelFake,
     mensaje_llama_tool,
