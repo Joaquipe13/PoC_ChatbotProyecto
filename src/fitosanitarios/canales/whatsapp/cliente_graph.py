@@ -7,15 +7,27 @@ de la API (máx. 3 botones, título ≤ 20 caracteres; máx. 10 filas en listas)
 sin hacer ninguna llamada de red, para poder testearlas sin mockear HTTP.
 """
 
+import logging
+import re
+
 import httpx
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_fixed
 
 from fitosanitarios.config import Settings
 
+logger = logging.getLogger(__name__)
+
 MAX_BOTONES = 3
 MAX_LARGO_TITULO_BOTON = 20
 MAX_FILAS_LISTA = 10
+MAX_LARGO_TITULO_FILA = 24
+MAX_LARGO_CUERPO = 1024
+TITULO_BOTON_LISTA = "Ver opciones"
 MAX_TAMANO_IMAGEN_BYTES = 5 * 1024 * 1024
+
+_RE_LINEA_BOTONES = re.compile(r"^\s*(\[[^\]]+\]\s*)+$")
+_RE_OPCION_CORCHETES = re.compile(r"\[([^\]]+)\]")
+_RE_FILA_LISTA = re.compile(r"^   - (.+)$")
 
 
 class ErrorEnvioWhatsApp(Exception):
@@ -134,12 +146,57 @@ def enviar_texto(settings: Settings, to: str, texto: str) -> None:
     _enviar(settings, _payload_texto(to, texto))
 
 
+def partir_opciones(mensaje: str) -> tuple[str, list[str]]:
+    """Separa el cuerpo de un mensaje de las opciones que el formateador deja
+    AL FINAL como texto: una línea `[Confirmar] [Corregir]` o un bloque de
+    líneas `   - opción` (ver `orquestador/formateador.py`). Devuelve
+    `(mensaje, [])` si el mensaje no termina en opciones -- las que quedan en
+    el medio de un mensaje (varias repreguntas) siguen saliendo como texto."""
+    lineas = mensaje.rstrip().split("\n")
+    if _RE_LINEA_BOTONES.match(lineas[-1]):
+        return "\n".join(lineas[:-1]).strip(), _RE_OPCION_CORCHETES.findall(lineas[-1])
+    opciones: list[str] = []
+    while lineas and (m := _RE_FILA_LISTA.match(lineas[-1])):
+        opciones.insert(0, m.group(1).strip())
+        lineas.pop()
+    if opciones:
+        return "\n".join(lineas).strip(), opciones
+    return mensaje, []
+
+
+def _payload_con_opciones(to: str, cuerpo: str, opciones: list[str]) -> dict | None:
+    """Botones (hasta 3) o lista (hasta 10) según la cantidad de opciones, o
+    `None` si algo no entra en los límites de la API: en ese caso el mensaje
+    sale como texto, como antes."""
+    if not cuerpo or len(cuerpo) > MAX_LARGO_CUERPO or len(set(opciones)) != len(opciones):
+        return None
+    if len(opciones) <= MAX_BOTONES and all(len(o) <= MAX_LARGO_TITULO_BOTON for o in opciones):
+        botones = [{"id": f"op{i}", "titulo": o} for i, o in enumerate(opciones, start=1)]
+        return _payload_botones(to, cuerpo, botones)
+    if len(opciones) <= MAX_FILAS_LISTA and all(len(o) <= MAX_LARGO_TITULO_FILA for o in opciones):
+        filas = [{"id": f"op{i}", "titulo": o} for i, o in enumerate(opciones, start=1)]
+        return _payload_lista(to, cuerpo, TITULO_BOTON_LISTA, filas)
+    return None
+
+
 def enviar_mensajes(settings: Settings, to: str, mensajes: list[str]) -> None:
     """Envía cada elemento de la lista ya partida por el formateador (ver
-    `orquestador/formateador.py::formatear_respuesta`) como un mensaje de
-    texto separado, en orden."""
+    `orquestador/formateador.py::formatear_respuesta`) en orden. Si el mensaje
+    termina en opciones (`[A] [B]` o `   - opción`) se manda como botones o
+    lista interactiva; el título elegido vuelve al webhook como texto (ver
+    `webhook.texto_e_imagen`). Si la API rechaza el interactivo, se reenvía
+    como texto para no perder la respuesta."""
     for mensaje in mensajes:
-        enviar_texto(settings, to, mensaje)
+        cuerpo, opciones = partir_opciones(mensaje)
+        payload = _payload_con_opciones(to, cuerpo, opciones) if opciones else None
+        if payload is None:
+            enviar_texto(settings, to, mensaje)
+            continue
+        try:
+            _enviar(settings, payload)
+        except ErrorEnvioWhatsApp:
+            logger.warning("Graph API rechazó el mensaje interactivo, se envía como texto")
+            enviar_texto(settings, to, mensaje)
 
 
 def enviar_botones(settings: Settings, to: str, texto: str, botones: list[dict]) -> None:
