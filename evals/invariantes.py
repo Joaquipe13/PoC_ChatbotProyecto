@@ -20,6 +20,7 @@ import sys
 from pathlib import Path
 
 from evals import registro
+from fitosanitarios.servicios.confirmacion import es_confirmacion
 
 # Tool que tiene que haber corrido en el turno para que el bot conteste con cada tipo.
 TOOLS_POR_TIPO = {
@@ -40,10 +41,6 @@ TIPOS_CON_NUMEROS_CRITICOS = TIPOS_CRITICOS_SIN_TOOL | {"detalle_bandas", "consu
 LIMITE_WHATSAPP = 4096
 TOOLS_EVALUACION = {"evaluar_viabilidad_legal"}
 CAMPOS_RECETA = {"cultivo", "lote", "superficie_ha", "tipo_aplicacion", "localidad"}
-PALABRAS_DE_CONFIRMACION = (
-    "confirm", "si", "sí", "dale", "ok", "correcto", "esta bien", "está bien", "perfecto",
-    "listo", "joya", "de acuerdo", "adelante", "evalu",
-)
 FRASES_CANCELAR = {"cancelar", "cancela", "cancelá", "nueva receta", "empezar de nuevo"}
 # Frases fijas de las plantillas que traen números (ejemplos que se le dan al usuario).
 EJEMPLOS_DE_PLANTILLA = ("8:30", "3 de la tarde", "25/09")
@@ -328,15 +325,6 @@ def receta_evaluada_sin_confirmacion(turnos, i, escenario) -> list[dict]:
     return []
 
 
-def _confirma(texto: str) -> bool:
-    minusculas = texto.lower()
-    palabras = set(re.findall(r"\w+", minusculas))
-    return any(
-        (p in palabras) if " " not in p and len(p) <= 3 else (p in minusculas)
-        for p in PALABRAS_DE_CONFIRMACION
-    )
-
-
 def evaluo_sin_que_el_usuario_confirme(turnos, i, escenario) -> list[dict]:
     """Después de mostrar la confirmación de una receta, el usuario tiene que aceptarla (o
     corregirla) antes de evaluar: contestar solo un dato pedido (la localidad, por ejemplo) no
@@ -348,7 +336,7 @@ def evaluo_sin_que_el_usuario_confirme(turnos, i, escenario) -> list[dict]:
     if not previos:
         return []
     despues = turnos[previos[-1] + 1: i + 1]
-    if any(_confirma(d["entrada"]["contenido"]) for d in despues):
+    if any(es_confirmacion(d["entrada"]["contenido"]) for d in despues):
         return []
     return [violacion("evaluo_sin_que_el_usuario_confirme", "alto", t["n"],
                       "evaluó la receta sin que el usuario la confirmara: "

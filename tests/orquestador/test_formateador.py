@@ -400,17 +400,18 @@ def test_consulta_producto_puntual():
         estado="ok",
         datos={
             "producto": "Flyer 10 Ec", "numero_inscripcion": "41881",
-            "banda_toxicologica": "II", "cultivo_autorizado": True,
-            "usos_registrados": [
-                {"cultivo": "soja", "dosis": {"texto_original": "160-180 cm3/ha"}}
+            "banda_toxicologica": "II", "cultivo": "soja", "cultivo_autorizado": True,
+            "usos_del_cultivo": [
+                {"cultivo": "Soja", "adversidad": "Chinche De La Alfalfa",
+                 "dosis": {"texto_original": "160-180 cm3/ha"}}
             ],
         },
         citas=[Cita(fuente="senasa", registro_senasa="41881", documento="detalle API")],
     )
     texto = _un_mensaje(respuesta, [resultado])
     assert texto == (
-        "*Flyer 10 Ec* · Reg. SENASA 41881 · Banda II · ✅ autorizado\n"
-        "Dosis registrada: 160-180 cm3/ha"
+        "*Flyer 10 Ec* · Reg. SENASA 41881 · Banda II · ✅ autorizado para soja\n"
+        "Dosis registrada para soja: 160-180 cm3/ha (Chinche De La Alfalfa)"
     )
     assert "*Fuentes*" not in texto
 
@@ -426,6 +427,61 @@ def test_consulta_producto_puntual_sin_dosis_registrada():
     )
     texto = _un_mensaje(respuesta, [resultado])
     assert texto == "*Flyer 10 Ec* · Reg. SENASA 41881 · Banda II · ✅ autorizado"
+
+
+def test_consulta_producto_muestra_la_dosis_del_cultivo_consultado_y_no_la_de_otro():
+    """Bug real (Gemini): "¿el Flyer 10 Ec está registrado para soja?" respondía
+    "Dosis registrada: 10 cm3/hl", la del primer uso registrado, que es de duraznero."""
+    resultado = ResultadoTool(
+        estado="ok",
+        datos={
+            "producto": "Flyer 10 Ec", "numero_inscripcion": "41881", "banda_toxicologica": "II",
+            "cultivo": "soja", "cultivo_autorizado": True,
+            # datos de otro cultivo que la tool ya no trae; si llegaran, no se usan
+            "usos_registrados": [
+                {"cultivo": "Duraznero", "dosis": {"texto_original": "10 cm3/hl"}}
+            ],
+            "usos_del_cultivo": [
+                {"cultivo": "Soja", "adversidad": "Chinche De La Alfalfa",
+                 "dosis": {"texto_original": "160-180 cm3/ha"}},
+                {"cultivo": "Soja", "adversidad": "Oruga",
+                 "dosis": {"texto_original": "25 a 35 cm3/ha"}},
+            ],
+        },
+    )
+    texto = _un_mensaje(RespuestaAgente(tipo="consulta_producto"), [resultado])
+    assert texto == (
+        "*Flyer 10 Ec* · Reg. SENASA 41881 · Banda II · ✅ autorizado para soja\n"
+        "Dosis registrada para soja:\n"
+        "- 160-180 cm3/ha (Chinche De La Alfalfa)\n"
+        "- 25 a 35 cm3/ha (Oruga)"
+    )
+    assert "10 cm3/hl" not in texto
+
+
+def test_consulta_producto_sin_dosis_para_el_cultivo_no_muestra_ninguna():
+    resultado = ResultadoTool(
+        estado="observado",
+        datos={
+            "producto": "Flyer 10 Ec", "numero_inscripcion": "41881", "banda_toxicologica": "II",
+            "cultivo": "maiz", "cultivo_autorizado": False, "usos_del_cultivo": [],
+        },
+    )
+    texto = _un_mensaje(RespuestaAgente(tipo="consulta_producto"), [resultado])
+    assert texto == "*Flyer 10 Ec* · Reg. SENASA 41881 · Banda II · ⚠️ no autorizado para maiz"
+
+
+def test_consulta_producto_con_muchas_dosis_muestra_las_primeras_y_cuenta_el_resto():
+    usos = [
+        {"cultivo": "Soja", "adversidad": f"Plaga {i}", "dosis": {"texto_original": f"{i} g/ha"}}
+        for i in range(1, 7)
+    ]
+    resultado = ResultadoTool(estado="ok", datos={
+        "producto": "X", "numero_inscripcion": "1", "banda_toxicologica": "IV",
+        "cultivo": "soja", "cultivo_autorizado": True, "usos_del_cultivo": usos,
+    })
+    texto = _un_mensaje(RespuestaAgente(tipo="consulta_producto"), [resultado])
+    assert texto.count("\n- ") == 5 and texto.endswith("- y 2 más")
 
 
 def test_consulta_producto_ignora_el_intro_del_llm():
@@ -1018,3 +1074,79 @@ def test_una_receta_leida_con_faltantes_sigue_siendo_una_confirmacion():
     )
     texto = _un_mensaje(RespuestaAgente(tipo="confirmacion_receta"), [resultado])
     assert texto.startswith("*Leí la receta*")
+
+
+# --- un mensaje con varias preguntas se contesta entero ---
+
+
+def _limitaciones(localidad, distancia=None, regla=AEREA_II):
+    datos = {"localidad": localidad, "distancia_m": distancia, "prohibiciones": [regla],
+             "condicionales": []}
+    if distancia is not None:
+        datos["restricciones"] = [{"prohibicion": regla, "excepciones": []}]
+    return ResultadoTool(estado="ok", datos=datos, citas=_citas(regla))
+
+
+def _todo(respuesta, resultados) -> str:
+    return "\n\n".join(formatear_respuesta(respuesta, resultados))
+
+
+def test_dos_consultas_en_un_turno_se_contestan_las_dos():
+    """Hallazgo H3: "y en trebol tmb a 1000? y pasame el texto del art 33" se contestaba solo
+    lo segundo. Ahora, si el LLM llama a las dos tools, se muestran las dos."""
+    texto = _todo(
+        RespuestaAgente(tipo="consulta_articulo"),
+        [_limitaciones("El Trébol", distancia=1000), _resultado_articulo(["Texto del art. 33."])],
+    )
+    assert "*A 1000 m en El Trébol*" in texto
+    assert "*Ley 11273/1995, art. 33 (santa-fe)*\nTexto del art. 33." in texto
+    assert texto.index("A 1000 m en El Trébol") < texto.index("Ley 11273/1995, art. 33")
+
+
+def test_dos_localidades_en_un_turno_muestran_cada_una():
+    texto = _todo(
+        RespuestaAgente(tipo="limitaciones"),
+        [_limitaciones("Rosario"), _limitaciones("El Trébol")],
+    )
+    assert "*Limitaciones en Rosario*" in texto and "*Limitaciones en El Trébol*" in texto
+
+
+def test_una_tool_llamada_varias_veces_con_lo_mismo_se_muestra_una_sola_vez():
+    """Gemini llegó a llamar 3 veces a `listar_limitaciones` con los mismos argumentos."""
+    tres = [_limitaciones("El Trébol") for _ in range(3)]
+    texto = _un_mensaje(RespuestaAgente(tipo="limitaciones"), tres)
+    assert texto.count("*Limitaciones en El Trébol*") == 1
+
+
+def test_una_consulta_contestada_y_otra_que_pide_un_dato_muestra_las_dos_cosas():
+    pregunta = ResultadoTool(estado="faltan_datos", faltantes=[CampoFaltante(
+        campo="norma", motivo="varias", tipo_entrada="lista",
+        pregunta_sugerida="El artículo 7 está en varias normas. ¿De cuál?",
+        opciones=["Ley 11273/1995 (santa-fe)", "Ordenanza 841/2010 (el-trebol)"],
+    )])
+    texto = _todo(
+        RespuestaAgente(tipo="limitaciones"), [_limitaciones("El Trébol"), pregunta]
+    )
+    respondido = texto.index("*Limitaciones en El Trébol*")
+    assert respondido < texto.index("El artículo 7 está en varias normas")
+    assert "   - Ordenanza 841/2010 (el-trebol)" in texto
+
+
+def test_el_tipo_que_elige_el_llm_no_cambia_lo_que_muestra_la_forma_de_los_datos():
+    normativa = ResultadoTool(
+        estado="ok", datos={"veredicto": "Si", "regla": "Se avisa 48 h antes."},
+        citas=_citas(AEREA_II),
+    )
+    texto = _un_mensaje(RespuestaAgente(tipo="limitaciones"), [normativa])
+    assert texto.startswith("*Si.* Se avisa 48 h antes.")
+
+
+def test_los_datos_de_un_riesgo_no_se_confunden_con_un_listado_de_productos():
+    riesgo = ResultadoTool(estado="ok", datos={
+        "productos": [{"nombre": "Flyer 10 Ec", "numero_inscripcion": "41881",
+                       "banda_toxicologica": "II"}],
+        "condiciones": {"localidad": "El Trébol", "tipo_aplicacion": "aerea", "banda": "II",
+                        "productos_por_banda": {"Flyer 10 Ec": "II"}, "distancias_minimas": []},
+    })
+    texto = _un_mensaje(RespuestaAgente(tipo="detalle_bandas"), [riesgo])
+    assert texto.startswith("*Banda de cada producto*")

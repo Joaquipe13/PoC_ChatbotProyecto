@@ -8,6 +8,7 @@ todas las que aplican -- no solo la que ganó (ver skill, "Geo": "Con varias,
 gana la más restrictiva, citando todas").
 """
 
+import unicodedata
 from dataclasses import dataclass
 
 from fitosanitarios.dominio.modelos import Cita
@@ -39,6 +40,30 @@ class ChequeoDistanciaZona:
     distancia_min_aplicable_m: float
     citas: list[Cita]
     advertencias: list[str]
+
+
+def texto_plano(texto: str) -> str:
+    """Minúsculas, sin tildes y con `_ - , ;` como espacios: para comparar lo que escribe el
+    LLM o el usuario con los valores del catálogo."""
+    sin_tildes = "".join(
+        c for c in unicodedata.normalize("NFD", texto) if unicodedata.category(c) != "Mn"
+    )
+    plano = sin_tildes.lower()
+    for separador in "_-,;":
+        plano = plano.replace(separador, " ")
+    return " ".join(plano.split())
+
+
+def normalizar_tipo_aplicacion(texto: str | None) -> str | None:
+    """"aérea", "Aereo", "con avión", "terrestre" -> "aerea" / "terrestre"; `None` si no se
+    reconoce. Las reglas se comparan con estos dos valores exactos: un "aérea" que llegara
+    sin normalizar no coincidiría con ninguna y el dictamen ignoraría la distancia."""
+    palabras = texto_plano(texto or "").split()
+    if any(p.startswith(("aere", "avion", "dron")) for p in palabras):
+        return "aerea"
+    if any(p.startswith(("terre", "mosquito", "pulveriz", "mochila")) for p in palabras):
+        return "terrestre"
+    return None
 
 
 def _coincide(r: ReglaCandidata, tipo_zona: str, tipo_aplicacion: str, banda: str) -> bool:

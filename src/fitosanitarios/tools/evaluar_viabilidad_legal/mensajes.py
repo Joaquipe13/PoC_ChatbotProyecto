@@ -2,7 +2,7 @@
 operario (la plantilla del tipo de respuesta `dictamen` cuando la evaluación trae
 veredicto; sin él, la forma es la de `evaluar_riesgo`)."""
 
-from fitosanitarios.dominio.modelos import Cita, RespuestaAgente, ResultadoTool
+from fitosanitarios.dominio.modelos import CampoFaltante, Cita, RespuestaAgente, ResultadoTool
 from fitosanitarios.servicios.formato import (
     SEGUIMIENTO_COMPLETO,
     SEGUIMIENTO_SOLO_INFO,
@@ -25,8 +25,29 @@ def pregunta_producto_ambiguo(nombre: str) -> str:
     return f"Hay varios productos parecidos a '{nombre}'. ¿Cuál es?"
 
 
-def resumen_para_llm(resultado_dictamen: str) -> str:
-    return f"evaluar_viabilidad_legal: {resultado_dictamen}"
+MOTIVO_SIN_CONFIRMAR = "la receta leída de la foto todavía no fue confirmada"
+PREGUNTA_CONFIRMAR = "Antes de evaluar: ¿confirmás que los datos de la receta son correctos?"
+
+
+def faltante_confirmacion() -> CampoFaltante:
+    """Se pide la confirmación con los mismos botones con que se mostró la receta."""
+    return CampoFaltante(
+        campo="confirmacion", motivo=MOTIVO_SIN_CONFIRMAR, pregunta_sugerida=PREGUNTA_CONFIRMAR,
+        tipo_entrada="botones", opciones=["Confirmar", "Corregir"],
+    )
+
+
+def resumen_para_llm(resultado: ResultadoTool, resultado_dictamen: str) -> str:
+    """Lo que ve el LLM de la tool. Si pidió un dato, se lo dice para que se lo pregunte al
+    operario en vez de volver a llamarla."""
+    texto = f"evaluar_viabilidad_legal: {resultado_dictamen}"
+    if resultado.faltantes:
+        campos = ", ".join(f.campo for f in resultado.faltantes)
+        texto += (
+            f". Falta: {campos}. Preguntáselo al operario y no vuelvas a llamar la tool "
+            "hasta que responda"
+        )
+    return texto
 
 
 def plantilla_dictamen(respuesta: RespuestaAgente, resultados: list[ResultadoTool]) -> str:

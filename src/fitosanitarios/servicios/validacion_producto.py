@@ -24,6 +24,9 @@ class ResolucionProducto:
     marca: str | None = None
     banda_toxicologica: str | None = None
     usos_registrados: list[dict] | None = None
+    # Solo los usos del cultivo consultado (y de la adversidad, si se dio): es lo único
+    # que se le puede mostrar al usuario como "la dosis registrada".
+    usos_del_cultivo: list[dict] | None = None
 
 
 def _dosis_sin_ambiguedad_de_adversidad(
@@ -132,5 +135,5 @@ def resolver_y_validar_producto(
         numero_inscripcion=producto.numero_inscripcion, marca=producto.marca,
         banda_toxicologica=producto.banda_toxicologica,
         chequeo_producto=chequeo_producto, chequeo_dosis=chequeo_dosis,
-        usos_registrados=producto.usos_registrados,
+        usos_registrados=producto.usos_registrados, usos_del_cultivo=usos_cultivo,
     )

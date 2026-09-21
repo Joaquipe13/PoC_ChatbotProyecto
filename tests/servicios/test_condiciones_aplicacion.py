@@ -1,3 +1,5 @@
+import pytest
+
 from fitosanitarios.servicios.condiciones_aplicacion import (
     banda_de_la_aplicacion,
     calcular_condiciones,
@@ -114,3 +116,15 @@ def test_una_regla_leida_del_pdf_marca_la_distancia_como_extraida():
 def test_una_regla_de_csv_no_se_marca_como_extraida():
     condiciones = calcular_condiciones("El Trébol", "aerea", {"Producto A": "IV"}, REGLAS_EL_TREBOL)
     assert condiciones.distancias_minimas[0].extraida_de_pdf is False
+
+
+@pytest.mark.parametrize("escrito", ["aerea", "aérea", "Aérea", "aplicación aérea", "con avión"])
+def test_el_tipo_de_aplicacion_se_normaliza_antes_de_buscar_reglas(escrito):
+    """Gemini puede mandar "aérea" con tilde: no tiene que dejar sin distancia al dictamen."""
+    reglas = [ReglaCandidata(
+        tipo_zona="zona_urbana", tipo_aplicacion="aerea", bandas=["todas"], distancia_min_m=1000,
+        norma="Ley X", articulo="1", jurisdiccion_id=None,
+    )]
+    condiciones = calcular_condiciones("El Trébol", escrito, {"Flyer": "II"}, reglas)
+    assert condiciones.tipo_aplicacion == "aerea"
+    assert [d.distancia_min_m for d in condiciones.distancias_minimas] == [1000]

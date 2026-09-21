@@ -47,8 +47,9 @@ def validar_producto_registro_logica(
         "producto": resolucion.marca,
         "numero_inscripcion": resolucion.numero_inscripcion,
         "banda_toxicologica": resolucion.banda_toxicologica,
+        "cultivo": args.cultivo,
         "cultivo_autorizado": cp.cultivo_autorizado,
-        "usos_registrados": resolucion.usos_registrados,
+        "usos_del_cultivo": resolucion.usos_del_cultivo or [],
     }
     advertencias = []
     if cp.cultivo_autorizado is False:

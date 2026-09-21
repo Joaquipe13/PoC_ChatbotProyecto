@@ -4,6 +4,7 @@ vuelve a invocar `validar_producto_registro`/`evaluar_riesgo` como tools
 separadas, para que el dictamen no dependa de que el LLM encadene bien las
 tools (ver skill, "Arquitectura")."""
 
+from langchain.tools import ToolRuntime
 from langchain_core.tools import tool
 from pydantic import BaseModel
 
@@ -11,6 +12,7 @@ from fitosanitarios.datos.retrievers.territorio import reglas_candidatas
 from fitosanitarios.dominio.modelos import CampoFaltante, ResultadoTool
 from fitosanitarios.dominio.motivos import MotivoNoResuelto
 from fitosanitarios.servicios.condiciones_aplicacion import calcular_condiciones
+from fitosanitarios.servicios.confirmacion import hay_receta_sin_confirmar
 from fitosanitarios.servicios.dictamen import armar_dictamen
 from fitosanitarios.servicios.ubicacion import resolver_ubicacion_o_cortar
 from fitosanitarios.servicios.validacion_producto import resolver_y_validar_producto
@@ -110,6 +112,7 @@ def evaluar_viabilidad_legal(
     tipo_aplicacion: str,
     productos: list[ProductoDeclarado],
     cultivo: str,
+    runtime: ToolRuntime,
     localidad: str | None = None,
     provincia: str | None = None,
     adversidad: str | None = None,
@@ -117,6 +120,14 @@ def evaluar_viabilidad_legal(
 ) -> tuple[str, ResultadoTool]:
     from fitosanitarios.config import get_settings
     from fitosanitarios.servicios.recursos import con_conexion_y_modelo
+
+    # Una receta de foto se evalúa después de que el usuario la confirma, no antes: se
+    # decide acá, no en el prompt (ver `servicios/confirmacion.py`).
+    if hay_receta_sin_confirmar(runtime.state.get("messages", [])):
+        pendiente = ResultadoTool(
+            estado="faltan_datos", faltantes=[mensajes.faltante_confirmacion()]
+        )
+        return mensajes.resumen_para_llm(pendiente, "-"), pendiente
 
     args = EvaluarViabilidadLegalArgs(
         localidad=localidad, provincia=provincia, tipo_aplicacion=tipo_aplicacion,
@@ -130,4 +141,4 @@ def evaluar_viabilidad_legal(
         )
     )
     dictamen_resultado = resultado.datos["dictamen"]["resultado"] if resultado.datos else "-"
-    return mensajes.resumen_para_llm(dictamen_resultado), resultado
+    return mensajes.resumen_para_llm(resultado, dictamen_resultado), resultado

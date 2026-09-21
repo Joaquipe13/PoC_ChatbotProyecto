@@ -6,10 +6,16 @@ Todo determinista, a partir de las reglas cargadas: el LLM solo interpreta la
 pregunta (qué filtros pasar), nunca decide qué limitaciones existen.
 """
 
-import unicodedata
 from dataclasses import dataclass, field
 
-from fitosanitarios.servicios.reglas import ReglaCandidata, excepciones_aplicables
+from fitosanitarios.servicios.reglas import (
+    ReglaCandidata,
+    excepciones_aplicables,
+    normalizar_tipo_aplicacion,  # noqa: F401 -- se reexporta para la tool
+)
+from fitosanitarios.servicios.reglas import (
+    texto_plano as _plano,
+)
 
 BANDAS = ["Ia", "Ib", "II", "III", "IV"]
 _COLOR = {
@@ -21,15 +27,6 @@ _ZONAS = {
     "escuela": ("escuela", "escuelas", "colegio", "establecimiento educativo", "educativo"),
     "curso_agua": ("curso de agua", "cursos de agua", "agua", "arroyo", "canal", "laguna"),
 }
-
-
-def _plano(texto: str) -> str:
-    sin_tildes = unicodedata.normalize("NFD", texto)
-    sin_tildes = "".join(c for c in sin_tildes if unicodedata.category(c) != "Mn")
-    plano = sin_tildes.lower()
-    for separador in "_-,;":
-        plano = plano.replace(separador, " ")
-    return " ".join(plano.split())
 
 
 def normalizar_bandas(texto: str | None) -> list[str] | None:
@@ -58,15 +55,6 @@ def normalizar_tipo_zona(texto: str | None) -> str | None:
         if plano == tipo.replace("_", " ") or any(s in plano for s in sinonimos):
             return tipo
     return plano.replace(" ", "_")
-
-
-def normalizar_tipo_aplicacion(texto: str | None) -> str | None:
-    palabras = _plano(texto or "").split()
-    if any(p.startswith(("aere", "avion", "dron")) for p in palabras):
-        return "aerea"
-    if any(p.startswith(("terre", "mosquito", "pulveriz", "mochila")) for p in palabras):
-        return "terrestre"
-    return None
 
 
 def _coincide(

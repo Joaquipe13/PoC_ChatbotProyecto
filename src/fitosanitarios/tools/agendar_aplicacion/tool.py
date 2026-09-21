@@ -26,6 +26,7 @@ from fitosanitarios.servicios.fechas import (
     resolver_fecha,
     resolver_hora,
 )
+from fitosanitarios.servicios.reglas import normalizar_tipo_aplicacion
 from fitosanitarios.tools.agendar_aplicacion import mensajes
 from fitosanitarios.tools.agendar_aplicacion.prompts import DESCRIPCION
 from fitosanitarios.tools.agendar_aplicacion.utils import agendar_aplicacion as agendar
@@ -92,7 +93,9 @@ def agendar_aplicacion_logica(
         conn, thread_id, fecha, hora,
         {
             "numero": args.numero, "cultivo": args.cultivo, "lote": args.lote,
-            "superficie_ha": args.superficie_ha, "tipo_aplicacion": args.tipo_aplicacion,
+            "superficie_ha": args.superficie_ha, "tipo_aplicacion": (
+                normalizar_tipo_aplicacion(args.tipo_aplicacion) or args.tipo_aplicacion
+            ),
         },
     )
     advertencias = [

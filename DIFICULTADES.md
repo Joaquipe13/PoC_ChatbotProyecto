@@ -222,3 +222,13 @@ Probando por WhatsApp con una receta de María Susana, el dictamen salía para "
 - `detalle_bandas` salía con el encabezado solo cuando el producto no se resolvía (se descartaba en silencio) y sin distancias.
 - `catalogo.producto.banda_toxicologica` estaba vacía en 7.189 de 7.370 productos (solo los 181 con detalle SENASA la tenían); ahora sale de la clase del listado, que es el mismo valor.
 - Las preguntas ("Para continuar necesito 1 dato: 1. productos: ¿Cuál de estos productos es?") no se entendían solas.
+
+### Tres hallazgos del piloto de evaluación conversacional, arreglados en código (21/09/2026)
+
+La primera corrida del loop de Fase 12 (`evals/runs/20260921-192037/informe.md`) encontró tres fallas que las pruebas de unidad y las consultas sueltas no veían. Los tres arreglos son deterministas y cada uno dejó un test permanente.
+
+- **H1, la consulta de un producto mostraba la dosis de otro cultivo.** `validar_producto_registro` devolvía `usos_registrados` sin filtrar y la plantilla tomaba el primero. Ahora la tool devuelve solo los usos del cultivo consultado (y de la adversidad, si se indicó) en `usos_del_cultivo`, y la plantilla dice `Dosis registrada para soja: ...`; si el cultivo no está autorizado lo dice y no muestra ninguna dosis.
+- **H2, una receta de foto se evaluó sin que el usuario la confirmara.** Tras mostrar la receta leída, el usuario contestó solo la localidad y Gemini llamó a `evaluar_viabilidad_legal`. El prompt ya pedía confirmar, pero no alcanza. Ahora la tool mira el historial (`servicios/confirmacion.py`, con `ToolRuntime`): si hay una receta mostrada sin confirmación posterior, no evalúa y devuelve la pregunta de confirmación con sus botones. El mismo criterio lo usa el invariante `evaluo_sin_que_el_usuario_confirme` del harness.
+- **H3, un mensaje con dos pedidos se contestó a medias.** El formateador mostraba solo el primer resultado del turno. Ahora arma una sección por cada consulta distinta que el turno contestó (sin repetir llamadas idénticas) y, al final, lo que una tool todavía necesita saber. Además, el prompt pide una tool por pregunta.
+
+Aparte: `evaluar_riesgo`, `evaluar_viabilidad_legal` y `agendar_aplicacion` usaban `tipo_aplicacion` tal como lo escribía Gemini. Un "aérea" con tilde no coincidía con ninguna regla y el dictamen quedaba sin distancia. La normalización (que ya tenía `listar_limitaciones`) pasó a `servicios/reglas.py` y se aplica en `calcular_condiciones`.

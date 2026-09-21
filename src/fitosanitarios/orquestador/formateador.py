@@ -14,6 +14,7 @@ plantillas (citas, números, *Fuentes*) está en `servicios/formato.py`
 (ver docs/especificacion-plantillas.md).
 """
 
+import json
 import re
 
 from fitosanitarios.dominio.modelos import RespuestaAgente, ResultadoTool
@@ -220,10 +221,55 @@ def partir_por_seccion(texto: str, limite: int = LIMITE_CARACTERES_WHATSAPP) -> 
     return mensajes
 
 
+def _forma_de(datos: dict | None) -> str | None:
+    for propio, tiene_esa_forma in _FORMAS_PROPIAS.items():
+        if datos and tiene_esa_forma(datos):
+            return propio
+    return None
+
+
+def _respuestas_de_consultas(resultados: list[ResultadoTool]) -> list[tuple[str, ResultadoTool]]:
+    """Cada consulta distinta que el turno contestó, con su plantilla. Llamadas idénticas (el
+    LLM repitió una tool con los mismos argumentos) cuentan una sola vez."""
+    vistas: set[tuple[str, str]] = set()
+    respuestas: list[tuple[str, ResultadoTool]] = []
+    for r in resultados:
+        forma = _forma_de(r.datos)
+        if forma is None:
+            continue
+        clave = (forma, json.dumps(r.datos, sort_keys=True, default=str))
+        if clave not in vistas:
+            vistas.add(clave)
+            respuestas.append((forma, r))
+    return respuestas
+
+
+def _texto_de_varias_consultas(
+    respuesta: RespuestaAgente, resultados: list[ResultadoTool]
+) -> str | None:
+    """Un mensaje con varias preguntas ("¿y en El Trébol a 1000 m? y pasame el art. 33")
+    se contesta entero: una sección por cada consulta, y al final lo que una tool todavía
+    necesita saber. Antes se mostraba solo el primer resultado y el resto se perdía
+    (hallazgo H3 de la evaluación conversacional). `None` si no es ese caso."""
+    respuestas = _respuestas_de_consultas(resultados)
+    pendientes = [
+        r for r in resultados if r.estado == "faltan_datos" and r.faltantes and not r.datos
+    ]
+    if len(respuestas) < 2 and not (respuestas and pendientes):
+        return None
+    secciones = [_PLANTILLAS[forma](respuesta, [r]) for forma, r in respuestas]
+    if pendientes:
+        secciones.append(_plantilla_repregunta(respuesta, pendientes))
+    return "\n\n".join(s for s in secciones if s.strip())
+
+
 def formatear_respuesta(respuesta: RespuestaAgente, resultados: list[ResultadoTool]) -> list[str]:
     """Punto de entrada del formateador: `RespuestaAgente.tipo` + los
     `ResultadoTool` de las tools ejecutadas en el turno -> lista de mensajes
     de WhatsApp (más de uno solo si supera el límite de caracteres)."""
+    varias = _texto_de_varias_consultas(respuesta, resultados)
+    if varias is not None:
+        return partir_por_seccion(varias)
     tipo = _tipo_efectivo(respuesta.tipo, resultados)
     texto = _PLANTILLAS[tipo](respuesta, resultados)
     # En dictamen/detalle_bandas la plantilla ya cierra con su propia pregunta:
@@ -244,6 +290,13 @@ _FORMAS_PROPIAS = {
         isinstance(datos.get("prohibiciones"), list) or isinstance(datos.get("restricciones"), list)
     ),
     "consulta_articulo": lambda datos: isinstance(datos.get("partes"), list),
+    "consulta_normativa": lambda datos: "veredicto" in datos and "regla" in datos,
+    # el listado de `consultar_productos` trae `total` (los datos de `evaluar_riesgo` también
+    # traen `productos`, pero no `total`); uno vacío no tiene qué mostrar: no cuenta
+    "consulta_producto": lambda datos: (
+        (bool(datos.get("productos")) and "total" in datos)
+        or ("numero_inscripcion" in datos and "cultivo_autorizado" in datos)
+    ),
 }
 
 

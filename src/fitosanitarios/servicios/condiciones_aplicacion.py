@@ -8,7 +8,11 @@ escuela, curso de agua...). Función pura, sin base ni red.
 """
 
 from fitosanitarios.dominio.modelos import Cita, CondicionesAplicacion, DistanciaMinima
-from fitosanitarios.servicios.reglas import ReglaCandidata, reglas_aplicables
+from fitosanitarios.servicios.reglas import (
+    ReglaCandidata,
+    normalizar_tipo_aplicacion,
+    reglas_aplicables,
+)
 
 # De más a menos peligrosa (Ia/Ib roja, II amarilla, III azul, IV verde).
 ORDEN_BANDAS = ["Ia", "Ib", "II", "III", "IV"]
@@ -30,6 +34,7 @@ def calcular_condiciones(
     reglas: list[ReglaCandidata],
     con_normativa_municipal: bool = True,
 ) -> CondicionesAplicacion:
+    tipo_aplicacion = normalizar_tipo_aplicacion(tipo_aplicacion) or tipo_aplicacion
     banda = banda_de_la_aplicacion(list(banda_por_producto.values()))
     sin_banda = [p for p, b in banda_por_producto.items() if b not in ORDEN_BANDAS]
     advertencias: list[str] = []
