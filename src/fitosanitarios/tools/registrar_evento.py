@@ -77,7 +77,7 @@ def registrar_evento_logica(
                 CampoFaltante(
                     campo="vehiculo",
                     motivo="la descripción no coincide con ningún vehículo del catálogo",
-                    pregunta_sugerida="¿Cuál de estos vehículos es?",
+                    pregunta_sugerida=f"No identifiqué '{args.vehiculo}'. ¿Cuál de estos es?",
                     tipo_entrada="lista",
                     opciones=resultado.opciones_ambiguas,
                 )

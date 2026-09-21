@@ -273,21 +273,35 @@ def _plantilla_detalle_bandas(respuesta: RespuestaAgente, resultados: list[Resul
     if not condiciones:
         return "No pude obtener la banda de los productos."
     registros = {p.get("nombre"): p.get("numero_inscripcion") for p in datos.get("productos", [])}
+    productos = condiciones.get("productos_por_banda") or {}
 
     lineas = ["*Banda de cada producto*"]
-    for producto, banda in (condiciones.get("productos_por_banda") or {}).items():
+    for producto, banda in productos.items():
         reg = f" · Reg. SENASA {registros[producto]}" if registros.get(producto) else ""
         if banda:
             lineas.append(f"- {producto}{reg}: {banda} ({_COLOR_BANDA.get(banda, 'sin color')})")
         else:
             lineas.append(f"- {producto}{reg}: no figura en SENASA ⚠️")
+    if not productos:
+        lineas.append("- No pude identificar ningún producto en el registro de SENASA ⚠️")
     if condiciones.get("banda"):
         color = _COLOR_BANDA.get(condiciones["banda"], "")
         lineas.append(
             f"La aplicación se rige por la más peligrosa: {condiciones['banda']}"
             + (f" ({color})." if color else ".")
         )
-    return _unir_secciones("\n".join(lineas), "¿Querés que agende la aplicación?")
+
+    # Las restricciones (distancias mínimas y sus avisos) van en el mismo
+    # mensaje: quien pide la banda pide también qué exige la norma.
+    no_realizados = [c for r in resultados for c in r.chequeos_no_realizados]
+    bloque_no_realizados = (
+        "\n".join(["*No se pudo verificar*"] + [f"- {c}" for c in no_realizados])
+        if no_realizados else ""
+    )
+    return _unir_secciones(
+        "\n".join(lineas), _bloque_condiciones(condiciones), bloque_no_realizados,
+        "¿Querés que agende la aplicación?" if productos else "",
+    )
 
 
 # --- agendar_aplicacion ---
@@ -427,10 +441,12 @@ def _plantilla_repregunta(respuesta: RespuestaAgente, resultados: list[Resultado
             "Necesito un dato más para continuar, pero no pude identificar cuál. "
             "¿Podés repetir el mensaje?"
         )
-    plural = "s" if len(faltantes) != 1 else ""
-    lineas = [f"Para continuar necesito {len(faltantes)} dato{plural}:"]
+    # Estructura fija: la pregunta y, si corresponde, sus opciones. Sin encabezado
+    # ni nombre de campo: la pregunta tiene que entenderse sola.
+    varias = len(faltantes) > 1
+    lineas: list[str] = []
     for i, f in enumerate(faltantes[:3], start=1):
-        lineas.append(f"{i}. *{f.campo}*: {f.pregunta_sugerida}")
+        lineas.append(f"{i}. {f.pregunta_sugerida}" if varias else f.pregunta_sugerida)
         if f.tipo_entrada == "botones" and f.opciones:
             lineas.append("[" + "] [".join(f.opciones) + "]")
         elif f.tipo_entrada == "lista" and f.opciones:
@@ -595,10 +611,28 @@ def formatear_respuesta(respuesta: RespuestaAgente, resultados: list[ResultadoTo
     """Punto de entrada del formateador: `RespuestaAgente.tipo` + los
     `ResultadoTool` de las tools ejecutadas en el turno -> lista de mensajes
     de WhatsApp (más de uno solo si supera el límite de caracteres)."""
-    render = _PLANTILLAS[respuesta.tipo]
-    texto = render(respuesta, resultados)
-    if respuesta.intro and respuesta.tipo not in (
-        "fuera_de_dominio", "ayuda", "error", "consulta_producto",
-    ):
+    tipo = _tipo_efectivo(respuesta.tipo, resultados)
+    texto = _PLANTILLAS[tipo](respuesta, resultados)
+    # En dictamen/detalle_bandas la plantilla ya cierra con su propia pregunta:
+    # una intro del LLM ("¿querés ver las bandas?") la contradice. Si el tipo
+    # se corrigió, la intro hablaba de otra cosa.
+    sin_intro = ("fuera_de_dominio", "ayuda", "error", "consulta_producto",
+                 "dictamen", "detalle_bandas")
+    if respuesta.intro and tipo == respuesta.tipo and tipo not in sin_intro:
         texto = f"{respuesta.intro}\n\n{texto}"
     return partir_por_seccion(texto)
+
+
+def _tipo_efectivo(tipo: str, resultados: list[ResultadoTool]) -> str:
+    """El LLM elige el `tipo`, pero si la tool no llegó a evaluar nada (faltó
+    un dato, p. ej. la provincia) no hay dictamen ni bandas que mostrar: se
+    responde lo que la tool devolvió en vez de una plantilla vacía (bug real:
+    `tipo="dictamen"` tras un `faltan_datos` salía como una sola frase)."""
+    if tipo not in ("dictamen", "detalle_bandas") or any(r.datos for r in resultados):
+        return tipo
+    for r in resultados:
+        if r.estado == "faltan_datos":
+            return "repregunta"
+        if r.estado == "no_resuelto":
+            return "no_resuelto"
+    return tipo

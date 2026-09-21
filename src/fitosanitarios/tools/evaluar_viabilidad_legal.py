@@ -61,7 +61,9 @@ def evaluar_viabilidad_legal_logica(
                     CampoFaltante(
                         campo="productos",
                         motivo=f"'{producto.nombre}' es ambiguo, coincide con varios productos",
-                        pregunta_sugerida="¿Cuál de estos productos es?",
+                        pregunta_sugerida=(
+                            f"Hay varios productos parecidos a '{producto.nombre}'. ¿Cuál es?"
+                        ),
                         tipo_entrada="lista",
                         opciones=resolucion.opciones_ambiguas,
                     )

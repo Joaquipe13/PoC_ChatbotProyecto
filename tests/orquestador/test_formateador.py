@@ -229,8 +229,56 @@ def test_detalle_bandas_lista_la_banda_de_cada_producto():
         "- Producto B · Reg. SENASA 41881: II (amarilla)\n"
         "- Producto C: no figura en SENASA ⚠️\n"
         "La aplicación se rige por la más peligrosa: II (amarilla).\n\n"
+        "*Condiciones de aplicación* — El Trébol · aérea · banda II (amarilla)\n"
+        "- *Distancia mínima a zona urbana:* 3000 m (Ordenanza 841/2010, art. 7)\n\n"
         "¿Querés que agende la aplicación?"
     )
+
+
+def test_detalle_bandas_sin_producto_resuelto_lo_dice_y_no_ofrece_agendar():
+    """Bug real: un producto que no está en el catálogo se descartaba en
+    silencio y la plantilla salía con el encabezado solo, sin banda, sin
+    distancia y con la oferta de agendar."""
+    resultado = ResultadoTool(
+        estado="ok",
+        datos={"jurisdiccion_id": None, "productos": [], "condiciones": {
+            "localidad": "Maria Susana", "tipo_aplicacion": "terrestre", "banda": None,
+            "productos_por_banda": {}, "distancias_minimas": [],
+            "advertencias": ["No hay una distancia mínima cargada para Maria Susana"],
+        }},
+        chequeos_no_realizados=["Glifosato Full: no se pudo resolver contra el registro"],
+    )
+    texto = _un_mensaje(RespuestaAgente(tipo="detalle_bandas"), [resultado])
+    assert "No pude identificar ningún producto" in texto
+    assert "Glifosato Full: no se pudo resolver contra el registro" in texto
+    assert "No hay una distancia mínima cargada" in texto
+    assert "agende" not in texto
+
+
+def test_dictamen_tras_faltan_datos_repregunta_en_vez_de_salir_vacio():
+    """Bug real: el LLM eligió `dictamen` aunque la tool pidió la provincia;
+    salía solo su intro ("La evaluación ha finalizado...")."""
+    resultado = ResultadoTool(
+        estado="faltan_datos",
+        faltantes=[CampoFaltante(
+            campo="provincia", motivo="la localidad no tiene normativa cargada",
+            pregunta_sugerida="¿En qué provincia queda Pergamino?", tipo_entrada="texto",
+        )],
+    )
+    respuesta = RespuestaAgente(tipo="dictamen", intro="La evaluación de la receta ha finalizado.")
+    texto = _un_mensaje(respuesta, [resultado])
+    assert "¿En qué provincia queda Pergamino?" in texto
+    assert "ha finalizado" not in texto
+
+
+def test_dictamen_y_detalle_bandas_ignoran_el_intro_del_llm():
+    resultado = ResultadoTool(
+        estado="ok",
+        datos={"jurisdiccion_id": "el-trebol", "condiciones": _CONDICIONES_EL_TREBOL},
+    )
+    intro = "¿Querés ver el detalle de las bandas?"
+    for tipo in ("dictamen", "detalle_bandas"):
+        assert intro not in _un_mensaje(RespuestaAgente(tipo=tipo, intro=intro), [resultado])
 
 
 def test_agendar_sin_fecha_pregunta_la_fecha():
@@ -423,9 +471,8 @@ def test_repregunta_agrupada_hasta_3():
     )
     texto = _un_mensaje(respuesta, [])
     assert texto == (
-        "Para continuar necesito 2 datos:\n"
-        "1. *ubicacion_lote*: Mandá la ubicación del lote\n"
-        "2. *tipo_aplicacion*: Elegí una opción\n"
+        "1. Mandá la ubicación del lote\n"
+        "2. Elegí una opción\n"
         "[Terrestre] [Aérea]"
     )
 
@@ -630,3 +677,15 @@ def test_dictamen_avisa_cuando_la_distancia_se_leyo_del_texto_de_la_norma():
         "⚠️ La distancia a zona urbana se leyó del texto de Ley 11273/1995, art. 33 "
         "(la norma no tiene reglas.csv): verificala con la norma."
     ) in texto
+
+
+def test_repregunta_de_un_dato_es_solo_la_pregunta_con_sus_opciones():
+    respuesta = RespuestaAgente(tipo="repregunta", faltantes=[
+        CampoFaltante(campo="productos", motivo="ambiguo",
+                      pregunta_sugerida="Hay varios productos parecidos a 'Glifosato'. ¿Cuál es?",
+                      tipo_entrada="lista", opciones=["Glifosato 48 Kemsure", "Glifosato 48 Sem"]),
+    ])
+    assert _un_mensaje(respuesta, []) == (
+        "Hay varios productos parecidos a 'Glifosato'. ¿Cuál es?" + chr(10)
+        + "   - Glifosato 48 Kemsure" + chr(10) + "   - Glifosato 48 Sem"
+    )

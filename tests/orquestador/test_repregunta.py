@@ -33,8 +33,8 @@ def test_repregunta_agrupada_no_llama_ninguna_tool():
 
     assert respuesta.tipo == "repregunta"
     assert len(respuesta.faltantes) == 2
-    assert "ubicacion_lote" in mensajes[0]
-    assert "tipo_aplicacion" in mensajes[0]
+    assert "1. Mandá la ubicación del lote" in mensajes[0]
+    assert "2. ¿Terrestre o aérea?" in mensajes[0]
     assert len(modelo.llamadas) == 1  # una sola llamada al modelo: no hubo tool-calling
 
 

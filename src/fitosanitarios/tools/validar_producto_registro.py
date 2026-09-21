@@ -31,7 +31,9 @@ def validar_producto_registro_logica(
                 CampoFaltante(
                     campo="producto_nombre",
                     motivo="varios productos coinciden con ese nombre",
-                    pregunta_sugerida="¿Cuál de estos productos es?",
+                    pregunta_sugerida=(
+                        f"Hay varios productos parecidos a '{args.producto_nombre}'. ¿Cuál es?"
+                    ),
                     tipo_entrada="lista",
                     opciones=resolucion.opciones_ambiguas,
                 )

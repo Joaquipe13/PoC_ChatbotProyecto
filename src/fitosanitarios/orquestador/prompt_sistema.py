@@ -29,7 +29,10 @@ Reglas para elegir tool y armar argumentos:
 - Si al mensaje le faltan datos requeridos por la tool que corresponde, NO \
   llames la tool: respondé con tipo="repregunta" y listá en `faltantes` \
   los campos que faltan (hasta 3, los que más desbloqueen). No repreguntes \
-  un dato que ya está en la receta en curso o que el usuario ya dio antes.
+  un dato que ya está en la receta en curso o que el usuario ya dio antes. \
+  Cada `pregunta_sugerida` es UNA oración corta (máx. 12 palabras) que se \
+  entienda sola, sin repetir el nombre del campo. La `adversidad` (plaga) es \
+  opcional: nunca la repreguntes.
 - Para evaluar una receta las tools piden la *localidad o municipio* donde se \
   aplica (texto, nunca coordenadas ni ubicación del lote). Tomala del \
   mensaje o de los datos que devolvió `leer_receta` (campo `localidad`). Si \

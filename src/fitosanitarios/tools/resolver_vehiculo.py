@@ -27,7 +27,7 @@ def resolver_vehiculo_logica(args: ResolverVehiculoArgs, conn, modelo_embeddings
                 CampoFaltante(
                     campo="vehiculo",
                     motivo="la descripción no coincide con ningún vehículo del catálogo",
-                    pregunta_sugerida="¿Cuál de estos vehículos es?",
+                    pregunta_sugerida=f"No identifiqué '{args.descripcion}'. ¿Cuál de estos es?",
                     tipo_entrada="lista",
                     opciones=resolucion.opciones_ambiguas,
                 )
