@@ -61,9 +61,12 @@ src/fitosanitarios/
   datos/          migraciones SQL por schema, repositorios y retrievers
   senasa/         cliente de la API, crawler, normalizador, parser de dosis
   insumos/        loaders y validadores de SIG, normativa y reglas
-  servicios/      geo, dosis, matching, reglas, dictamen, rag_normativa
-  tools/          tools LangChain
-  orquestador/    agente, prompt de sistema, estado, formateador, plantillas
+  servicios/      geo, dosis, matching, reglas, dictamen, recursos, ubicacion, formato (lo que usa más de una tool)
+  tools/          una carpeta por tool: tool.py (schema + lógica + la tool de LangChain),
+                  prompts.py (DESCRIPCION, lo que lee el LLM), mensajes.py (lo que lee el
+                  operario: preguntas, avisos, plantilla de respuesta), utils.py si hace falta
+  orquestador/    agente (create_agent, TOOLS, ToolCallLimitMiddleware), prompt de sistema,
+                  estado, formateador, plantillas, respuesta_directa (tipo por tool, sin 2ª llamada)
   canales/whatsapp/  webhook FastAPI, cliente Graph, normalización de números
 evals/  tests/  notebooks/  data/ (crudos fuera de git, salvo muestras y fixtures)
 ```
@@ -115,6 +118,15 @@ Más las tablas propias del checkpointer de LangGraph.
 | `responder_consulta_normativa` | artículos por embedding (+ full-text) con join a norma, filtrados por localidad, provincia y nacional | el LLM responde solo con esos artículos; citas verificadas en código |
 | `consultar_productos` | productos registrados por cultivo, adversidad, principio activo, aptitud o banda: términos resueltos por embedding, después joins y filtros | lista con registro, banda y dosis registrada. Informa lo registrado; no recomienda qué aplicar (eso lo prescribe el agrónomo) |
 
+### Otras tools de normativa (deterministas, sin RAG)
+
+Agregadas después de la Fase 6 para lo que no necesita ni conviene resolver por similitud: un número de artículo exacto, o la lista completa de límites de una localidad (que tiene que ser completa, no "lo más parecido").
+
+| Tool | De dónde sale | Nota |
+|---|---|---|
+| `consultar_articulo` | `territorio.articulo` por número exacto (+ norma, si la nombró) | texto literal del PDF, sin que el LLM lo reescriba; distinto de `responder_consulta_normativa` (embedding + redacción) |
+| `listar_limitaciones` | `territorio.regla_distancia` de la localidad (municipal + provincial + nacional), filtrada por tipo de zona/aplicación/banda si los dio | lista completa con norma y artículo citando cada fila; con `distancia_m` agrega qué excepciones (`permitido=S`) habilitarían aplicar a esa distancia. Nunca bloquea el dictamen (eso lo hace `evaluar_riesgo`/`evaluar_viabilidad_legal` con las `permitido=N`) |
+
 ## Contratos
 
 ```python
@@ -143,16 +155,23 @@ class ResultadoTool(BaseModel):
     chequeos_no_realizados: list[str] = []
 
 class RespuestaAgente(BaseModel):      # response_format del agente
-    tipo: Literal["confirmacion_receta", "dictamen", "consulta_producto", "consulta_normativa",
-                  "repregunta", "fuera_de_dominio", "no_resuelto", "ayuda", "error"]
-    intro: str | None = None           # máximo una línea
+    tipo: Literal[
+        "confirmacion_receta", "dictamen", "consulta_producto", "consulta_normativa",
+        "repregunta", "fuera_de_dominio", "no_resuelto", "ayuda", "error",
+        # Fase 9 (extensiones RF6/RF7/RF9):
+        "consulta_vehiculo", "evento_registrado", "agenda",
+        "detalle_bandas", "agendar_aplicacion",  # seguimiento del dictamen
+        "consulta_articulo", "limitaciones",     # consultas de normativa sin LLM en el texto
+    ]
     faltantes: list[CampoFaltante] = []  # solo si repregunta sin haber llamado tools
 ```
 
 - Estado `ok`: todo cumple. `observado`: corrió y algo no cumple. `faltan_datos`: el usuario puede aportar lo que falta. `no_resuelto`: el sistema no tiene cómo resolverlo. `error`: falla técnica.
 - Los casos esperables (producto no encontrado, lote fuera de cobertura) se devuelven como estado, nunca como excepción. Las excepciones quedan para bugs.
-- Las tools devuelven contenido y artifact (`response_format="content_and_artifact"`, verificar): un resumen corto para el LLM y el `ResultadoTool` completo como artifact. El formateador toma `RespuestaAgente.tipo` y renderiza los artifacts de las tools ejecutadas en el turno actual, así el LLM no puede alterar números ni citas.
+- Las tools devuelven contenido y artifact (`response_format="content_and_artifact"`): un resumen corto para el LLM y el `ResultadoTool` completo como artifact. El formateador toma `RespuestaAgente.tipo` y renderiza los artifacts de las tools ejecutadas en el turno actual, así el LLM no puede alterar números ni citas.
 - Toda afirmación sobre normativa o registro lleva su `Cita`.
+- **`intro` (una línea que el LLM redactaba) se sacó** ("Menos tokens por turno", ver DECISIONES.md): el formateador ya la ignoraba en casi todos los tipos y sacarla evitó una segunda llamada a Gemini solo para escribirla.
+- **`return_direct=True` en 10 de las 12 tools** (todas menos `evaluar_riesgo` y `resolver_vehiculo`): el turno termina apenas corre la tool, sin una segunda llamada al modelo para elegir `tipo`. Ese `tipo` sale de `orquestador/respuesta_directa.py::TIPO_POR_TOOL` (una tabla tool → tipo) según el nombre de la tool y su `estado` (`no_resuelto`/`faltan_datos` pisan el tipo por defecto). `evaluar_riesgo` sigue pasando por el modelo porque su resultado puede ser un dictamen completo o solo el detalle de bandas, según de qué se venía hablando; `resolver_vehiculo` porque alimenta a otra tool, no termina el turno.
 
 ### Catálogo `MotivoNoResuelto`
 
@@ -167,6 +186,9 @@ class RespuestaAgente(BaseModel):      # response_format del agente
 | `IMAGEN_ILEGIBLE` | la extracción no alcanza la confianza mínima en campos clave |
 | `LIMITE_REPREGUNTAS` | 2 intentos fallidos por el mismo dato |
 | `SERVICIO_NO_DISPONIBLE` | cuota del LLM agotada, base o servicio caído |
+| `VEHICULO_NO_ENCONTRADO` | Fase 9: `resolver_vehiculo` no reconoce la descripción |
+| `SIN_EVENTO_EN_CURSO` | Fase 9: `registrar_evento("finalizar")` sin un `iniciar` previo |
+| `ARTICULO_NO_ENCONTRADO` | `consultar_articulo`: el número no está en la norma (o en ninguna, o en varias sin desambiguar) |
 
 Fuera de dominio no es un motivo de tool: lo decide el orquestador antes de llamar tools.
 
@@ -181,8 +203,15 @@ Fuera de dominio no es un motivo de tool: lo decide el orquestador antes de llam
 | `agendar_aplicacion` | fecha, hora (texto del operario, resuelto en código) | datos de la receta | fecha: pregunta el día. Hora: muestra la agenda de ese día y pregunta el horario |
 | `responder_consulta_normativa` | pregunta, jurisdicción (explícita o de la receta en curso) | tipo de aplicación, tipo de zona | jurisdicción: lista de las localidades cargadas |
 | `consultar_productos` | al menos uno: cultivo, adversidad o principio activo | aptitud, banda máxima | pedir cultivo o plaga |
+| `consultar_articulo` | número de artículo | norma, localidad, provincia | número: pedirlo. Número en varias normas: lista para elegir |
+| `listar_limitaciones` | localidad (o de la receta en curso) | provincia, tipo de aplicación, banda, tipo de zona, distancia_m | localidad: lista de las cargadas |
+| `resolver_vehiculo` | descripción del vehículo | — | no se repregunta: si no lo reconoce, `VEHICULO_NO_ENCONTRADO` y lo resuelve quien la llama |
+| `registrar_evento` | acción (iniciar/finalizar) | vehículo y lote (solo iniciar), id de receta | no se repregunta: `faltan_datos` si iniciar sin vehículo/lote |
+| `consultar_agenda` | — | fecha (default: hoy) | no aplica |
 
 Fuentes para completar un parámetro, en orden: mensaje actual, receta en curso, turnos previos. Nunca por suposición.
+
+**Tope de llamadas.** `ToolCallLimitMiddleware(run_limit=4)`: pasadas 4 llamadas a tools en el mismo turno, las siguientes reciben un aviso y no se ejecutan (evita bucles que agotan la cuota gratuita del LLM).
 
 ## Política del orquestador
 
@@ -194,6 +223,8 @@ Por cada mensaje:
 4. Llamar la tool con argumentos validados por schema.
 5. Leer el estado del resultado: `ok`/`observado` → responder. `faltan_datos` → repregunta. `no_resuelto` → informar. `error` → mensaje de error y log.
 6. Emitir `RespuestaAgente`.
+
+Los pasos 5 y 6 los decide el LLM solo para `evaluar_riesgo` y `resolver_vehiculo`: las otras 10 tools tienen `return_direct=True`, el turno termina apenas corren y el `tipo` sale de una tabla fija (`orquestador/respuesta_directa.py`), sin una segunda llamada al modelo (ver "Contratos", más abajo). Si la tool rechaza los argumentos antes de devolver un `ResultadoTool` (falla la validación del schema), sí vuelve a llamarse al modelo una vez para que vea el error y decida.
 
 Reglas de repregunta:
 
@@ -220,10 +251,11 @@ Estado: checkpointer de LangGraph en Postgres con `thread_id` = número de Whats
 
 ### Geo
 
-- Jurisdicción del lote por punto en polígono contra el `limite` de cada `localidad.geojson`. Si no cae en ninguno: `JURISDICCION_NO_CUBIERTA`.
-- Distancias a todas las zonas protegidas dentro de `RADIO_BUSQUEDA_ZONAS_M`, también las de localidades vecinas: una escuela del pueblo de al lado puede estar a 50 m. Se aplican las reglas de la jurisdicción del lote.
-- Punto y polígonos reproyectados al CRS de `estimate_utm_crs()` (EPSG:32720 en la zona de Rosario). Punto dentro de la zona: 0 m.
-- Reglas candidatas: las de la carpeta de la localidad del lote, las provinciales de su provincia y las nacionales. Aplica la que coincide en `tipo_zona`, `tipo_aplicacion` (o `todas`) y banda del producto (o `todas`). Con varias, gana la más restrictiva, citando todas.
+**Cambio de diseño (19/09/2026, Fase 12, ver DECISIONES.md): ya no se compara la ubicación del lote (lat/lon) contra la geometría cargada.** La localidad se resuelve por **nombre** (`servicios/localidad.py::resolver_localidad`: coincidencia exacta contra `jurisdiccion_id` o nombre, si no por texto contenido uno en el otro; ambigua o desconocida se pregunta, nunca se adivina). Con eso, `evaluar_riesgo`/`evaluar_viabilidad_legal` informan la **banda de la aplicación** (la más peligrosa entre los productos) y la **distancia mínima que exige la norma** para cada tipo de zona -- no una distancia real medida desde el lote. `servicios/geo.py::resolver_jurisdiccion` (punto en polígono) quedó en el código pero sin ningún llamador.
+
+- Reglas candidatas (`datos/retrievers/territorio.py::reglas_candidatas`): las de la localidad, las provinciales de su provincia y las nacionales. Aplica la que coincide en `tipo_zona`, `tipo_aplicacion` (o `todas`) y banda del producto (o `todas`). Con varias, gana la más restrictiva (mayor `distancia_min_m`), citando todas.
+- `regla_distancia.permitido`: `N` (prohibición) es la única que usan el dictamen y el agendado -- dentro de esa distancia no se puede. `S` (condicional) nunca bloquea ni ablanda una `N`; solo sirve para consultas ("¿puedo aplicar a X m bajo alguna condición?", `listar_limitaciones` con `distancia_m`).
+- Una localidad sin `localidad.geojson` (22/09/2026, ver DECISIONES.md, "Localidades y normas sin fuente oficial") igual puede tener reglas de distancia cargadas: sin geometría no hay zonas protegidas propias ni límite, pero `reglas.csv` no depende de eso.
 
 ### Dosis
 
