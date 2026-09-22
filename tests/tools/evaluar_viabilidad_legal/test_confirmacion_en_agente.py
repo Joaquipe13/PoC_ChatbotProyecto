@@ -59,13 +59,12 @@ def test_si_el_usuario_solo_contesta_la_localidad_no_se_evalua_y_se_pide_confirm
         mensaje_respuesta_estructurada({"tipo": "confirmacion_receta"}),
         # t2: el usuario dijo "el trebol" y el LLM evalúa sin confirmación
         mensaje_llama_tool("evaluar_viabilidad_legal", ARGS_EVALUAR),
-        mensaje_respuesta_estructurada({"tipo": "dictamen"}),
     ])
     turno("Te mando la foto de mi receta.")
     respuesta, mensajes = turno("el trebol")
 
     assert evaluaciones == []  # nunca llegó a evaluar
-    assert respuesta.tipo == "dictamen"  # lo que eligió el LLM
+    assert respuesta.tipo == "repregunta"
     assert mensajes == [
         "Antes de evaluar: ¿confirmás que los datos de la receta son correctos?\n"
         "[Confirmar] [Corregir]"
@@ -76,9 +75,7 @@ def test_despues_de_confirmar_si_evalua(evaluaciones):
     turno = _conversacion([
         mensaje_respuesta_estructurada({"tipo": "confirmacion_receta"}),
         mensaje_llama_tool("evaluar_viabilidad_legal", ARGS_EVALUAR, "c1"),
-        mensaje_respuesta_estructurada({"tipo": "dictamen"}, "r1"),
         mensaje_llama_tool("evaluar_viabilidad_legal", ARGS_EVALUAR, "c2"),
-        mensaje_respuesta_estructurada({"tipo": "dictamen"}, "r2"),
     ])
     turno("Te mando la foto de mi receta.")
     turno("el trebol")  # bloqueado
@@ -91,7 +88,6 @@ def test_despues_de_confirmar_si_evalua(evaluaciones):
 def test_una_evaluacion_sin_receta_de_foto_no_pide_confirmacion(evaluaciones):
     turno = _conversacion([
         mensaje_llama_tool("evaluar_viabilidad_legal", ARGS_EVALUAR),
-        mensaje_respuesta_estructurada({"tipo": "dictamen"}),
     ])
     respuesta, mensajes = turno("quiero evaluar Flyer 10 Ec en soja por aire en El Trébol")
     assert len(evaluaciones) == 1 and "APTA" in mensajes[0]

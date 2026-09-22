@@ -48,6 +48,7 @@ def leer_receta_logica(
     args_schema=LeerRecetaArgs,
     description=DESCRIPCION,
     response_format="content_and_artifact",
+    return_direct=True,  # ver `orquestador/respuesta_directa.py`
 )
 def leer_receta(imagen_base64: str) -> tuple[str, ResultadoTool]:
     # Import diferido: evita que importar el módulo de la tool (para tests,
@@ -78,7 +79,10 @@ def crear_tool_leer_receta_ligada(imagen_base64: str):
     construye una tool sin parámetros que usa la imagen del cierre (clausura)
     de esta función, y el agente solo tiene que decidir *si* llamarla."""
 
-    @tool("leer_receta", description=DESCRIPCION_LIGADA, response_format="content_and_artifact")
+    @tool(
+        "leer_receta", description=DESCRIPCION_LIGADA, response_format="content_and_artifact",
+        return_direct=True,
+    )
     def leer_receta_ligada() -> tuple[str, ResultadoTool]:
         from fitosanitarios.config import get_settings
         from fitosanitarios.llm.client import crear_cliente_llm

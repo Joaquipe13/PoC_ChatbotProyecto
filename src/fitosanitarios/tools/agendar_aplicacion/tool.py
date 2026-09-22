@@ -118,6 +118,7 @@ def agendar_aplicacion_logica(
     args_schema=AgendarAplicacionArgs,
     description=DESCRIPCION,
     response_format="content_and_artifact",
+    return_direct=True,  # ver `orquestador/respuesta_directa.py`
 )
 def agendar_aplicacion(
     config: RunnableConfig,

@@ -142,7 +142,7 @@ Para evaluar la receta me faltan 2 datos:
 
 **Cuándo:** el orquestador clasifica el mensaje como fuera de dominio, **antes** de llamar cualquier tool.
 
-**Campos que usa:** ninguno de tool (no hay artifacts); texto fijo, `RespuestaAgente.intro` puede variar levemente pero el cuerpo es la plantilla.
+**Campos que usa:** ninguno de tool (no hay artifacts); texto fijo.
 
 ```
 Solo puedo ayudarte con recetas de fitosanitarios: leer y validar recetas, verificar productos registrados en SENASA y responder dudas sobre la normativa de aplicación de las localidades cargadas. ¿Me mandás una receta o una consulta sobre eso?
@@ -176,7 +176,7 @@ Hola 👋 Soy el asistente de recetas fitosanitarias. Puedo:
 Mandame una foto de receta o contame qué necesitás.
 ```
 
-**Pendiente de decidir en Fase 7:** si este tipo se mantiene separado o se resuelve como un caso particular de `fuera_de_dominio` con `intro` distinta (ver nota al principio de este documento).
+**Pendiente de decidir en Fase 7:** si este tipo se mantiene separado o se resuelve como un caso particular de `fuera_de_dominio` (ver nota al principio de este documento).
 
 ## `error`
 

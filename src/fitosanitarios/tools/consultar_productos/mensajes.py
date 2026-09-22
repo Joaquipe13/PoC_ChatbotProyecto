@@ -26,7 +26,7 @@ def resumen_para_llm(total: int) -> str:
 
 
 def plantilla_listado(respuesta: RespuestaAgente, resultados: list[ResultadoTool]) -> str:
-    """Sin intro del LLM ni sección *Fuentes* aparte (ver `formatear_respuesta`
+    """Sin sección *Fuentes* aparte (ver `formatear_respuesta`
     y DECISIONES.md): la única Cita que arma la tool es un marcador genérico
     ("SENASA, (vademécum)") que no agrega nada sobre lo que ya va en la línea
     del producto (el propio n.° de registro). La Cita real sigue viajando en

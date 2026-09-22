@@ -107,6 +107,7 @@ def evaluar_viabilidad_legal_logica(
     args_schema=EvaluarViabilidadLegalArgs,
     description=DESCRIPCION,
     response_format="content_and_artifact",
+    return_direct=True,  # ver `orquestador/respuesta_directa.py`
 )
 def evaluar_viabilidad_legal(
     tipo_aplicacion: str,

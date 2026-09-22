@@ -64,6 +64,7 @@ def validar_producto_registro_logica(
     args_schema=ValidarProductoRegistroArgs,
     description=DESCRIPCION,
     response_format="content_and_artifact",
+    return_direct=True,  # ver `orquestador/respuesta_directa.py`
 )
 def validar_producto_registro(
     producto_nombre: str,

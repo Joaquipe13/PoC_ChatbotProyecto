@@ -16,6 +16,7 @@ import logging
 from contextlib import contextmanager
 
 from langchain.agents import create_agent
+from langchain.agents.middleware import ToolCallLimitMiddleware
 from langchain.agents.structured_output import ToolStrategy
 from langchain_core.language_models.chat_models import BaseChatModel
 from langgraph.checkpoint.postgres import PostgresSaver
@@ -37,6 +38,13 @@ from fitosanitarios.tools.responder_consulta_normativa import responder_consulta
 from fitosanitarios.tools.validar_producto_registro import validar_producto_registro
 
 logger = logging.getLogger(__name__)
+
+# Tope de llamadas a tools en un mismo turno. Un turno normal usa una o dos (un mensaje con
+# varias preguntas, una por pregunta); en la evaluación conversacional Gemini llegó a llamar
+# cinco veces a `listar_limitaciones` con los mismos argumentos, y cada vuelta reenvía los
+# ~4k tokens de tools y prompt. Pasado el tope, las llamadas reciben un aviso y el modelo
+# responde con lo que ya tiene.
+LIMITE_TOOLS_POR_TURNO = 4
 
 TOOLS = [
     leer_receta,
@@ -103,6 +111,7 @@ def crear_agente(model: BaseChatModel, checkpointer=None, imagen_base64: str | N
         tools=construir_tools(imagen_base64),
         system_prompt=PROMPT_SISTEMA,
         response_format=ToolStrategy(RespuestaAgente),
+        middleware=[ToolCallLimitMiddleware(run_limit=LIMITE_TOOLS_POR_TURNO)],
         checkpointer=checkpointer,
     )
 

@@ -17,7 +17,7 @@ def turno(n, entrada="hola", tipo="ayuda", texto="ok", tools=(), faltantes=(), *
     return {
         "tipo_registro": "turno", "n": n, "entrada": {"tipo": "texto", "contenido": entrada},
         "tool_calls": list(tools),
-        "respuesta": {"tipo": tipo, "intro": None, "faltantes": list(faltantes)},
+        "respuesta": {"tipo": tipo, "faltantes": list(faltantes)},
         "mensajes": [{"texto": texto, "envio": "texto", "opciones": []}],
         "latencia_s": 1.0, "tokens": {"entrada": 1, "salida": 1}, "llamadas_tool": len(tools),
         "reintentos_tool": 0, "infra": False, "error": None, **extra,

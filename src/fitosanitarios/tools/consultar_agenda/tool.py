@@ -52,6 +52,7 @@ def consultar_agenda_tool_logica(
     args_schema=ConsultarAgendaArgs,
     description=DESCRIPCION,
     response_format="content_and_artifact",
+    return_direct=True,  # ver `orquestador/respuesta_directa.py`
 )
 def consultar_agenda(config: RunnableConfig, fecha: str | None = None) -> tuple[str, ResultadoTool]:
     from fitosanitarios.servicios.recursos import con_conexion

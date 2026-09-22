@@ -12,7 +12,7 @@ Cada línea de un `.jsonl` es un registro con `tipo_registro`:
 
 - `turno`: `n`, `entrada` ({tipo: texto|imagen, contenido, ruta?}), `tool_calls` (nombre,
   args saneados, estado, motivo, faltantes, citas, chequeos_no_realizados, advertencias,
-  datos), `respuesta` ({tipo, intro, faltantes}), `mensajes` (lo que se le muestra al
+  datos), `respuesta` ({tipo, faltantes}), `mensajes` (lo que se le muestra al
   usuario, con cómo se enviaría: texto, botones o lista), `latencia_s`, `tokens`,
   `llamadas_tool`, `reintentos_tool`, `infra`, `error`;
 - `cierre`: lo que declaró el simulador al terminar (objetivo logrado o por qué abandonó).

@@ -100,6 +100,7 @@ def registrar_evento_logica(
     args_schema=RegistrarEventoArgs,
     description=DESCRIPCION,
     response_format="content_and_artifact",
+    return_direct=True,  # ver `orquestador/respuesta_directa.py`
 )
 def registrar_evento(
     accion: Literal["iniciar", "finalizar"],

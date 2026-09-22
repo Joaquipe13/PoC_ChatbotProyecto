@@ -111,7 +111,7 @@ def test_respuesta_agente_repregunta_sin_tools_lleva_faltantes():
 
 
 def test_respuesta_agente_fuera_de_dominio_sin_faltantes():
-    respuesta = RespuestaAgente(tipo="fuera_de_dominio", intro="Solo puedo ayudarte con...")
+    respuesta = RespuestaAgente(tipo="fuera_de_dominio")
     assert respuesta.faltantes == []
     restaurada = RespuestaAgente.model_validate(respuesta.model_dump())
     assert restaurada == respuesta

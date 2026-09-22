@@ -181,5 +181,4 @@ class RespuestaAgente(BaseModel):  # response_format del agente
         "consulta_articulo",
         "limitaciones",
     ]
-    intro: str | None = None  # máximo una línea
     faltantes: list[CampoFaltante] = Field(default_factory=list)  # solo si repregunta sin tools

@@ -45,7 +45,7 @@ def mensaje_llama_tool(nombre_tool: str, args: dict, id_llamada: str = "call_1")
 
 def mensaje_respuesta_estructurada(datos: dict, id_llamada: str = "call_resp") -> AIMessage:
     """`datos` tiene que ser un dict serializable con las claves de
-    `RespuestaAgente` (tipo, intro, faltantes)."""
+    `RespuestaAgente` (tipo, faltantes)."""
     return AIMessage(
         content="",
         tool_calls=[{"name": "RespuestaAgente", "args": datos, "id": id_llamada}],

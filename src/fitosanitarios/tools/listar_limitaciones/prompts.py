@@ -2,26 +2,19 @@
 argumentos."""
 
 DESCRIPCION = """\
-Lista las limitaciones que impone la normativa de una localidad: a qué
-distancia de cada zona (zona urbana, escuelas, cursos de agua) se puede o no
-aplicar, según tipo de aplicación y banda, con norma y artículo. Usar para: "¿qué
-limitaciones hay en El Trébol?", "que restricciones tiene san carlos", "¿qué
-artículo dispone el límite?", "¿a cuánto de la zona urbana puedo fumigar con
-avión?", y también "¿puedo aplicar a 1000 metros bajo alguna condición?" (pasar
-`distancia_m`: responde qué está prohibido a esa distancia y qué excepciones
-permitirían aplicar). Para ver el texto de un artículo usar `consultar_articulo`.
-Si el mensaje trae un producto y su dosis para evaluar una aplicación, usar
-`evaluar_riesgo`, no esta.
+Limitaciones de la normativa de una localidad: a qué distancia de la zona
+urbana, escuelas o cursos de agua se puede o no aplicar, según tipo de
+aplicación y banda, con norma y artículo. Para "¿qué limitaciones hay en X?",
+"¿qué artículo dispone el límite?", "¿a cuánto de la zona urbana puedo fumigar con
+avión?" y "¿puedo aplicar a 1000 metros bajo alguna condición?" (pasar
+`distancia_m`). El texto de un artículo por su número: `consultar_articulo`.
+Con un producto y su dosis: `evaluar_riesgo`.
 
 Args:
-    localidad: localidad o municipio de la consulta, si la dijo o si hay una
-        receta en curso.
-    provincia: solo si la tool la pidió porque la localidad no está cargada.
-    tipo_aplicacion: "terrestre" o "aerea", solo si lo mencionó.
-    banda: banda toxicológica (Ia, Ib, II, III, IV) o su color (roja, amarilla,
-        azul, verde), solo si la mencionó.
-    tipo_zona: zona en cuestión ("zona urbana", "escuela", "curso de agua"), solo si
-        la mencionó.
-    distancia_m: distancia en metros entre el lote y la zona (pueblo, escuela, arroyo) a
-        la que quiere aplicar, solo si la dio. Nunca la dosis (cm3/ha, L/ha) ni la
-        superficie ni una cantidad de producto."""
+    localidad: la de la consulta o la de la receta en curso.
+    provincia: solo si la tool la pidió.
+    tipo_aplicacion: "terrestre" o "aerea", si lo dijo.
+    banda: Ia, Ib, II, III, IV o su color (roja, amarilla, azul, verde), si la dijo.
+    tipo_zona: "zona urbana", "escuela" o "curso de agua", si la dijo.
+    distancia_m: metros entre el lote y la zona a la que quiere aplicar, si los dio.
+        Nunca la dosis ni la superficie."""

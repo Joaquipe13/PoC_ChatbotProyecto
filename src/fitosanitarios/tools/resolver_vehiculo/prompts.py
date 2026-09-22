@@ -2,12 +2,8 @@
 argumentos."""
 
 DESCRIPCION = """\
-Identifica qué vehículo/equipo de aplicación menciona el operario a
-partir de una descripción informal ("la mosquito", "el dron", "la de
-arrastre"). Usar cuando el operario nombra el equipo y hace falta saber
-cuál es exactamente, por ejemplo antes de `registrar_evento`. No hace
-falta llamarla por separado si el operario ya da un nombre exacto del
-catálogo: `registrar_evento` la resuelve internamente.
+Identifica qué vehículo o equipo menciona el operario ("la mosquito", "el dron"). No
+hace falta llamarla antes de `registrar_evento`: la resuelve internamente.
 
 Args:
-    descripcion: cómo nombró el operario el vehículo, tal cual lo escribió."""
+    descripcion: cómo nombró el vehículo, tal cual."""

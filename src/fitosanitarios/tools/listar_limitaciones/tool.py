@@ -116,6 +116,7 @@ def listar_limitaciones_logica(args: ListarLimitacionesArgs, conn) -> ResultadoT
     args_schema=ListarLimitacionesArgs,
     description=DESCRIPCION,
     response_format="content_and_artifact",
+    return_direct=True,  # ver `orquestador/respuesta_directa.py`
 )
 def listar_limitaciones(
     localidad: str | None = None,

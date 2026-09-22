@@ -257,7 +257,7 @@ def test_detalle_bandas_sin_producto_resuelto_lo_dice_y_no_ofrece_agendar():
 
 def test_dictamen_tras_faltan_datos_repregunta_en_vez_de_salir_vacio():
     """Bug real: el LLM eligió `dictamen` aunque la tool pidió la provincia;
-    salía solo su intro ("La evaluación ha finalizado...")."""
+    salía una sola frase."""
     resultado = ResultadoTool(
         estado="faltan_datos",
         faltantes=[CampoFaltante(
@@ -265,20 +265,9 @@ def test_dictamen_tras_faltan_datos_repregunta_en_vez_de_salir_vacio():
             pregunta_sugerida="¿En qué provincia queda Pergamino?", tipo_entrada="texto",
         )],
     )
-    respuesta = RespuestaAgente(tipo="dictamen", intro="La evaluación de la receta ha finalizado.")
+    respuesta = RespuestaAgente(tipo="dictamen")
     texto = _un_mensaje(respuesta, [resultado])
     assert "¿En qué provincia queda Pergamino?" in texto
-    assert "ha finalizado" not in texto
-
-
-def test_dictamen_y_detalle_bandas_ignoran_el_intro_del_llm():
-    resultado = ResultadoTool(
-        estado="ok",
-        datos={"jurisdiccion_id": "el-trebol", "condiciones": _CONDICIONES_EL_TREBOL},
-    )
-    intro = "¿Querés ver el detalle de las bandas?"
-    for tipo in ("dictamen", "detalle_bandas"):
-        assert intro not in _un_mensaje(RespuestaAgente(tipo=tipo, intro=intro), [resultado])
 
 
 def test_agendar_sin_fecha_pregunta_la_fecha():
@@ -484,19 +473,6 @@ def test_consulta_producto_con_muchas_dosis_muestra_las_primeras_y_cuenta_el_res
     assert texto.count("\n- ") == 5 and texto.endswith("- y 2 más")
 
 
-def test_consulta_producto_ignora_el_intro_del_llm():
-    respuesta = RespuestaAgente(tipo="consulta_producto", intro="Acá tenés el resultado:")
-    resultado = ResultadoTool(
-        estado="ok",
-        datos={
-            "producto": "Flyer 10 Ec", "numero_inscripcion": "41881",
-            "banda_toxicologica": "II",
-        },
-    )
-    texto = _un_mensaje(respuesta, [resultado])
-    assert "Acá tenés" not in texto
-
-
 def test_consulta_normativa():
     respuesta = RespuestaAgente(tipo="consulta_normativa")
     resultado = ResultadoTool(
@@ -534,10 +510,9 @@ def test_repregunta_agrupada_hasta_3():
 
 
 def test_fuera_de_dominio_es_texto_fijo():
-    respuesta = RespuestaAgente(tipo="fuera_de_dominio", intro="algo que no debería aparecer")
+    respuesta = RespuestaAgente(tipo="fuera_de_dominio")
     texto = _un_mensaje(respuesta, [])
     assert texto.startswith("Solo puedo ayudarte con recetas de fitosanitarios")
-    assert "algo que no debería aparecer" not in texto
 
 
 def test_no_resuelto_con_motivo():
@@ -559,13 +534,6 @@ def test_error_es_texto_fijo():
     respuesta = RespuestaAgente(tipo="error")
     texto = _un_mensaje(respuesta, [])
     assert "problema técnico" in texto
-
-
-def test_intro_se_antepone_salvo_en_fuera_de_dominio_ayuda_y_error():
-    respuesta = RespuestaAgente(tipo="consulta_normativa", intro="Che, mirá esto:")
-    resultado = ResultadoTool(estado="ok", datos={"veredicto": "Si", "regla": "Se puede."})
-    texto = _un_mensaje(respuesta, [resultado])
-    assert texto.startswith("Che, mirá esto:")
 
 
 def test_partir_por_seccion_no_corta_una_lista_a_mitad():
@@ -765,13 +733,13 @@ def _resultado_articulo(partes, **extra):
 
 def test_consulta_articulo_muestra_el_texto_literal_con_su_encabezado():
     texto = _un_mensaje(
-        RespuestaAgente(tipo="consulta_articulo", intro="Acá está."),
+        RespuestaAgente(tipo="consulta_articulo"),
         [_resultado_articulo(["Prohíbese la aplicación aérea dentro de 3.000 metros."])],
     )
     assert texto == (
         "*Ley 11273/1995, art. 33 (santa-fe)*\n"
         "Prohíbese la aplicación aérea dentro de 3.000 metros."
-    )  # sin la intro del LLM: el texto de la norma va solo
+    )
 
 
 def test_consulta_articulo_con_varios_textos_para_el_mismo_numero():

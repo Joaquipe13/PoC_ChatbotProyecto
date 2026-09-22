@@ -2,24 +2,18 @@
 del LLM que redacta la respuesta a partir de los fragmentos recuperados."""
 
 DESCRIPCION = """\
-Responde una pregunta puntual sobre normativa de aplicación de
-fitosanitarios en una localidad cargada, citando artículo y norma. Usar
-para dudas de contenido ("¿hay que avisar antes de aplicar?", "¿qué
-obligaciones tiene el aplicador?", "¿se puede aplicar de noche?"). No usar para
-preguntas de distancias o limitaciones ("¿a cuántos metros de una escuela puedo
-aplicar?", "¿qué límites hay en X?": `listar_limitaciones`), ni para el texto de un
-artículo por su número (`consultar_articulo`), ni para el dictamen de una receta
-(`evaluar_viabilidad_legal`).
+Responde una pregunta de contenido sobre la normativa de aplicación en una localidad
+cargada, citando artículo y norma ("¿hay que avisar antes de aplicar?", "¿se puede
+aplicar de noche?"). No para distancias o límites (`listar_limitaciones`), ni para el
+texto de un artículo por su número (`consultar_articulo`), ni para el dictamen de una
+receta (`evaluar_viabilidad_legal`).
 
 Args:
-    pregunta: la pregunta tal como la escribió el operario.
-    jurisdiccion_id: localidad de la consulta (explícita o de la receta
-        en curso), si se conoce.
-    provincia: provincia de la localidad, solo si la tool la pidió porque
-        la localidad no tiene normativa municipal cargada (se usa la
-        provincial y se aclara).
-    tipo_aplicacion: "terrestre" o "aerea", si se mencionó.
-    tipo_zona: tipo de zona protegida en cuestión, si se mencionó."""
+    pregunta: tal como la escribió el operario.
+    jurisdiccion_id: localidad de la consulta o de la receta en curso, si se conoce.
+    provincia: solo si la tool la pidió.
+    tipo_aplicacion: "terrestre" o "aerea", si lo mencionó.
+    tipo_zona: zona protegida en cuestión, si la mencionó."""
 
 PROMPT_SISTEMA_CONSULTA_NORMATIVA = (
     "Sos un asistente que responde preguntas sobre normativa de aplicación de "

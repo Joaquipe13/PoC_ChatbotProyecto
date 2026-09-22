@@ -36,7 +36,7 @@ def _dosis_del_cultivo(usos: list[dict]) -> list[str]:
 
 
 def plantilla_producto(respuesta: RespuestaAgente, resultados: list[ResultadoTool]) -> str:
-    """Sin intro del LLM ni sección *Fuentes* aparte: ver
+    """Sin sección *Fuentes* aparte: ver
     `consultar_productos.mensajes.plantilla_listado`. La dosis registrada es la del cultivo
     consultado: nunca la de otro cultivo (bug real: se mostraba la del primer uso registrado,
     de duraznero, para una consulta sobre soja)."""

@@ -2,16 +2,13 @@
 argumentos."""
 
 DESCRIPCION = """\
-Lista productos registrados en SENASA para un cultivo, plaga o
-principio activo. Usar cuando el operario pide un listado ("¿qué hay
-para yuyo colorado en soja?"), no para preguntar por un producto puntual
-(eso es `validar_producto_registro`). Informa lo registrado; no
-recomienda qué aplicar.
+Lista productos registrados en SENASA para un cultivo, plaga o principio activo
+("¿qué hay para yuyo colorado en soja?"). Para UN producto puntual:
+`validar_producto_registro`. Informa lo registrado, no recomienda.
 
 Args:
-    cultivo: cultivo a buscar, si se mencionó.
-    adversidad: plaga, maleza o enfermedad a buscar, si se mencionó.
-    principio_activo: principio activo a buscar, si se mencionó.
-    aptitud: herbicida/insecticida/fungicida/etc., si se mencionó.
-    banda_maxima: banda toxicológica más peligrosa a incluir (ej. "III"
-        incluye III y IV, no Ia/Ib/II), si se mencionó."""
+    cultivo: cultivo a buscar, si lo mencionó.
+    adversidad: plaga, maleza o enfermedad, si la mencionó.
+    principio_activo: principio activo, si lo mencionó.
+    aptitud: herbicida, insecticida, fungicida, etc., si la mencionó.
+    banda_maxima: banda más peligrosa a incluir ("III" incluye III y IV), si la mencionó."""

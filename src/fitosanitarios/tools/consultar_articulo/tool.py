@@ -130,6 +130,7 @@ def consultar_articulo_logica(args: ConsultarArticuloArgs, conn) -> ResultadoToo
     args_schema=ConsultarArticuloArgs,
     description=DESCRIPCION,
     response_format="content_and_artifact",
+    return_direct=True,  # ver `orquestador/respuesta_directa.py`
 )
 def consultar_articulo(
     numero_articulo: str,

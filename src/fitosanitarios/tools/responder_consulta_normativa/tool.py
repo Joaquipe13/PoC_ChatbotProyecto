@@ -104,6 +104,7 @@ def responder_consulta_normativa_logica(
     args_schema=ResponderConsultaNormativaArgs,
     description=DESCRIPCION,
     response_format="content_and_artifact",
+    return_direct=True,  # ver `orquestador/respuesta_directa.py`
 )
 def responder_consulta_normativa(
     pregunta: str,

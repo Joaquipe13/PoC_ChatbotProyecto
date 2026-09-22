@@ -272,13 +272,6 @@ def formatear_respuesta(respuesta: RespuestaAgente, resultados: list[ResultadoTo
         return partir_por_seccion(varias)
     tipo = _tipo_efectivo(respuesta.tipo, resultados)
     texto = _PLANTILLAS[tipo](respuesta, resultados)
-    # En dictamen/detalle_bandas la plantilla ya cierra con su propia pregunta:
-    # una intro del LLM ("¿querés ver las bandas?") la contradice. Si el tipo
-    # se corrigió, la intro hablaba de otra cosa.
-    sin_intro = ("fuera_de_dominio", "ayuda", "error", "consulta_producto",
-                 "dictamen", "detalle_bandas", "consulta_articulo", "limitaciones")
-    if respuesta.intro and tipo == respuesta.tipo and tipo not in sin_intro:
-        texto = f"{respuesta.intro}\n\n{texto}"
     return partir_por_seccion(texto)
 
 

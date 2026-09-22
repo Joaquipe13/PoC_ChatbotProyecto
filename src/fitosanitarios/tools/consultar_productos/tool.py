@@ -79,6 +79,7 @@ def consultar_productos_logica(
     args_schema=ConsultarProductosArgs,
     description=DESCRIPCION,
     response_format="content_and_artifact",
+    return_direct=True,  # ver `orquestador/respuesta_directa.py`
 )
 def consultar_productos(
     cultivo: str | None = None,

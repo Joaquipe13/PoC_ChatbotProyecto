@@ -16,6 +16,7 @@ from fitosanitarios.orquestador.estado import (
     registrar_turno,
 )
 from fitosanitarios.orquestador.formateador import formatear_respuesta
+from fitosanitarios.orquestador.respuesta_directa import respuesta_de_las_tools
 
 logger = logging.getLogger(__name__)
 
@@ -32,18 +33,18 @@ def _tool_calls_del_turno(mensajes: list) -> list[dict]:
     return list(reversed(llamadas))
 
 
-def _artifacts_del_turno(mensajes: list) -> list[ResultadoTool]:
+def _resultados_del_turno(mensajes: list) -> list[tuple[str, ResultadoTool]]:
     """Los `ToolMessage` de una tool declarada con
     `response_format="content_and_artifact"` traen el `ResultadoTool` en
     `.artifact` (ver skill, "Contratos"; confirmado interactivamente antes
     de escribir esto, ver DECISIONES.md). Solo los del turno actual: los
-    mensajes nuevos desde el último `HumanMessage`."""
-    resultados: list[ResultadoTool] = []
+    mensajes nuevos desde el último `HumanMessage`. Devuelve (nombre de la tool, resultado)."""
+    resultados: list[tuple[str, ResultadoTool]] = []
     for m in reversed(mensajes):
         if isinstance(m, HumanMessage):
             break
         if isinstance(m, ToolMessage) and isinstance(m.artifact, ResultadoTool):
-            resultados.append(m.artifact)
+            resultados.append((m.name, m.artifact))
     return list(reversed(resultados))
 
 
@@ -79,8 +80,27 @@ def ejecutar_turno(
         return respuesta, formatear_respuesta(respuesta, [])
 
     respuesta: RespuestaAgente | None = resultado_grafo.get("structured_response")
-    artifacts = _artifacts_del_turno(resultado_grafo["messages"])
+    resultados = _resultados_del_turno(resultado_grafo["messages"])
     tool_calls = _tool_calls_del_turno(resultado_grafo["messages"])
+
+    if respuesta is None and tool_calls:
+        # El turno terminó en las tools (`return_direct`, ver `respuesta_directa.py`).
+        respuesta = respuesta_de_las_tools([n for n, _ in resultados], [r for _, r in resultados])
+        if respuesta is None:
+            # Una tool falló antes de dar un resultado (argumentos inválidos): el modelo
+            # tiene que ver el error y decidir, como cuando la tool no cortaba el turno.
+            # Los resultados de la primera pasada no sobreviven al checkpoint: se conservan.
+            try:
+                resultado_grafo = agente.invoke({"messages": []}, config=config)
+            except Exception:
+                logger.exception("Excepción reintentando el turno (thread %s)", thread_id)
+            else:
+                resultados += _resultados_del_turno(resultado_grafo["messages"])
+                tool_calls = _tool_calls_del_turno(resultado_grafo["messages"])
+                respuesta = resultado_grafo.get("structured_response") or respuesta_de_las_tools(
+                    [n for n, _ in resultados], [r for _, r in resultados]
+                )
+    artifacts = [r for _, r in resultados]
 
     if respuesta is None:
         logger.warning("El agente no devolvió structured_response (thread %s)", thread_id)

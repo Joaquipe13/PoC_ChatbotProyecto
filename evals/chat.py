@@ -241,7 +241,7 @@ def correr_turno(
         },
         "tool_calls": tool_calls,
         "respuesta": {
-            "tipo": respuesta.tipo, "intro": respuesta.intro,
+            "tipo": respuesta.tipo,
             "faltantes": [f.model_dump(mode="json") for f in respuesta.faltantes],
         },
         "mensajes": [como_se_enviaria(m) for m in mensajes],
