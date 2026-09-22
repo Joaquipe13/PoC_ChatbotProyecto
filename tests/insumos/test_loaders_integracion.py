@@ -1,40 +1,34 @@
 """Test de integración de los 3 loaders de insumos contra Postgres real (Docker).
 
-Se salta automáticamente si no hay una base disponible en DATABASE_URL. Para
-correrlo:
+Se salta automáticamente si no hay una base de test disponible (ver
+`tests/db_test_infra.py`). Para correrlo:
 
     docker compose up -d db
     uv run pytest tests/insumos/test_loaders_integracion.py -q
 
 Usa el modelo de embeddings REAL (fixture compartida `modelo_embeddings` de
 tests/conftest.py), no uno fake: este archivo hace un DELETE completo de
-`territorio.*` y recarga desde las fixtures, y esa base es la misma que se
-usa para verificación manual y para los tests de la Fase 6
-(`tests/tools/responder_consulta_normativa/test_tool.py`, que necesitan
-similitud vectorial real). Usar un modelo fake acá corrompía esos datos con
-embeddings dummy cada vez que corría la suite completa (ver DIFICULTADES.md).
+`territorio.*` y recarga desde las fixtures en la base de test (no la de
+desarrollo). Usar un modelo fake acá corrompería esos datos con embeddings
+dummy cada vez que corre la suite completa (ver DIFICULTADES.md).
 """
 
 from pathlib import Path
 
-import psycopg
 import pytest
 
 from fitosanitarios.config import get_settings
 from fitosanitarios.insumos.loader_geo import cargar_localidades
 from fitosanitarios.insumos.loader_normativa import cargar_normativa
 from fitosanitarios.insumos.loader_reglas import cargar_reglas
+from tests.db_test_infra import cargar_fixtures_insumos, conectar_o_saltar
 
 FIXTURES = Path(__file__).resolve().parent.parent / "fixtures" / "insumos"
 
 
 @pytest.fixture
-def conexion():
-    settings = get_settings()
-    try:
-        conn = psycopg.connect(settings.database_url, connect_timeout=3)
-    except psycopg.OperationalError:
-        pytest.skip("No hay Postgres disponible en DATABASE_URL (docker compose up -d db)")
+def conexion(modelo_embeddings):
+    conn = conectar_o_saltar(get_settings().database_url)
     with conn.cursor() as cur:
         cur.execute("DELETE FROM territorio.regla_distancia")
         cur.execute("DELETE FROM territorio.articulo")
@@ -44,6 +38,11 @@ def conexion():
         cur.execute("DELETE FROM territorio.provincia")
     conn.commit()
     yield conn
+    # Deja la base en el estado canónico (FIXTURES cargadas), sea cual sea
+    # lo que haya cargado el test: otros archivos comparten esta misma base
+    # y no cargan sus propios datos (ver tests/conftest.py, `_base_de_test`,
+    # y DIFICULTADES.md, "el orden de los tests importa").
+    cargar_fixtures_insumos(conn, modelo_embeddings)
     conn.close()
 
 
@@ -221,10 +220,3 @@ def test_localidad_sin_geojson_se_carga_con_norma_sin_pdf(conexion, modelo_embed
             "WHERE n.archivo = 'fallo-testville-2020'"
         )
         assert cur.fetchone() == (500,)
-
-    # Este test usa una carpeta propia en vez de FIXTURES (`conexion` borró
-    # todo `territorio.*` al empezar): se recarga FIXTURES para no dejar la
-    # base sin las localidades sintéticas de las que dependen otros archivos
-    # de test que no llaman a `_cargar_todo` por su cuenta (ver
-    # DIFICULTADES.md, orden de `tests/insumos/test_loaders_integracion.py`).
-    _cargar_todo(conexion, modelo_embeddings)
