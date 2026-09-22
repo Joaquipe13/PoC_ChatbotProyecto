@@ -91,6 +91,35 @@ def test_la_normativa_nacional_no_avisa_que_se_leera_del_pdf(tmp_path):
     assert resultado.es_valido and resultado.advertencias == []
 
 
+# --- A5 / .md: localidad sin `localidad.geojson`, norma sin PDF (22/09/2026,
+# ver DECISIONES.md, "Localidades y normas sin fuente oficial") ---
+
+
+def test_localidad_sin_geojson_es_valida_y_avisa_a5(tmp_path):
+    carpeta = tmp_path / "santa-fe" / "sastre"
+    carpeta.mkdir(parents=True)
+    (carpeta / "fallo-sastre-2020.md").write_text("Texto de referencia.", encoding="utf-8")
+
+    resultado = validar_carpeta_localidad(carpeta)
+    assert resultado.es_valido
+    assert any(a.codigo == "A5" for a in resultado.advertencias)
+
+
+def test_localidad_sin_geojson_ni_norma_sigue_fallando_f1(tmp_path):
+    carpeta = tmp_path / "santa-fe" / "sin-nada"
+    carpeta.mkdir(parents=True)
+
+    resultado = validar_carpeta_localidad(carpeta)
+    assert any(e.codigo == "F1" for e in resultado.errores)
+
+
+def test_f6_nombre_de_fallo_con_localidad_de_varias_palabras_es_valido(tmp_path):
+    from fitosanitarios.insumos.validador import validar_nombre_norma
+
+    resultado = validar_nombre_norma(tmp_path / "fallo-san-jorge-2009.md")
+    assert resultado.es_valido
+
+
 # --- F2: no hay exactamente un límite ---
 
 

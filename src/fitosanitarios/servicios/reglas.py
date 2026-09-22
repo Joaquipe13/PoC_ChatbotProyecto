@@ -13,6 +13,13 @@ from dataclasses import dataclass
 
 from fitosanitarios.dominio.modelos import Cita
 
+# Convención de `reglas.csv` para "prohibido en toda la jurisdicción, sin
+# distancia máxima" (22/09/2026, ver DECISIONES.md, "Localidades y normas sin
+# fuente oficial"): el modelo no tiene un valor "infinito", así que se carga
+# como una distancia grande y se muestra distinto (ver
+# `tools/listar_limitaciones/mensajes.py`).
+DISTANCIA_SIN_LIMITE_M = 99999.0
+
 
 @dataclass
 class ReglaCandidata:

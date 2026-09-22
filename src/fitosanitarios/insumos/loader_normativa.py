@@ -1,11 +1,23 @@
-"""Carga la normativa (PDFs) a `territorio.norma` y `territorio.articulo`,
-chunkeada por artículo con embedding (ver skill, "RAG de normativa").
+"""Carga la normativa (PDFs, y `.md` sin fuente oficial) a `territorio.norma`
+y `territorio.articulo`, chunkeada por artículo con embedding (ver skill,
+"RAG de normativa").
 
 Si un PDF no tiene capa de texto, intenta OCR con Tesseract (pytesseract). Si
 Tesseract no está instalado en la máquina no falla: marca los artículos para
 revisión manual (`requiere_revision=True`) y sigue con el resto -- ver
 DIFICULTADES.md, Tesseract no está instalado en la máquina de desarrollo de
 esta sesión, no se pudo probar el camino de OCR real todavía.
+
+**Normas sin PDF (22/09/2026, ver DECISIONES.md, "Localidades y normas sin
+fuente oficial: Sastre y San Jorge").** Un fallo judicial o una norma citada
+solo por fuente secundaria (sin texto oficial disponible) se carga desde un
+`.md` en vez de un PDF: mismo nombre `<tipo>-<numero>-<anio>`, con `tipo`
+también pudiendo ser `fallo`. Se toma el texto tal cual (sin OCR) pero **no
+se chunkea en artículos**: no tiene encabezados "Artículo N" reales y no hay
+que inventarlos, así que solo sirve para que `reglas.csv` cite la norma (sin
+`articulo`); no aparece en `consultar_articulo` ni en
+`responder_consulta_normativa` (RAG). El texto completo queda en el `.md` de
+la carpeta como referencia para quien lea el insumo.
 
 Idempotente por localidad/ámbito: antes de cargar, borra las normas
 existentes de ese alcance y las vuelve a insertar (mismo patrón que
@@ -33,7 +45,9 @@ logger = logging.getLogger(__name__)
 _PATRON_ARTICULO = re.compile(
     r"(?im)^\s*art(?:\.|[ií]culo)?\s*(?:n[°º]?\.?)?\s*(\d+)\s*[°º]?\s*[:.\-]*\s*"
 )
-_PATRON_NOMBRE_PDF = re.compile(r"^(ordenanza|decreto|resolucion|ley)-([a-z0-9]+)-(\d{4})\.pdf$")
+_PATRON_NOMBRE_NORMA = re.compile(
+    r"^(ordenanza|decreto|resolucion|ley|fallo)-([a-z0-9]+(?:-[a-z0-9]+)*)-(\d{4})\.(pdf|md)$"
+)
 
 
 def chunkear_articulos(texto: str) -> list[tuple[str, str]]:
@@ -77,12 +91,21 @@ def extraer_texto_o_ocr(ruta_pdf: Path) -> tuple[str, bool]:
         return "", True
 
 
-def _parsear_nombre_pdf(ruta_pdf: Path) -> tuple[str, str, int]:
-    m = _PATRON_NOMBRE_PDF.match(ruta_pdf.name)
+def _parsear_nombre_norma(ruta: Path) -> tuple[str, str, int]:
+    m = _PATRON_NOMBRE_NORMA.match(ruta.name)
     if not m:
-        raise ValueError(f"{ruta_pdf.name} no respeta <tipo>-<numero>-<anio>.pdf")
-    tipo, numero, anio = m.groups()
+        raise ValueError(f"{ruta.name} no respeta <tipo>-<numero>-<anio>.pdf|.md")
+    tipo, numero, anio, _extension = m.groups()
     return tipo, numero, int(anio)
+
+
+def _texto_de_norma(ruta: Path) -> tuple[str, bool]:
+    """(texto, requiere_revision). Un `.md` es una norma sin fuente oficial
+    (fallo judicial o cita de fuente secundaria: ver DECISIONES.md,
+    "Localidades y normas sin fuente oficial"), se toma tal cual, sin OCR."""
+    if ruta.suffix == ".md":
+        return ruta.read_text(encoding="utf-8").strip(), False
+    return extraer_texto_o_ocr(ruta)
 
 
 def cargar_normas_de_carpeta(
@@ -104,10 +127,12 @@ def cargar_normas_de_carpeta(
         cur.execute("DELETE FROM territorio.norma WHERE ambito = 'nacional'")
 
     resumen = {"normas": 0, "articulos": 0, "pdfs_requieren_revision": 0}
-    for pdf in sorted(carpeta.glob("*.pdf")):
-        tipo, numero, anio = _parsear_nombre_pdf(pdf)
-        archivo = pdf.stem
-        texto, requiere_revision = extraer_texto_o_ocr(pdf)
+    docs = sorted(carpeta.glob("*.pdf")) + sorted(carpeta.glob("*.md"))
+    for doc in docs:
+        tipo, numero, anio = _parsear_nombre_norma(doc)
+        archivo = doc.stem
+        sin_fuente_oficial = doc.suffix == ".md"
+        texto, requiere_revision = _texto_de_norma(doc)
         if requiere_revision:
             resumen["pdfs_requieren_revision"] += 1
 
@@ -120,16 +145,22 @@ def cargar_normas_de_carpeta(
             """,
             (
                 ambito, localidad_id, provincia_id, tipo, numero, anio, archivo,
-                '{"paginas_sin_texto": %s}' % ("true" if requiere_revision else "false"),
+                '{"paginas_sin_texto": %s, "sin_fuente_oficial": %s}' % (
+                    "true" if requiere_revision else "false",
+                    "true" if sin_fuente_oficial else "false",
+                ),
             ),
         )
         norma_id = cur.fetchone()[0]
         resumen["normas"] += 1
 
+        if sin_fuente_oficial:
+            continue  # sin encabezados de articulo reales: no se chunkea (ver módulo)
+
         articulos = chunkear_articulos(texto)
         if not articulos:
             logger.warning(
-                "No se encontraron artículos en %s (¿formato de encabezado no estándar?)", pdf
+                "No se encontraron artículos en %s (¿formato de encabezado no estándar?)", doc
             )
         for numero_articulo, cuerpo in articulos:
             embedding = modelo_embeddings.encode(cuerpo[:2000]).tolist()

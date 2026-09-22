@@ -7,8 +7,8 @@ varias tools: `servicios/formato.py::norma_legible`.)
 import re
 import unicodedata
 
-_ARCHIVO = re.compile(r"(ordenanza|decreto|resolucion|ley)-(\w+)-(\d{4})")
-_TIPOS = ("ordenanza", "decreto", "resolucion", "ley")
+_ARCHIVO = re.compile(r"(ordenanza|decreto|resolucion|ley|fallo)-(\w+(?:-\w+)*)-(\d{4})")
+_TIPOS = ("ordenanza", "decreto", "resolucion", "ley", "fallo")
 
 
 def _sin_tildes(texto: str) -> str:

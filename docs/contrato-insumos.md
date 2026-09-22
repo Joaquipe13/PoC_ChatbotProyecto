@@ -21,10 +21,15 @@ data/insumos/
 
 **Cambio (21/09/2026, ver `DECISIONES.md`):** un único `reglas.csv` en la raíz de `data/insumos/` reemplaza a los `reglas.csv` por carpeta.
 
+**Cambio (22/09/2026, ver `DECISIONES.md`, "Localidades y normas sin fuente oficial: Sastre y San Jorge"):** `localidad.geojson` pasa a ser opcional, y una norma puede citarse desde un `.md` en vez de un PDF cuando no hay texto oficial disponible (un fallo judicial, o una norma citada solo por fuente secundaria).
+
 - `provincia` y `jurisdiccion_id` (nombres de carpeta): minúsculas, sin tildes, palabras separadas por guion. Son la clave que une geometría, normativa y reglas entre sí y con la base (`territorio.localidad.jurisdiccion_id`, `territorio.provincia.nombre`).
-- PDFs: `<tipo>-<numero>-<anio>.pdf`, con `tipo` ∈ `ordenanza | decreto | resolucion | ley`. De ahí sale la cita ("Ordenanza 914/2018") y el ámbito (municipal/provincial/nacional) sale de la carpeta que lo contiene. Solo normas vigentes; si una fue modificada, va también la modificatoria o el texto ordenado completo.
+- Normas: `<tipo>-<numero>-<anio>.pdf`, con `tipo` ∈ `ordenanza | decreto | resolucion | ley`. De ahí sale la cita ("Ordenanza 914/2018") y el ámbito (municipal/provincial/nacional) sale de la carpeta que lo contiene. Solo normas vigentes; si una fue modificada, va también la modificatoria o el texto ordenado completo.
+- **Sin texto oficial disponible:** la misma convención de nombre, pero `.md` en vez de `.pdf`, y `tipo` puede ser también `fallo` (un fallo judicial; `numero` es un identificador, no necesariamente un número de expediente — p. ej. `fallo-sastre-2020.md`). El `.md` es el texto de referencia completo (puede incluir fuentes, salvedades de alcance, mapeos inferidos); se carga tal cual, sin OCR, y **no se chunkea en artículos** (no tiene encabezados "Artículo N" reales): sirve para que `reglas.csv` cite la norma, pero no aparece en `consultar_articulo` ni en `responder_consulta_normativa` (RAG por similitud). Usar `.md` es una salida de emergencia para normas sin fuente oficial, no un reemplazo del PDF cuando este existe.
 
 ## `localidad.geojson`
+
+**Opcional** (22/09/2026, ver `DECISIONES.md`): sin él, la localidad igual se carga en `territorio.localidad` (para que le cuelguen normas y reglas de distancia), sin límite ni zonas protegidas -- el dictamen ya no compara la ubicación del lote contra geometría (Fase 12), así que solo se pierde la resolución de jurisdicción por punto-en-polígono, que no está en uso.
 
 `FeatureCollection` en EPSG:4326 (lat/lon). Cada feature lleva la propiedad `tipo`:
 
@@ -58,7 +63,7 @@ Resto de las columnas:
 - `tipo_aplicacion`: `terrestre | aerea | todas`.
 - `banda_toxicologica`: `todas` o una o más bandas separadas por `;` (`Ia;Ib;II`).
 - `condiciones`: el requisito legal de una fila `S` (ordenanza, terreno que impida equipos terrestres…). Vacío en las `N`.
-- `norma`: nombre de un PDF de la carpeta de esa jurisdicción, sin extensión (`ordenanza-914-2018`). Una norma citada desde otra jurisdicción no se encuentra.
+- `norma`: nombre de un PDF (o, sin fuente oficial, un `.md`) de la carpeta de esa jurisdicción, sin extensión (`ordenanza-914-2018`, `fallo-sastre-2020`). Una norma citada desde otra jurisdicción no se encuentra.
 - `articulo`: número. Vacío si la regla no cita uno.
 - `observaciones`: aviso que el modelo no cubre (aviso previo, horarios, viento). El dictamen lo muestra como advertencia, no como bloqueo.
 
@@ -76,12 +81,12 @@ Implementadas en `src/fitosanitarios/insumos/validador.py` (Fase 3). Dos niveles
 
 | # | Condición |
 |---|---|
-| F1 | A una carpeta de localidad le falta `localidad.geojson` o al menos un PDF; o a la carpeta de una provincia le falta al menos un PDF de normativa provincial. |
+| F1 | A una carpeta de localidad, o a la carpeta de una provincia, le falta al menos una norma (PDF o `.md`). |
 | F2 | El GeoJSON no tiene exactamente un feature `limite`. |
 | F3 | El GeoJSON trae un `tipo` de feature desconocido (fuera de `limite`, `escuela`, `curso_agua`, `zona_urbana`, `otro`). |
 | F4 | Una geometría es inválida (self-intersecting, coordenadas fuera de rango) o cae fuera del bounding box de Argentina. |
-| F5 | Una fila de `reglas.csv` cita en `norma` un PDF que no está en la carpeta de su jurisdicción. |
-| F6 | Un nombre de archivo o de carpeta no respeta la convención (`<tipo>-<numero>-<anio>.pdf`, carpeta en minúsculas/sin tildes/con guiones). |
+| F5 | Una fila de `reglas.csv` cita en `norma` una norma que no está en la carpeta de su jurisdicción. |
+| F6 | Un nombre de archivo o de carpeta no respeta la convención (`<tipo>-<numero>-<anio>.pdf` o `.md`, carpeta en minúsculas/sin tildes/con guiones). |
 | F7 | La `provincia` del `limite` de una localidad no coincide con la carpeta de la provincia donde está. |
 | F8 | Una fila de `reglas.csv` no respeta el formato (`permitido`, `tipo_aplicacion` o banda desconocidos, distancia no numérica, columna faltante). |
 | F9 | Una fila de `reglas.csv` es de una jurisdicción que no tiene carpeta. |
@@ -91,8 +96,9 @@ Implementadas en `src/fitosanitarios/insumos/validador.py` (Fase 3). Dos niveles
 | # | Condición |
 |---|---|
 | A2 | Una zona protegida queda a más de `RADIO_BUSQUEDA_ZONAS_M` del límite de su propia localidad. |
-| A4 | Una provincia o localidad no tiene filas en `reglas.csv`: sus distancias se leerán del texto de los PDF (fuente `pdf_extraido`). No aplica a la nacional. |
 | A3 | Un PDF no tiene texto extraíble (escaneado): se marca `requiere_revision=true` en `territorio.articulo` y sigue por OCR (Fase 3). |
+| A4 | Una provincia o localidad no tiene filas en `reglas.csv`: sus distancias se leerán del texto de los PDF (fuente `pdf_extraido`). No aplica a la nacional. |
+| A5 | Una carpeta de localidad no tiene `localidad.geojson` (22/09/2026): se carga sin límite ni zonas protegidas. |
 
 ## Datos sintéticos para desarrollo y tests
 

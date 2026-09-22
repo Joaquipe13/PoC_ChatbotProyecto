@@ -167,3 +167,64 @@ def test_norma_nacional_sin_filas_en_reglas_csv_no_rompe_la_carga_ni_da_reglas(
             "JOIN territorio.norma n ON n.id = rd.norma_id WHERE n.ambito = 'nacional'"
         )
         assert cur.fetchone()[0] == 0
+
+
+# --- Localidad sin `localidad.geojson` y norma sin PDF (22/09/2026, ver
+# DECISIONES.md, "Localidades y normas sin fuente oficial: Sastre y San
+# Jorge") -- data sintética propia en tmp_path, no toca FIXTURES: los conteos
+# de las otras pruebas de este archivo (2 localidades, 6 reglas) dependen de
+# esa carpeta compartida.
+
+
+def test_localidad_sin_geojson_se_carga_con_norma_sin_pdf(conexion, modelo_embeddings, tmp_path):
+    localidad = tmp_path / "testprov" / "testville"
+    localidad.mkdir(parents=True)
+    (localidad / "fallo-testville-2020.md").write_text(
+        "# Fallo de prueba\nTexto de referencia, sin encabezados de artículo.",
+        encoding="utf-8",
+    )
+    (tmp_path / "reglas.csv").write_text(
+        "provincia,jurisdiccion,tipo_zona,tipo_aplicacion,banda_toxicologica,distancia_min_m,"
+        "permitido,condiciones,norma,articulo,observaciones\n"
+        "testprov,testville,zona_urbana,terrestre,todas,500,N,,fallo-testville-2020,,\n",
+        encoding="utf-8",
+    )
+
+    cargar_localidades(conexion, tmp_path)
+    cargar_normativa(conexion, tmp_path, modelo_embeddings)
+    total = cargar_reglas(conexion, tmp_path)
+
+    assert total == 1
+    with conexion.cursor() as cur:
+        cur.execute(
+            "SELECT limite, bbox_min_lon FROM territorio.localidad WHERE jurisdiccion_id = %s",
+            ("testville",),
+        )
+        limite, bbox_min_lon = cur.fetchone()
+        assert limite is None and bbox_min_lon is None
+
+        cur.execute(
+            "SELECT tipo FROM territorio.norma WHERE archivo = 'fallo-testville-2020'"
+        )
+        assert cur.fetchone() == ("fallo",)
+
+        cur.execute(
+            "SELECT count(*) FROM territorio.articulo a "
+            "JOIN territorio.norma n ON n.id = a.norma_id "
+            "WHERE n.archivo = 'fallo-testville-2020'"
+        )
+        assert cur.fetchone()[0] == 0  # sin encabezados reales: no se inventan artículos
+
+        cur.execute(
+            "SELECT rd.distancia_min_m FROM territorio.regla_distancia rd "
+            "JOIN territorio.norma n ON n.id = rd.norma_id "
+            "WHERE n.archivo = 'fallo-testville-2020'"
+        )
+        assert cur.fetchone() == (500,)
+
+    # Este test usa una carpeta propia en vez de FIXTURES (`conexion` borró
+    # todo `territorio.*` al empezar): se recarga FIXTURES para no dejar la
+    # base sin las localidades sintéticas de las que dependen otros archivos
+    # de test que no llaman a `_cargar_todo` por su cuenta (ver
+    # DIFICULTADES.md, orden de `tests/insumos/test_loaders_integracion.py`).
+    _cargar_todo(conexion, modelo_embeddings)

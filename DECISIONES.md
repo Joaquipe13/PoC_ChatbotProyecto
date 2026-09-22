@@ -567,3 +567,29 @@ Se quedan en `servicios/` porque los usan varias tools: `eventos`, `fechas`, `re
 **No se hizo:** filtrar las tools por mensaje (un enrutador extra ahorraría menos que lo anterior) y podar el historial (solo importa pasados ~15 turnos).
 
 **Al medir con `evals.chat --replay`** los tokens de entrada de un replay incluyen el historial que ya dejaron replays anteriores del mismo escenario (reutilizan el thread): para comparar costos usar una sola llamada, no un replay repetido.
+
+
+## Localidades y normas sin fuente oficial: Sastre y San Jorge (22/09/2026)
+
+**Motivación.** El usuario investigó y cargó en `reglas.csv` las limitaciones de Sastre y Ortiz (Fallo judicial 2020, confirmado por la Corte Suprema de Santa Fe en 2023, más la Ordenanza municipal 1174/19) y de San Jorge (Fallo judicial 2009), ninguna con PDF oficial disponible: son fallos judiciales (sin repositorio público) y, para Sastre, una ordenanza conocida solo por una nota de prensa (Infosastre), sin número de artículo ni texto verificado. El pipeline existente exigía `localidad.geojson` (`territorio.localidad.limite` era `NOT NULL`) y una norma respaldada por un PDF con `tipo ∈ {ordenanza, decreto, resolucion, ley}`: ninguna de las dos cosas existía para estas dos localidades.
+
+**Decisión (confirmada explícitamente por el usuario, dos preguntas separadas):**
+1. `localidad.geojson` pasa a ser **opcional**: se relajó el schema (`territorio.localidad.limite` y el bbox, `NULL` permitido) en vez de fabricar una geometría de relleno. El dictamen ya no compara la ubicación del lote contra geometría (Fase 12), así que lo único que se pierde es la resolución de jurisdicción por punto-en-polígono (`servicios/geo.py::resolver_jurisdiccion`), que ya no está en uso por ninguna tool (código muerto, no se tocó).
+2. Se agregó `fallo` como `tipo` de norma reconocido, **y se generalizó a cualquier tipo**: una norma sin PDF oficial se carga desde un `.md` con el mismo nombre (`<tipo>-<numero>-<anio>.md`), tal cual, sin OCR ni chunking en artículos (no tiene encabezados "Artículo N" reales, y no se los inventa). Esto también cubre la Ordenanza 1174/19 de Sastre (`tipo=ordenanza`, sin PDF), no solo los fallos judiciales -- la pregunta al usuario solo mencionaba `fallo`, pero limitar la excepción a ese tipo habría dejado sin cargar la ordenanza, que es la otra mitad de los datos de Sastre.
+
+**Qué cambió en código:**
+- `datos/migraciones/005_normas_sin_fuente_oficial.sql`: `territorio.localidad.limite`/bbox nullable; `territorio.norma.tipo` admite `fallo`.
+- `insumos/loader_geo.py`: `cargar_localidad_sin_geometria` (nueva) inserta la localidad con `limite=NULL`; el nombre sale de `territorio.municipio` si coincide con la carpeta, si no del nombre de la carpeta capitalizado.
+- `insumos/loader_normativa.py`: `_PATRON_NOMBRE_NORMA` acepta `.md` y el tipo `numero` con guiones (`san-jorge`, no solo dígitos); un `.md` se lee tal cual (`_texto_de_norma`) y **no se chunkea** -- por eso estas normas no aparecen en `consultar_articulo` ni en `responder_consulta_normativa` (RAG), solo en `listar_limitaciones`/el dictamen vía `reglas.csv`.
+- `insumos/validador.py`: `localidad.geojson` ausente pasa de error (F1) a aviso (A5); F1 ahora pide "al menos un PDF o `.md`"; `NOMBRE_NORMA_VALIDO` (ex `NOMBRE_PDF_VALIDO`) acepta `fallo` y guiones en el identificador.
+- `servicios/formato.py::norma_legible` y `tools/consultar_articulo/utils.py` reconocen `fallo` y nombres con guiones (`fallo-san-jorge-2009` → "Fallo San Jorge/2009").
+- `servicios/reglas.py::DISTANCIA_SIN_LIMITE_M` (99999): convención para "prohibido en toda la jurisdicción, sin distancia máxima" (banda roja en Sastre, ordenanza 1174/19) -- el modelo no tenía un valor "infinito". `listar_limitaciones/mensajes.py` lo muestra como "no se puede aplicar en toda la jurisdicción", no como "a menos de 99999 m".
+- `data/insumos/santa-fe/{sastre,san-jorge}/`: carpetas nuevas (antes los `.md` estaban sueltos en `santa-fe/`), con los `.md` de fuente y las filas correspondientes en `reglas.csv`.
+
+**Riesgos y límites conocidos, sin resolver:**
+- **Todo sale de fuente secundaria** (notas de prensa, no el texto oficial de sentencias ni de la ordenanza): número de artículo, fechas exactas y el mapeo "ligeramente/moderadamente peligroso" → banda III/II son inferencias del usuario, marcadas como tales en los `.md` y en `observaciones` de `reglas.csv`, pero **el dictamen las trata igual que a la Ley 11.273** (no hay un nivel de confianza en el modelo de datos).
+- **El fallo de San Jorge (2009) resolvió un caso puntual** (barrio Urquiza contra campos linderos), no hay ordenanza municipal que lo generalice; el propio `.md` dice que no es automático asumir que rige para cualquier aplicación en cualquier punto de San Jorge. Se cargó igual como prohibición `N` de alcance municipal porque es "el único criterio disponible a falta de otra norma" (decisión del usuario), pero el sistema no distingue "alcance general" de "alcance de un caso": queda como deuda conocida.
+- **Sin RAG:** `consultar_articulo` y `responder_consulta_normativa` no citan estos `.md` (no se chunkean/embeben); solo `listar_limitaciones` y el dictamen los usan, vía `reglas.csv`.
+- **Migración 005 sin aplicar en la base de desarrollo al escribir esto** (ver nota de todas las migraciones de este archivo: no hay Alembic, se aplica a mano con `psql`).
+
+**Verificación.** Suite completa (651 tests, sin los de integración contra Postgres) en verde. Tests nuevos: `tests/insumos/test_validador.py` (A5, F1 sin PDF ni `.md`, F6 con localidad de varias palabras), `tests/insumos/test_loaders_integracion.py::test_localidad_sin_geojson_se_carga_con_norma_sin_pdf` (localidad sintética propia, no toca las fixtures compartidas), `tests/servicios/test_formato.py`, `tests/tools/listar_limitaciones/test_mensajes.py`.

@@ -36,12 +36,15 @@ def num(valor) -> str:
 
 
 def norma_legible(norma: str) -> str:
-    """"ordenanza-841-2010" (nombre del PDF) -> "Ordenanza 841/2010"."""
-    m = re.fullmatch(r"(ordenanza|decreto|resolucion|ley)-(\w+)-(\d{4})", norma)
+    """"ordenanza-841-2010" (nombre del PDF) -> "Ordenanza 841/2010".
+    "fallo-sastre-2020" (sin PDF, ver DECISIONES.md) -> "Fallo Sastre/2020"."""
+    m = re.fullmatch(r"(ordenanza|decreto|resolucion|ley|fallo)-(\w+(?:-\w+)*)-(\d{4})", norma)
     if not m:
         return norma
     tipo = "Resolución" if m[1] == "resolucion" else m[1].capitalize()
-    return f"{tipo} {m[2]}/{m[3]}"
+    # Un fallo no tiene numero: `m[2]` es el nombre de la localidad ("sastre").
+    identificador = m[2].replace("-", " ").title() if m[1] == "fallo" else m[2]
+    return f"{tipo} {identificador}/{m[3]}"
 
 
 def cita_norma(cita: Cita) -> str:

@@ -26,7 +26,9 @@ from fitosanitarios.insumos.estructura import (
 from fitosanitarios.insumos.reglas_csv import leer_reglas_csv
 
 NOMBRE_CARPETA_VALIDO = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
-NOMBRE_PDF_VALIDO = re.compile(r"^(ordenanza|decreto|resolucion|ley)-[a-z0-9]+-\d{4}\.pdf$")
+NOMBRE_NORMA_VALIDO = re.compile(
+    r"^(ordenanza|decreto|resolucion|ley|fallo)-[a-z0-9]+(?:-[a-z0-9]+)*-\d{4}\.(pdf|md)$"
+)
 TIPOS_ZONA_PROTEGIDA = {"escuela", "curso_agua", "zona_urbana", "otro"}
 TIPOS_FEATURE_CONOCIDOS = TIPOS_ZONA_PROTEGIDA | {"limite"}
 
@@ -195,14 +197,14 @@ def validar_nombre_carpeta(nombre: str, ruta: Path) -> ResultadoValidacion:
     return resultado
 
 
-def validar_nombre_pdf(ruta_pdf: Path) -> ResultadoValidacion:
+def validar_nombre_norma(ruta: Path) -> ResultadoValidacion:
     resultado = ResultadoValidacion()
-    if not NOMBRE_PDF_VALIDO.match(ruta_pdf.name):
+    if not NOMBRE_NORMA_VALIDO.match(ruta.name):
         resultado.errores.append(
             ErrorValidacion(
-                "F6", str(ruta_pdf),
-                f"nombre de PDF '{ruta_pdf.name}' no respeta la convención "
-                "<tipo>-<numero>-<anio>.pdf",
+                "F6", str(ruta),
+                f"nombre de norma '{ruta.name}' no respeta la convención "
+                "<tipo>-<numero>-<anio>.pdf o .md",
             )
         )
     return resultado
@@ -214,28 +216,41 @@ def pdf_tiene_texto(ruta_pdf: Path) -> bool:
 
 
 def validar_carpeta_localidad(ruta: Path) -> ResultadoValidacion:
-    """Valida una carpeta de `data/insumos/<provincia>/<jurisdiccion_id>/`."""
+    """Valida una carpeta de `data/insumos/<provincia>/<jurisdiccion_id>/`.
+
+    `localidad.geojson` es opcional (22/09/2026, ver DECISIONES.md,
+    "Localidades y normas sin fuente oficial"): sin él, la localidad se carga
+    sin límite ni zonas protegidas (A5), solo avisa."""
     resultado = ResultadoValidacion()
     resultado.extend(validar_nombre_carpeta(ruta.name, ruta))
 
     geojson = ruta / "localidad.geojson"
     pdfs = sorted(ruta.glob("*.pdf"))
+    mds = sorted(ruta.glob("*.md"))
 
     if not geojson.exists():
-        resultado.errores.append(ErrorValidacion("F1", str(ruta), "falta localidad.geojson"))
-    if not pdfs:
-        resultado.errores.append(ErrorValidacion("F1", str(ruta), "falta al menos un PDF de norma"))
+        resultado.advertencias.append(
+            AdvertenciaValidacion(
+                "A5", str(ruta), "sin localidad.geojson: sin límite ni zonas protegidas"
+            )
+        )
+    if not pdfs and not mds:
+        resultado.errores.append(
+            ErrorValidacion("F1", str(ruta), "falta al menos un PDF o .md de norma")
+        )
 
     if geojson.exists():
         resultado.extend(validar_geojson(geojson))
     for pdf in pdfs:
-        resultado.extend(validar_nombre_pdf(pdf))
+        resultado.extend(validar_nombre_norma(pdf))
         if not pdf_tiene_texto(pdf):
             resultado.advertencias.append(
                 AdvertenciaValidacion(
                     "A3", str(pdf), "el PDF no tiene texto extraíble, requiere OCR"
                 )
             )
+    for md in mds:
+        resultado.extend(validar_nombre_norma(md))
 
     return resultado
 
@@ -243,20 +258,26 @@ def validar_carpeta_localidad(ruta: Path) -> ResultadoValidacion:
 def validar_carpeta_normativa_general(ruta: Path) -> ResultadoValidacion:
     """Valida la carpeta de una provincia (`data/insumos/<provincia>/`, sus
     propios PDFs; las subcarpetas de localidad se validan aparte) o
-    `normativa-general/nacional/`: al menos un PDF con el nombre de la convención."""
+    `normativa-general/nacional/`: al menos un PDF o `.md` con el nombre de
+    la convención."""
     resultado = ResultadoValidacion()
     pdfs = sorted(ruta.glob("*.pdf"))
-    if not pdfs:
-        resultado.errores.append(ErrorValidacion("F1", str(ruta), "falta al menos un PDF de norma"))
+    mds = sorted(ruta.glob("*.md"))
+    if not pdfs and not mds:
+        resultado.errores.append(
+            ErrorValidacion("F1", str(ruta), "falta al menos un PDF o .md de norma")
+        )
 
     for pdf in pdfs:
-        resultado.extend(validar_nombre_pdf(pdf))
+        resultado.extend(validar_nombre_norma(pdf))
         if not pdf_tiene_texto(pdf):
             resultado.advertencias.append(
                 AdvertenciaValidacion(
                     "A3", str(pdf), "el PDF no tiene texto extraíble, requiere OCR"
                 )
             )
+    for md in mds:
+        resultado.extend(validar_nombre_norma(md))
 
     return resultado
 
@@ -281,7 +302,9 @@ def validar_insumos(data_dir: Path) -> dict[str, ResultadoValidacion]:
     def registrar(clave: str, carpeta: Path) -> None:
         alcance = alcance_de_carpeta(data_dir, carpeta)
         claves_por_alcance[alcance] = clave
-        pdfs_por_alcance[alcance] = {p.stem for p in carpeta.glob("*.pdf")}
+        pdfs_por_alcance[alcance] = (
+            {p.stem for p in carpeta.glob("*.pdf")} | {p.stem for p in carpeta.glob("*.md")}
+        )
 
     for provincia_dir in carpetas_provincia(data_dir):
         provincia = provincia_dir.name

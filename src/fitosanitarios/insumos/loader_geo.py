@@ -6,11 +6,21 @@ docs/modelo-datos.md). No valida el contrato -- eso ya lo hizo
 `validador.py`; este loader asume que la carpeta pasó la validación (falla
 si no, con un error de FK/constraint menos claro, por eso `--data` en el CLI
 corre el validador primero).
+
+**Localidades sin `localidad.geojson` (22/09/2026, ver DECISIONES.md,
+"Localidades y normas sin fuente oficial: Sastre y San Jorge").** Es
+opcional: una carpeta de localidad sin `localidad.geojson` igual se carga
+en `territorio.localidad`, sin límite ni zonas protegidas (`limite` y el
+bbox quedan `NULL`), solo para que le cuelguen normas y reglas de distancia
+-- el dictamen ya no compara la ubicación del lote contra geometría
+(Fase 12). El `nombre` sale de `territorio.municipio` si coincide con el
+nombre de la carpeta; si no, del nombre de la carpeta capitalizado.
 """
 
 import argparse
 import json
 import logging
+import unicodedata
 from pathlib import Path
 
 import psycopg
@@ -98,15 +108,68 @@ def cargar_localidad(cur, jurisdiccion_id: str, ruta_geojson: Path) -> int:
     return localidad_id
 
 
+def _sin_tildes(texto: str) -> str:
+    descompuesto = unicodedata.normalize("NFD", texto)
+    return "".join(c for c in descompuesto if unicodedata.category(c) != "Mn").lower()
+
+
+def _nombre_desde_municipios(cur, provincia_nombre: str, jurisdiccion_id: str) -> str | None:
+    cur.execute(
+        "SELECT nombre FROM territorio.municipio WHERE provincia = %s", (provincia_nombre,)
+    )
+    buscado = jurisdiccion_id.replace("-", " ")
+    for (nombre,) in cur.fetchall():
+        if _sin_tildes(nombre) == buscado:
+            return nombre
+    return None
+
+
+def cargar_localidad_sin_geometria(cur, jurisdiccion_id: str, nombre: str, provincia_id: int) -> int:
+    """Localidad sin `localidad.geojson` (22/09/2026, ver DECISIONES.md,
+    "Localidades y normas sin fuente oficial"): sin límite ni zonas
+    protegidas, solo sirve para que le cuelguen normas y reglas de distancia."""
+    cur.execute(
+        """
+        INSERT INTO territorio.localidad
+            (jurisdiccion_id, nombre, provincia_id, limite,
+             bbox_min_lon, bbox_min_lat, bbox_max_lon, bbox_max_lat)
+        VALUES (%s, %s, %s, NULL, NULL, NULL, NULL, NULL)
+        ON CONFLICT (jurisdiccion_id) DO UPDATE SET
+            nombre = EXCLUDED.nombre,
+            provincia_id = EXCLUDED.provincia_id,
+            limite = NULL,
+            bbox_min_lon = NULL,
+            bbox_min_lat = NULL,
+            bbox_max_lon = NULL,
+            bbox_max_lat = NULL
+        RETURNING id
+        """,
+        (jurisdiccion_id, nombre, provincia_id),
+    )
+    localidad_id = cur.fetchone()[0]
+    cur.execute("DELETE FROM territorio.zona_protegida WHERE localidad_id = %s", (localidad_id,))
+    return localidad_id
+
+
 def cargar_localidades(conn: psycopg.Connection, data_dir: Path) -> dict[str, int]:
     resumen: dict[str, int] = {}
     with conn.cursor() as cur:
-        for _provincia, carpeta in localidades(data_dir):
+        for provincia_dir, carpeta in localidades(data_dir):
             geojson = carpeta / "localidad.geojson"
-            if not geojson.exists():
-                logger.warning("Carpeta %s sin localidad.geojson, se omite", carpeta)
-                continue
-            localidad_id = cargar_localidad(cur, carpeta.name, geojson)
+            if geojson.exists():
+                localidad_id = cargar_localidad(cur, carpeta.name, geojson)
+            else:
+                provincia_id = _upsert_provincia(cur, provincia_dir.name)
+                nombre = (
+                    _nombre_desde_municipios(cur, provincia_dir.name, carpeta.name)
+                    or carpeta.name.replace("-", " ").title()
+                )
+                localidad_id = cargar_localidad_sin_geometria(
+                    cur, carpeta.name, nombre, provincia_id
+                )
+                logger.warning(
+                    "%s sin localidad.geojson: se carga sin límite ni zonas protegidas", carpeta
+                )
             resumen[carpeta.name] = localidad_id
             logger.info("Localidad cargada: %s -> id %d", carpeta.name, localidad_id)
         conn.commit()

@@ -11,6 +11,7 @@ from fitosanitarios.servicios.formato import (
     todas_las_citas,
     unir_secciones,
 )
+from fitosanitarios.servicios.reglas import DISTANCIA_SIN_LIMITE_M
 
 # --- avisos de la tool ---
 
@@ -78,10 +79,11 @@ def _linea_prohibicion(r: dict, con_aplicacion: bool = False) -> list[str]:
     if con_aplicacion:
         detalle.append(_NOMBRE_APLICACION[r["tipo_aplicacion"]])
     detalle.append(_bandas_legibles(r["bandas"]))
-    lineas = [
-        f"- {' · '.join(detalle)}: a menos de {num(r['distancia_min_m'])} m no se puede "
-        f"aplicar ({_referencia(r)})"
-    ]
+    if r["distancia_min_m"] >= DISTANCIA_SIN_LIMITE_M:
+        alcance = "no se puede aplicar en toda la jurisdicción"
+    else:
+        alcance = f"a menos de {num(r['distancia_min_m'])} m no se puede aplicar"
+    lineas = [f"- {' · '.join(detalle)}: {alcance} ({_referencia(r)})"]
     if r.get("observaciones"):
         lineas.append(f"  ⚠️ {r['observaciones']}")
     if r.get("extraida_de_pdf"):
