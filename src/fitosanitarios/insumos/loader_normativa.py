@@ -14,10 +14,14 @@ solo por fuente secundaria (sin texto oficial disponible) se carga desde un
 `.md` en vez de un PDF: mismo nombre `<tipo>-<numero>-<anio>`, con `tipo`
 también pudiendo ser `fallo`. Se toma el texto tal cual (sin OCR) pero **no
 se chunkea en artículos**: no tiene encabezados "Artículo N" reales y no hay
-que inventarlos, así que solo sirve para que `reglas.csv` cite la norma (sin
-`articulo`); no aparece en `consultar_articulo` ni en
-`responder_consulta_normativa` (RAG). El texto completo queda en el `.md` de
-la carpeta como referencia para quien lea el insumo.
+que inventarlos, así que no aparece en `consultar_articulo`.
+
+**Fragmentos para el RAG (23/09/2026, ver DECISIONES.md, "RAG de
+limitaciones").** Además de los artículos, cada norma se parte en fragmentos
+(`territorio.fragmento_norma`) con el `RecursiveCharacterTextSplitter` de la
+cursada (800 caracteres, 120 de solapamiento): un artículo largo queda en
+varios fragmentos, y una norma sin PDF, sin artículos, también se fragmenta
+(`articulo_id` NULL). Son los que busca `responder_consulta_normativa`.
 
 Idempotente por localidad/ámbito: antes de cargar, borra las normas
 existentes de ese alcance y las vuelve a insertar (mismo patrón que
@@ -34,11 +38,13 @@ import pdfplumber
 import psycopg
 
 from fitosanitarios.config import get_settings
+from fitosanitarios.datos.vectores import vector_literal
 from fitosanitarios.insumos.estructura import (
     carpeta_nacional,
     carpetas_localidad,
     carpetas_provincia,
 )
+from fitosanitarios.servicios.fragmentos import partir_en_fragmentos
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +54,6 @@ _PATRON_ARTICULO = re.compile(
 _PATRON_NOMBRE_NORMA = re.compile(
     r"^(ordenanza|decreto|resolucion|ley|fallo)-([a-z0-9]+(?:-[a-z0-9]+)*)-(\d{4})\.(pdf|md)$"
 )
-
 
 def chunkear_articulos(texto: str) -> list[tuple[str, str]]:
     """Divide el texto de una norma en artículos: [(numero, cuerpo), ...].
@@ -126,7 +131,7 @@ def cargar_normas_de_carpeta(
     else:
         cur.execute("DELETE FROM territorio.norma WHERE ambito = 'nacional'")
 
-    resumen = {"normas": 0, "articulos": 0, "pdfs_requieren_revision": 0}
+    resumen = {"normas": 0, "articulos": 0, "fragmentos": 0, "pdfs_requieren_revision": 0}
     docs = sorted(carpeta.glob("*.pdf")) + sorted(carpeta.glob("*.md"))
     for doc in docs:
         tipo, numero, anio = _parsear_nombre_norma(doc)
@@ -155,9 +160,15 @@ def cargar_normas_de_carpeta(
         resumen["normas"] += 1
 
         if sin_fuente_oficial:
-            continue  # sin encabezados de articulo reales: no se chunkea (ver módulo)
+            # sin encabezados de artículo reales: no se chunkea en artículos, pero sí
+            # en fragmentos para el RAG (ver módulo)
+            resumen["fragmentos"] += _insertar_fragmentos(
+                cur, norma_id, [(None, texto)], modelo_embeddings
+            )
+            continue
 
         articulos = chunkear_articulos(texto)
+        insertados: list[tuple[int, str]] = []
         if not articulos:
             logger.warning(
                 "No se encontraron artículos en %s (¿formato de encabezado no estándar?)", doc
@@ -170,16 +181,47 @@ def cargar_normas_de_carpeta(
                 INSERT INTO territorio.articulo
                     (norma_id, numero, texto, requiere_revision, embedding)
                 VALUES (%s, %s, %s, %s, %s::vector)
+                RETURNING id
                 """,
                 (norma_id, numero_articulo, cuerpo, requiere_revision, vector_literal),
             )
+            insertados.append((cur.fetchone()[0], cuerpo))
             resumen["articulos"] += 1
+        resumen["fragmentos"] += _insertar_fragmentos(
+            cur, norma_id, insertados, modelo_embeddings
+        )
 
     return resumen
 
 
+def _insertar_fragmentos(
+    cur, norma_id: int, textos: list[tuple[int | None, str]], modelo_embeddings
+) -> int:
+    """`textos`: (articulo_id, texto) de cada artículo, o (None, texto completo) para una
+    norma sin artículos. Los embeddings se calculan en lote."""
+    fragmentos = [
+        (articulo_id, orden, fragmento)
+        for articulo_id, texto in textos
+        for orden, fragmento in enumerate(partir_en_fragmentos(texto))
+    ]
+    if not fragmentos:
+        return 0
+    embeddings = modelo_embeddings.encode([f[2] for f in fragmentos], batch_size=32)
+    for (articulo_id, orden, fragmento), embedding in zip(fragmentos, embeddings, strict=True):
+        cur.execute(
+            """
+            INSERT INTO territorio.fragmento_norma (norma_id, articulo_id, orden, texto, embedding)
+            VALUES (%s, %s, %s, %s, %s::vector)
+            """,
+            (norma_id, articulo_id, orden, fragmento, vector_literal(embedding.tolist())),
+        )
+    return len(fragmentos)
+
+
 def cargar_normativa(conn: psycopg.Connection, data_dir: Path, modelo_embeddings) -> dict:
-    resumen_total: dict[str, int] = {"normas": 0, "articulos": 0, "pdfs_requieren_revision": 0}
+    resumen_total: dict[str, int] = {
+        "normas": 0, "articulos": 0, "fragmentos": 0, "pdfs_requieren_revision": 0
+    }
 
     with conn.cursor() as cur:
         for provincia_dir in carpetas_provincia(data_dir):

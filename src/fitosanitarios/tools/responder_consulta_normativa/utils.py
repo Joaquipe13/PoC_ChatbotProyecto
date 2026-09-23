@@ -32,18 +32,26 @@ def _normalizar_numero_articulo(valor: str) -> str:
     DIFICULTADES.md). Sin normalizar, el matching exacto contra `numero`
     descarta citas válidas."""
     m = _PATRON_NUMERO_ARTICULO.search(valor)
-    return m.group(0) if m else valor.strip()
+    # Sin número ("", "sin artículo"): la cita es de un fragmento sin artículo (un fallo).
+    return m.group(0) if m else ""
 
 
 @dataclass
 class FragmentoNormativa:
-    articulo_id: int
-    numero: str
+    articulo_id: int  # el id del fragmento o de la regla en su tabla
+    numero: str | None  # el artículo; None en un fallo o una norma sin artículos
     texto: str
     norma: str
     ambito: str
     jurisdiccion_id: str
     score: float
+    tipo: str = "fragmento"  # "fragmento" (texto de la norma) o "regla" (de reglas.csv)
+
+
+def _referencia(f: FragmentoNormativa) -> str:
+    if f.tipo == "regla":
+        return f"regla cargada, art. {f.numero}" if f.numero else "regla cargada"
+    return f"art. {f.numero}" if f.numero else "sin artículo"
 
 
 def filtrar_por_umbral(
@@ -55,7 +63,8 @@ def filtrar_por_umbral(
 def _armar_contexto(fragmentos: list[FragmentoNormativa]) -> str:
     return "\n\n".join(
         PLANTILLA_FRAGMENTO.format(
-            norma=f.norma, numero=f.numero, jurisdiccion_id=f.jurisdiccion_id, texto=f.texto
+            norma=f.norma, referencia=_referencia(f), jurisdiccion_id=f.jurisdiccion_id,
+            texto=f.texto,
         )
         for f in fragmentos
     )
@@ -105,8 +114,9 @@ def responder_con_fragmentos(
     regla = datos.get("regla") or ""
     articulos_citados = datos.get("articulos_citados") or []
 
+    # Un fragmento sin artículo (un fallo) se cita por la norma sola: su clave es "".
     fragmentos_por_clave = {
-        (f.norma, _normalizar_numero_articulo(str(f.numero))): f for f in fragmentos
+        (f.norma, _normalizar_numero_articulo(f.numero or "")): f for f in fragmentos
     }
     citas: list[Cita] = []
     advertencias: list[str] = []

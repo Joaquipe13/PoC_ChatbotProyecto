@@ -115,3 +115,36 @@ def test_sin_articulos_citados_no_hay_citas():
     resultado = responder_con_fragmentos("¿puedo aplicar?", [_fragmento_escuela()], fake)
     assert resultado.citas == []
     assert resultado.advertencias == []
+
+
+def test_un_fragmento_sin_articulo_se_cita_por_la_norma_sola():
+    """Un fallo judicial no tiene artículos: el LLM lo cita con "" y la cita queda sin
+    número de artículo."""
+    fallo = FragmentoNormativa(
+        articulo_id=5, numero=None, texto="Se prohíbe fumigar a menos de 1000 m del pueblo.",
+        norma="fallo-sastre-2020", ambito="municipal", jurisdiccion_id="sastre", score=0.7,
+    )
+    respuesta_llm = json.dumps({
+        "veredicto": "No", "regla": "El fallo prohíbe fumigar a menos de 1000 m.",
+        "articulos_citados": [{"norma": "fallo-sastre-2020", "articulo": ""}],
+    })
+    resultado = responder_con_fragmentos("¿qué dice el fallo?", [fallo], ClienteLLMFake(
+        respuestas=[respuesta_llm]
+    ))
+    assert [(c.norma, c.articulo) for c in resultado.citas] == [("fallo-sastre-2020", None)]
+
+
+def test_el_contexto_marca_de_donde_sale_cada_fragmento():
+    from fitosanitarios.tools.responder_consulta_normativa.utils import _armar_contexto
+
+    regla = FragmentoNormativa(
+        articulo_id=1, numero="33", texto="prohibido a menos de 3000 m", norma="ley-11273-1995",
+        ambito="provincial", jurisdiccion_id="santa-fe", score=0.6, tipo="regla",
+    )
+    fallo = FragmentoNormativa(
+        articulo_id=2, numero=None, texto="texto del fallo", norma="fallo-sastre-2020",
+        ambito="municipal", jurisdiccion_id="sastre", score=0.6,
+    )
+    contexto = _armar_contexto([regla, fallo])
+    assert "[ley-11273-1995, regla cargada, art. 33, jurisdicción: santa-fe]" in contexto
+    assert "[fallo-sastre-2020, sin artículo, jurisdicción: sastre]" in contexto

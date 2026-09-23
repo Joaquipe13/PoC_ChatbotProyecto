@@ -85,7 +85,7 @@ def cargar_fixtures_insumos(conn: psycopg.Connection, modelo_embeddings) -> None
     provincial y la nacional). No toca `catalogo.*` ni `operacion.*`."""
     from fitosanitarios.insumos.loader_geo import cargar_localidades
     from fitosanitarios.insumos.loader_normativa import cargar_normativa
-    from fitosanitarios.insumos.loader_reglas import cargar_reglas
+    from fitosanitarios.insumos.loader_reglas import cargar_reglas, indexar_reglas
 
     with conn.cursor() as cur:
         cur.execute("DELETE FROM territorio.regla_distancia")
@@ -98,3 +98,4 @@ def cargar_fixtures_insumos(conn: psycopg.Connection, modelo_embeddings) -> None
     cargar_localidades(conn, FIXTURES_INSUMOS)
     cargar_normativa(conn, FIXTURES_INSUMOS, modelo_embeddings)
     cargar_reglas(conn, FIXTURES_INSUMOS)
+    indexar_reglas(conn, modelo_embeddings)

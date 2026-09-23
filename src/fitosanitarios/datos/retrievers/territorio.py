@@ -228,6 +228,55 @@ def articulos_por_similitud(
         return [dict(zip(columnas, fila, strict=True)) for fila in cur.fetchall()]
 
 
+def contexto_normativo_por_similitud(
+    conn: psycopg.Connection,
+    embedding_pregunta,
+    localidad_id: int | None,
+    provincia_id: int | None,
+    top_k: int = 8,
+) -> list[dict]:
+    """El retriever del RAG de normativa (23/09/2026, ver DECISIONES.md, "RAG de
+    limitaciones"): los fragmentos de normas (artículos partidos y normas sin PDF, como
+    los fallos) y las reglas de `reglas.csv` escritas como oración, de la localidad, su
+    provincia y la nación, ordenados por similitud coseno con la pregunta. `tipo` dice
+    de dónde sale cada uno ("fragmento" o "regla"); `numero` es el artículo, o `None`."""
+    embedding = vector_literal(embedding_pregunta)
+    with conn.cursor() as cur:
+        cur.execute(
+            f"""
+            SELECT * FROM (
+                SELECT 'fragmento' AS tipo, f.id, a.numero, f.texto, n.archivo, n.ambito,
+                       COALESCE(l.jurisdiccion_id, pr.nombre, 'nacional') AS jurisdiccion_id,
+                       1 - (f.embedding <=> %(emb)s::vector) AS score
+                FROM territorio.fragmento_norma f
+                JOIN territorio.norma n ON n.id = f.norma_id
+                LEFT JOIN territorio.articulo a ON a.id = f.articulo_id
+                LEFT JOIN territorio.localidad l ON l.id = n.localidad_id
+                LEFT JOIN territorio.provincia pr ON pr.id = n.provincia_id
+                WHERE {_ALCANCE_NORMAS}
+                UNION ALL
+                SELECT 'regla', r.id, a.numero, r.texto, n.archivo, n.ambito,
+                       COALESCE(l.jurisdiccion_id, pr.nombre, 'nacional'),
+                       1 - (r.embedding <=> %(emb)s::vector)
+                FROM territorio.regla_distancia r
+                JOIN territorio.norma n ON n.id = r.norma_id
+                LEFT JOIN territorio.articulo a ON a.id = r.articulo_id
+                LEFT JOIN territorio.localidad l ON l.id = n.localidad_id
+                LEFT JOIN territorio.provincia pr ON pr.id = n.provincia_id
+                WHERE r.embedding IS NOT NULL AND {_ALCANCE_NORMAS}
+            ) contexto
+            ORDER BY score DESC
+            LIMIT %(top_k)s
+            """,
+            {
+                "emb": embedding, "localidad_id": localidad_id,
+                "provincia_id": provincia_id, "top_k": top_k,
+            },
+        )
+        columnas = [d.name for d in cur.description]
+        return [dict(zip(columnas, fila, strict=True)) for fila in cur.fetchall()]
+
+
 _ALCANCE_NORMAS = """
     ((n.ambito = 'municipal' AND n.localidad_id = %(localidad_id)s)
   OR (n.ambito = 'provincial' AND n.provincia_id = %(provincia_id)s)

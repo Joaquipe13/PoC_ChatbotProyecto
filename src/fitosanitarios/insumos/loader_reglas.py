@@ -8,6 +8,11 @@ Resuelve la norma y el artículo citados contra lo que ya insertó
 (ver docs/contrato-insumos.md). Si una regla cita una norma o un artículo
 que no está cargado, falla con un error explícito en vez de insertar una FK
 inconsistente. Todo el archivo se valida antes de tocar la base.
+
+`indexar_reglas` (23/09/2026, ver DECISIONES.md, "RAG de limitaciones") escribe cada
+regla como una oración y le calcula el embedding, para recuperar por similitud qué
+reglas corresponden a una pregunta. Va aparte de `cargar_reglas` porque necesita el
+modelo de embeddings; `main` corre las dos.
 """
 
 import argparse
@@ -19,9 +24,13 @@ from pathlib import Path
 import psycopg
 
 from fitosanitarios.config import get_settings
+from fitosanitarios.datos.vectores import vector_literal
 from fitosanitarios.insumos.estructura import carpeta_nacional, carpetas_provincia, localidades
 from fitosanitarios.insumos.reglas_csv import FilaRegla, leer_reglas_csv
+from fitosanitarios.servicios.condiciones_aplicacion import COLOR_BANDA
 from fitosanitarios.servicios.extraccion_reglas import extraer_reglas_de_articulo
+from fitosanitarios.servicios.formato import norma_legible
+from fitosanitarios.servicios.reglas import DISTANCIA_SIN_LIMITE_M
 
 logger = logging.getLogger(__name__)
 
@@ -195,6 +204,85 @@ def extraer_reglas_de_pdfs(cur, filtro_normas: str, params: tuple) -> int:
     return total
 
 
+# Palabras con que un operario nombra cada cosa: van en el texto de la regla para que la
+# búsqueda por similitud la encuentre aunque la pregunta no use el término de la norma.
+_ZONA = {
+    "zona_urbana": "la zona urbana (planta urbana, pueblo, ciudad, casas)",
+    "escuela": "escuelas (establecimientos educativos, escuela rural)",
+    "curso_agua": "cursos de agua (arroyos, ríos, lagunas, canales)",
+    "otro": "otras zonas protegidas",
+}
+_APLICACION = {
+    "aerea": "aplicación aérea (avión, avioneta, fumigación aérea)",
+    "terrestre": "aplicación terrestre (equipo terrestre, mosquito, pulverizadora)",
+    "todas": "cualquier tipo de aplicación, aérea o terrestre",
+}
+
+
+def _bandas_con_color(bandas: list[str]) -> str:
+    if bandas == ["todas"]:
+        return "todas las bandas toxicológicas"
+    return "bandas " + ", ".join(f"{b} ({COLOR_BANDA.get(b, '?')})" for b in bandas)
+
+
+def texto_de_regla(
+    lugar: str, tipo_zona: str, tipo_aplicacion: str, bandas: list[str], distancia_m: float,
+    permitido: bool, condiciones: str | None, norma: str, articulo: str | None,
+) -> str:
+    """La regla como una oración, con los sinónimos de la zona, la aplicación y las
+    bandas. Es lo que se embebe; nunca se le muestra al operario."""
+    zona = _ZONA.get(tipo_zona, tipo_zona.replace("_", " "))
+    distancia = f"{distancia_m:g}"
+    if permitido:
+        desde = f"desde {distancia} m de {zona}" if distancia_m else f"cerca de {zona}"
+        regla = f"se permite aplicar {desde} con condiciones: {condiciones or 'según la norma'}"
+    elif distancia_m >= DISTANCIA_SIN_LIMITE_M:
+        regla = "prohibido aplicar en toda la jurisdicción"
+    else:
+        regla = f"prohibido aplicar a menos de {distancia} m de {zona}"
+    fuente = norma_legible(norma) + (f", art. {articulo}" if articulo else "")
+    return (
+        f"{lugar} · {_APLICACION.get(tipo_aplicacion, tipo_aplicacion)} · "
+        f"{_bandas_con_color(bandas)}: {regla} ({fuente})"
+    )
+
+
+def indexar_reglas(conn: psycopg.Connection, modelo_embeddings) -> int:
+    """Texto + embedding de todas las reglas cargadas (se recalculan siempre: son pocas)."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT r.id, COALESCE(l.nombre, p.nombre, 'Argentina'), r.tipo_zona,
+                   r.tipo_aplicacion, r.bandas, r.distancia_min_m, r.permitido,
+                   r.condiciones, n.archivo, a.numero
+            FROM territorio.regla_distancia r
+            JOIN territorio.norma n ON n.id = r.norma_id
+            LEFT JOIN territorio.articulo a ON a.id = r.articulo_id
+            LEFT JOIN territorio.localidad l ON l.id = n.localidad_id
+            LEFT JOIN territorio.provincia p ON p.id = n.provincia_id
+            ORDER BY r.id
+            """
+        )
+        filas = cur.fetchall()
+        if not filas:
+            return 0
+        textos = [
+            texto_de_regla(lugar, zona, aplicacion, list(bandas), float(distancia),
+                           permitido, condiciones, norma, articulo)
+            for (_, lugar, zona, aplicacion, bandas, distancia, permitido, condiciones,
+                 norma, articulo) in filas
+        ]
+        embeddings = modelo_embeddings.encode(textos, batch_size=32)
+        for (regla_id, *_), texto, embedding in zip(filas, textos, embeddings, strict=True):
+            cur.execute(
+                "UPDATE territorio.regla_distancia SET texto = %s, embedding = %s::vector"
+                " WHERE id = %s",
+                (texto, vector_literal(embedding.tolist()), regla_id),
+            )
+    conn.commit()
+    return len(filas)
+
+
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     parser = argparse.ArgumentParser()
@@ -204,9 +292,12 @@ def main() -> None:
 
     settings = get_settings()
     db_url = args.database_url or settings.database_url
+    from sentence_transformers import SentenceTransformer
+
     with psycopg.connect(db_url) as conn:
         total = cargar_reglas(conn, args.data)
-    logger.info("Reglas cargadas: %d", total)
+        indexadas = indexar_reglas(conn, SentenceTransformer(settings.embeddings_model))
+    logger.info("Reglas cargadas: %d (indexadas para la búsqueda: %d)", total, indexadas)
 
 
 if __name__ == "__main__":

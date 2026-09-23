@@ -53,6 +53,10 @@ def test_cada_tabla_con_columna_vector_es_una_entidad_propia_del_dominio(conexio
         ("catalogo", "adversidad"),
         ("catalogo", "vehiculo"),  # RAG de equipos (matricula + caracteristicas propias)
         ("territorio", "articulo"),
+        # RAG de limitaciones (23/09/2026): fragmentos de cada norma (FK a norma y
+        # artículo) y cada regla de distancia escrita como oración (la propia entidad).
+        ("territorio", "fragmento_norma"),
+        ("territorio", "regla_distancia"),
     }
     assert tablas_con_vector == esperadas
 
@@ -73,3 +77,20 @@ def test_cada_tabla_de_entidad_tiene_columnas_relacionales_propias(conexion):
         "id", "firma_id", "numero_inscripcion", "marca", "banda_toxicologica",
     }
     assert columnas_relacionales_esperadas.issubset(columnas)
+
+
+def test_fragmento_norma_esta_ligado_a_su_norma_y_su_articulo(conexion):
+    """No es un vector store genérico: cada fragmento cuelga de una norma (y de un
+    artículo, salvo en las normas sin PDF) por clave foránea."""
+    with conexion.cursor() as cur:
+        cur.execute(
+            """
+            SELECT kcu.column_name
+            FROM information_schema.table_constraints tc
+            JOIN information_schema.key_column_usage kcu
+              ON kcu.constraint_name = tc.constraint_name
+            WHERE tc.table_schema = 'territorio' AND tc.table_name = 'fragmento_norma'
+              AND tc.constraint_type = 'FOREIGN KEY'
+            """
+        )
+        assert {r[0] for r in cur.fetchall()} == {"norma_id", "articulo_id"}

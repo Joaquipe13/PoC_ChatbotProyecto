@@ -5,7 +5,7 @@ from langchain_core.tools import tool
 from pydantic import BaseModel
 
 from fitosanitarios.datos.retrievers.territorio import (
-    articulos_por_similitud,
+    contexto_normativo_por_similitud,
     listar_jurisdicciones_cargadas,
 )
 from fitosanitarios.dominio.modelos import CampoFaltante, ResultadoTool
@@ -60,15 +60,17 @@ def responder_consulta_normativa_logica(
         else [mensajes.aclaracion_sin_normativa_municipal(ubicacion.nombre)]
     )
 
+    # Retrieval: fragmentos de normas (artículos, fallos) y reglas cargadas, de la
+    # localidad, su provincia y la nación, por similitud con la pregunta.
     embedding_pregunta = modelo_embeddings.encode(args.pregunta).tolist()
-    filas = articulos_por_similitud(
+    filas = contexto_normativo_por_similitud(
         conn, embedding_pregunta, ubicacion.localidad_id, ubicacion.provincia_id, top_k=8
     )
     fragmentos = [
         FragmentoNormativa(
             articulo_id=f["id"], numero=f["numero"], texto=f["texto"],
             norma=f["archivo"], ambito=f["ambito"],
-            jurisdiccion_id=f["jurisdiccion_id"], score=f["score"],
+            jurisdiccion_id=f["jurisdiccion_id"], score=f["score"], tipo=f["tipo"],
         )
         for f in filas
     ]
