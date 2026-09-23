@@ -29,6 +29,7 @@ from fitosanitarios.orquestador.agente import (
 )
 from fitosanitarios.orquestador.estado import ContadorRepreguntas
 from fitosanitarios.orquestador.turno import ejecutar_turno
+from fitosanitarios.servicios.recursos import precargar_modelo_embeddings
 
 logger = logging.getLogger(__name__)
 
@@ -69,6 +70,7 @@ def crear_app_produccion(pila: ExitStack):
             "Gemini real. Arrancar con USE_FIXTURES=false para un canal real."
         )
     chequear_al_arrancar(settings, whatsapp=False)
+    precargar_modelo_embeddings()
     model = crear_modelo_chat_gemini(settings)
     checkpointer = pila.enter_context(checkpointer_postgres(settings.database_url))
     contador = ContadorRepreguntas()
