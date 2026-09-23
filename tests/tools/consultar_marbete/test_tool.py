@@ -38,11 +38,14 @@ def retriever(monkeypatch):
     monkeypatch.setattr(modulo, "palabras_de", lambda c, t: ["carenci", "citric"])
 
 
-def _consultar(respuesta_llm: dict | str, umbral: float = 0.42):
+REFORMULADA = "carencia, días antes de la cosecha, intervalo de seguridad"
+
+
+def _consultar(respuesta_llm: dict | str, umbral: float = 0.42, reformulada=REFORMULADA):
     texto = respuesta_llm if isinstance(respuesta_llm, str) else json.dumps(respuesta_llm)
     return consultar_marbete_logica(
         ConsultarMarbeteArgs(producto="vertimec", pregunta="¿qué carencia tiene en cítricos?"),
-        None, ModeloFalso(), ClienteLLMFake(respuestas=[texto]), umbral,
+        None, ModeloFalso(), ClienteLLMFake(respuestas=[reformulada, texto]), umbral,
     )
 
 
@@ -79,3 +82,36 @@ def test_producto_no_encontrado(monkeypatch):
     monkeypatch.setattr(modulo, "buscar_productos_por_nombre", lambda c, n, m: [])
     resultado = _consultar({})
     assert resultado.motivo == MotivoNoResuelto.PRODUCTO_NO_ENCONTRADO
+
+
+def test_una_pregunta_fuera_de_tema_no_busca_ni_responde(monkeypatch):
+    """"¿qué hora es?" se reformulaba como carencia ("tiempo de espera") y recuperaba páginas."""
+    monkeypatch.setattr(modulo, "buscar_productos_por_nombre", lambda c, n, m: [VERTIMEC])
+    monkeypatch.setattr(
+        modulo, "fragmentos_de_marbete",
+        lambda c, e, pid: pytest.fail("no tenía que buscar en el marbete"),
+    )
+    resultado = _consultar({}, reformulada="FUERA")
+    assert resultado.motivo == MotivoNoResuelto.MARBETE_SIN_RESPALDO
+
+
+def test_se_busca_con_la_pregunta_mas_la_reformulacion():
+    from fitosanitarios.tools.consultar_marbete.tool import consulta_de_busqueda
+
+    consulta = consulta_de_busqueda(
+        "¿cuándo puedo volver a entrar al lote?",
+        ClienteLLMFake(respuestas=["reingreso, reingresar al área tratada\notra línea"]),
+    )
+    assert consulta == (
+        "¿cuándo puedo volver a entrar al lote? reingreso, reingresar al área tratada"
+    )
+
+
+def test_si_la_reformulacion_falla_se_busca_con_la_pregunta_tal_cual():
+    from fitosanitarios.tools.consultar_marbete.tool import consulta_de_busqueda
+
+    class LLMCaido:
+        def generar(self, prompt, system=None):
+            raise RuntimeError("429")
+
+    assert consulta_de_busqueda("¿qué carencia tiene?", LLMCaido()) == "¿qué carencia tiene?"

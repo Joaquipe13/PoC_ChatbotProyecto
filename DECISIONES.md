@@ -675,4 +675,14 @@ Pedido del usuario, para el límite de la sección anterior. `servicios/busqueda
 
 **Evaluación de recuperación** (40 marbetes al azar de los cargados, 10 tipos de pregunta escritos como un operario y casi siempre sin la palabra técnica, 383 casos; un caso acierta si entre los 5 fragmentos recuperados hay uno que responde, marcado por el texto del marbete; sin Gemini): solo vectorial 68 %, **híbrida 81 %**. Donde más mejora: envases vacíos (45 → 90 %) y abejas (55 → 90 %). Siguen flojos reingreso (41 %), fitotoxicidad (56 %) y mezclas (68 %): el operario usa palabras que el marbete no ("volver a entrar al lote" / "reingresar", "quemar el cultivo" / "fitotoxicidad"). Preguntas ajenas con algo recuperado: 0 de 120 en las dos.
 
-**Se puede combinar con reformular la pregunta** (el paso "contextualizar" del notebook de la cursada: el LLM reescribe la pregunta sumando sinónimos antes de buscar). No se implementó: cuesta una llamada más a Gemini por consulta.
+**Se combina con reformular la pregunta:** ver la sección siguiente.
+
+## Reformulación de la pregunta antes de buscar en el marbete (23/09/2026)
+
+Pedido del usuario si la búsqueda híbrida seguía floja, y seguía: reingreso, fitotoxicidad y mezclas fallaban porque el operario usa palabras que el marbete no ("volver a entrar al lote" / "reingresar al área tratada", "quemar el cultivo" / "fitotoxicidad"). Es el paso "contextualizar la pregunta" del notebook de RAG de la cursada. `consultar_marbete` le pide primero al LLM una línea con la pregunta en palabras simples más los términos técnicos y sinónimos que usaría el marbete (sin datos ni respuestas), y busca con la pregunta original más esa línea, en las dos búsquedas (vectorial y BM25). La respuesta la sigue redactando el LLM sobre la pregunta original.
+
+**Fuera de tema.** En la primera prueba, "¿qué hora es?" se reformuló como "tiempo de espera, días de carencia" y recuperaba páginas. El prompt pide responder `FUERA` si la pregunta no es sobre el producto, su uso, sus riesgos o su manejo; en ese caso no se busca ni se responde (`MARBETE_SIN_RESPALDO`). Si la reformulación falla (cuota, red), se busca con la pregunta tal cual.
+
+**Evaluación** (misma metodología que la sección anterior, con la muestra fija de 40 marbetes y 373 casos, para comparar lo mismo; la carga seguía sumando productos): híbrida sola 76 %, **híbrida + reformulación 95 %**. Mezclas 62 → 97 %, fitotoxicidad 49 → 95 %, derrames 65 → 98 %, envases 75 → 100 %, carencia 78 → 92 %; reingreso 41 → 55 % (el más flojo: los marbetes lo dicen de formas muy variadas). Preguntas ajenas con algo recuperado: 1 de 120, igual que sin reformular. Con Gemini real, "¿cuándo puedo volver a entrar al lote?", "¿lo puedo tirar junto con otro producto?" y "¿puede quemar el cultivo?" contestan con la página correcta.
+
+**Costo:** una llamada más a Gemini por consulta de marbete (tres en total con la del orquestador y la de la respuesta).

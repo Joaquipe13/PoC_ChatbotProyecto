@@ -12,6 +12,21 @@ Args:
     producto: el nombre comercial tal como lo dijo.
     pregunta: tal como la escribió el operario."""
 
+# Reformulación de la pregunta antes de buscar (el paso "contextualizar la pregunta" del
+# notebook de RAG de la cursada): el operario pregunta "¿cuándo puedo volver a entrar al
+# lote?" y el marbete dice "reingresar al área tratada".
+RESPUESTA_FUERA_DE_TEMA = "FUERA"
+PROMPT_REFORMULACION = (
+    "Reescribís preguntas de operarios rurales para buscar la respuesta en el marbete "
+    "(la etiqueta aprobada por SENASA) de un producto fitosanitario. Devolvé una sola línea "
+    "con la pregunta en palabras simples seguida de los términos técnicos y sinónimos que "
+    "usaría el marbete para ese tema (por ejemplo: 'volver a entrar al lote' -> reingreso, "
+    "reingresar al área tratada, período de reingreso). No agregues datos, números ni "
+    "respuestas: solo palabras para buscar. Sin comillas ni explicaciones. Si la pregunta "
+    f"no es sobre el producto, su uso, sus riesgos o su manejo, respondé solo "
+    f"{RESPUESTA_FUERA_DE_TEMA}."
+)
+
 PROMPT_SISTEMA_MARBETE = (
     "Sos un asistente que responde preguntas sobre el marbete (la etiqueta aprobada por "
     "SENASA) de un producto fitosanitario, usando ÚNICAMENTE los fragmentos del marbete "

@@ -1,7 +1,8 @@
 """Tool `consultar_marbete`: RAG sobre el marbete de SENASA de un producto (ver
 DECISIONES.md, "RAG de marbetes"). Resuelve el producto con el matching de siempre
-(trigram + embedding), recupera los fragmentos de su marbete con búsqueda híbrida
-(similitud + palabras, `servicios/busqueda_hibrida.py`), y el LLM
+(trigram + embedding), le pide al LLM que reformule la pregunta con los términos que
+usaría el marbete, recupera los fragmentos de su marbete con búsqueda híbrida
+(similitud + palabras, `servicios/busqueda_hibrida.py`) y el LLM
 responde solo con esos fragmentos. Cada página que cita se verifica en código contra lo
 recuperado: si no está, se descarta; sin ninguna cita verificada no hay respuesta."""
 
@@ -25,12 +26,15 @@ from fitosanitarios.tools.consultar_marbete.prompts import (
     DESCRIPCION,
     PLANTILLA_FRAGMENTO,
     PLANTILLA_PROMPT_USUARIO,
+    PROMPT_REFORMULACION,
     PROMPT_SISTEMA_MARBETE,
+    RESPUESTA_FUERA_DE_TEMA,
 )
 
 logger = logging.getLogger(__name__)
 
 TOP_K_FRAGMENTOS = 5
+LARGO_MAXIMO_REFORMULACION = 400  # una línea de términos; más es el LLM divagando
 
 
 class ConsultarMarbeteArgs(BaseModel):
@@ -46,6 +50,22 @@ def _parsear_json(respuesta: str) -> dict | None:
         logger.warning("El LLM no devolvió JSON válido para consultar_marbete")
         return None
     return datos if isinstance(datos, dict) else None
+
+
+def consulta_de_busqueda(pregunta: str, cliente_llm) -> str | None:
+    """La pregunta del operario más los términos técnicos y sinónimos que usaría el marbete
+    (los escribe el LLM), para buscar con las dos. `None` si el LLM dice que la pregunta no
+    es sobre el producto; si falla, se busca con la pregunta tal cual."""
+    try:
+        reformulada = cliente_llm.generar(
+            f"Pregunta: {pregunta}", system=PROMPT_REFORMULACION
+        ).strip().splitlines()[0].strip()
+    except Exception:  # sin la reformulación se puede buscar igual
+        logger.warning("No se pudo reformular la pregunta para el marbete", exc_info=True)
+        return pregunta
+    if reformulada.upper().strip(" .") == RESPUESTA_FUERA_DE_TEMA:
+        return None
+    return f"{pregunta} {reformulada[:LARGO_MAXIMO_REFORMULACION]}"
 
 
 def consultar_marbete_logica(
@@ -68,19 +88,24 @@ def consultar_marbete_logica(
         )
     producto = candidatos[0]
 
-    # Retrieval híbrido: los fragmentos del marbete de ese producto, rankeados por
-    # similitud de significado y por palabras (BM25), fusionados.
-    del_marbete = fragmentos_de_marbete(
-        conn, modelo_embeddings.encode(args.pregunta).tolist(), producto.id
-    )
-    elegidos = seleccionar(
-        [f["score"] for f in del_marbete], [f["palabras"] for f in del_marbete],
-        palabras_de(conn, args.pregunta), umbral_similitud, TOP_K_FRAGMENTOS,
-    )
-    fragmentos = [del_marbete[p.indice] for p in elegidos]
     sin_respaldo = ResultadoTool(
         estado="no_resuelto", motivo=MotivoNoResuelto.MARBETE_SIN_RESPALDO
     )
+    # Reformulación: la pregunta más los términos que usaría el marbete.
+    consulta = consulta_de_busqueda(args.pregunta, cliente_llm)
+    if consulta is None:
+        return sin_respaldo
+
+    # Retrieval híbrido: los fragmentos del marbete de ese producto, rankeados por
+    # similitud de significado y por palabras (BM25), fusionados.
+    del_marbete = fragmentos_de_marbete(
+        conn, modelo_embeddings.encode(consulta).tolist(), producto.id
+    )
+    elegidos = seleccionar(
+        [f["score"] for f in del_marbete], [f["palabras"] for f in del_marbete],
+        palabras_de(conn, consulta), umbral_similitud, TOP_K_FRAGMENTOS,
+    )
+    fragmentos = [del_marbete[p.indice] for p in elegidos]
     if not fragmentos:
         return sin_respaldo
 
