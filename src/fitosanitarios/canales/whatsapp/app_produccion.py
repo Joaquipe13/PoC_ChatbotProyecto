@@ -13,6 +13,7 @@ from contextlib import ExitStack
 
 import psycopg
 
+from fitosanitarios.canales.chequeo_credenciales import chequear_al_arrancar
 from fitosanitarios.canales.whatsapp import cliente_graph
 from fitosanitarios.canales.whatsapp.normalizacion import numero_canonico, numero_para_envio
 from fitosanitarios.canales.whatsapp.webhook import (
@@ -92,6 +93,7 @@ def crear_app_produccion(pila: ExitStack):
             "usar un LLM fake para sus llamadas internas aunque el agente use "
             "Gemini real. Arrancar con USE_FIXTURES=false para un canal real."
         )
+    chequear_al_arrancar(settings, whatsapp=True)
     model = crear_modelo_chat_gemini(settings)
     checkpointer = pila.enter_context(checkpointer_postgres(settings.database_url))
     contador = ContadorRepreguntas()

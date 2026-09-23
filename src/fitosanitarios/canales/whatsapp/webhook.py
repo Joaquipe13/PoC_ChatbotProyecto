@@ -109,6 +109,10 @@ def crear_app(settings: Settings, procesar_mensaje: ProcesadorMensaje) -> FastAP
             and params.get("hub.verify_token") == settings.whatsapp_verify_token
         ):
             return Response(content=params.get("hub.challenge", ""), media_type="text/plain")
+        logger.warning(
+            "Handshake del webhook rechazado: el token de verificación no coincide con "
+            "WHATSAPP_VERIFY_TOKEN del .env (revisalo en Meta > WhatsApp > Configuración)."
+        )
         return Response(status_code=403)
 
     @app.post("/webhook")
@@ -119,6 +123,12 @@ def crear_app(settings: Settings, procesar_mensaje: ProcesadorMensaje) -> FastAP
     ) -> Response:
         cuerpo = await request.body()
         if not verificar_firma(cuerpo, x_hub_signature_256, settings.whatsapp_app_secret):
+            # Sin este aviso, un WHATSAPP_APP_SECRET mal cargado dejaba al bot sin
+            # contestar y sin ninguna pista en la consola.
+            logger.warning(
+                "Mensaje rechazado por firma inválida: revisá WHATSAPP_APP_SECRET en .env "
+                "(Meta > tu app > Configuración > Básica > Clave secreta de la app)."
+            )
             return Response(status_code=401)
 
         payload = json.loads(cuerpo)

@@ -64,7 +64,14 @@ que se use un túnel nombrado/pago) -- se usa en el paso siguiente como
 
 ## 5. Suscribir el webhook
 
-1. Levantar el servidor local: `uv run uvicorn fitosanitarios.canales.whatsapp.app_produccion:app --port 8000`.
+1. Levantar el servidor local con `USE_FIXTURES=false` (en `.env` o en la
+   línea de comando): `uv run uvicorn fitosanitarios.canales.whatsapp.app_produccion:app --port 8000`.
+   Al arrancar se chequean las credenciales (`canales/chequeo_credenciales.py`):
+   Postgres y el catálogo, cada `GEMINI_API_KEY_*` y el token de WhatsApp
+   contra la Graph API (muestra el número asociado). Si algo falla, el
+   servidor no arranca y dice qué corregir. El `WHATSAPP_APP_SECRET` no se
+   puede verificar al arrancar: si está mal, cada mensaje entrante deja en
+   la consola "Mensaje rechazado por firma inválida".
 2. En el panel de WhatsApp > Configuración > Webhook, pegar la URL del
    túnel + `/webhook` y el `WHATSAPP_VERIFY_TOKEN` del paso 3.
 3. Meta hace un `GET` de verificación (`hub.mode=subscribe`); si el
