@@ -92,7 +92,7 @@ def cargar_catalogo(
     embeddings = modelo_embeddings.encode(textos, batch_size=64) if textos else []
 
     with conn.cursor() as cur:
-        for (item, detalle), embedding in zip(productos, embeddings):
+        for (item, detalle), embedding in zip(productos, embeddings, strict=True):
             firma_id = _upsert_firma(cur, item.nombre_firma, cache_firma, resumen)
             producto_id = _upsert_producto(
                 cur, item, detalle, firma_id, _vector_literal(embedding.tolist()), resumen
