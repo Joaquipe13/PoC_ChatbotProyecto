@@ -88,5 +88,5 @@ def plantilla_detalle_bandas(respuesta: RespuestaAgente, resultados: list[Result
     no_realizados = [c for r in resultados for c in r.chequeos_no_realizados]
     return unir_secciones(
         "\n".join(lineas), bloque_condiciones(condiciones), bloque_no_verificado(no_realizados),
-        "¿Querés que agende la aplicación?" if productos else "",
+        SEGUIMIENTO_COMPLETO if productos else "",
     )

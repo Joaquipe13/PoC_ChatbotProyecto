@@ -183,7 +183,7 @@ def test_dictamen_da_la_distancia_minima_con_la_norma_que_la_fija_y_ofrece_segui
         "*Fuentes*\n"
         "- SENASA, Reg. 41881 (detalle API)\n"
         "- Ordenanza 841/2010, art. 6 (el-trebol)\n\n"
-        "¿Querés más info (la banda de cada producto) o que agende la aplicación?"
+        "¿Agendamos la aplicación?\n[Agendar] [No, gracias]"
     )
 
 
@@ -194,8 +194,8 @@ def test_dictamen_no_muestra_la_banda_de_cada_producto_hasta_que_se_pide():
 
 def test_dictamen_observado_no_ofrece_agendar():
     texto = _un_mensaje(RespuestaAgente(tipo="dictamen"), [_dictamen_el_trebol("OBSERVADA")])
-    assert texto.endswith("¿Querés más info (la banda de cada producto)?")
-    assert "agende" not in texto
+    assert texto.endswith("¿Querés la banda de cada producto?\n[Sí] [No]")
+    assert "Agendar" not in texto
 
 
 def test_evaluar_riesgo_suelto_muestra_condiciones_sin_veredicto():
@@ -208,7 +208,7 @@ def test_evaluar_riesgo_suelto_muestra_condiciones_sin_veredicto():
     assert texto.startswith("*Condiciones de aplicación* — El Trébol")
     assert "Resultado" not in texto
     assert "Fuentes" not in texto  # la única norma ya está en la línea de la distancia
-    assert texto.endswith("o que agende la aplicación?")
+    assert texto.endswith("[Agendar] [No, gracias]")
 
 
 def test_detalle_bandas_lista_la_banda_de_cada_producto():
@@ -231,7 +231,7 @@ def test_detalle_bandas_lista_la_banda_de_cada_producto():
         "La aplicación se rige por la más peligrosa: II (amarilla).\n\n"
         "*Condiciones de aplicación* — El Trébol · aérea · banda II (amarilla)\n"
         "- *Distancia mínima a zona urbana:* 3000 m (Ordenanza 841/2010, art. 7)\n\n"
-        "¿Querés que agende la aplicación?"
+        "¿Agendamos la aplicación?\n[Agendar] [No, gracias]"
     )
 
 

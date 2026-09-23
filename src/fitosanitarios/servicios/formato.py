@@ -19,8 +19,10 @@ NOMBRE_ZONA = {
 }
 
 # Lo que se le ofrece al operario después de un dictamen o de una evaluación de riesgo.
-SEGUIMIENTO_COMPLETO = "¿Querés más info (la banda de cada producto) o que agende la aplicación?"
-SEGUIMIENTO_SOLO_INFO = "¿Querés más info (la banda de cada producto)?"
+# Botones (pedido del usuario, 22/09/2026, ver DECISIONES.md): la última línea entre
+# corchetes es la que `cliente_graph.partir_opciones` convierte en botones de WhatsApp.
+SEGUIMIENTO_COMPLETO = "¿Agendamos la aplicación?\n[Agendar] [No, gracias]"
+SEGUIMIENTO_SOLO_INFO = "¿Querés la banda de cada producto?\n[Sí] [No]"
 
 _ICONO_TAREA = {"pendiente": "⏳", "en_curso": "🚜", "finalizada": "✅"}
 
@@ -121,7 +123,13 @@ def lineas_agenda(tareas: list[dict]) -> list[str]:
 def bloque_condiciones(condiciones: dict | None) -> str:
     """Lo más concreto posible: distancia mínima y la norma que la fija. La
     banda de cada producto queda para cuando el usuario pide más info. No
-    compara contra la ubicación del lote."""
+    compara contra la ubicación del lote.
+
+    Las `observaciones` de cada regla (`reglas.csv`) no se muestran acá: son
+    texto libre para transparencia de fuente (de dónde sale un fallo, cómo
+    se infirió una banda) que sirve en `listar_limitaciones` pero satura un
+    dictamen que tiene que ser corto (pedido del usuario, 22/09/2026, ver
+    DECISIONES.md)."""
     if not condiciones:
         return ""
     tipo = "aérea" if condiciones["tipo_aplicacion"] == "aerea" else condiciones["tipo_aplicacion"]
@@ -145,7 +153,6 @@ def bloque_condiciones(condiciones: dict | None) -> str:
                 f"⚠️ La distancia a {zona} se leyó del texto de {fuente} (no hay reglas "
                 "cargadas a mano para esa jurisdicción): verificala con la norma."
             )
-        lineas.extend(f"⚠️ {a}" for a in d.get("advertencias", []))
     lineas.extend(f"⚠️ {a}" for a in condiciones.get("advertencias", []))
     return "\n".join(lineas)
 
