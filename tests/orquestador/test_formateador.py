@@ -836,8 +836,8 @@ def test_limitaciones_agrupa_por_aplicacion_y_lista_las_excepciones():
         "- Zona urbana · bandas Ia, Ib, II: a menos de 500 m no se puede aplicar "
         "(Ley 11273/1995, art. 34)\n\n"
         "*Excepciones*\n"
-        "- Zona urbana · aérea · banda II: se puede aplicar desde 500 m, si: ordenanza que la "
-        "autorice (Ley 055297/2017, art. 51)\n\n"
+        "- Zona urbana · aérea · banda II: se puede desde 500 m con condiciones "
+        "(Ley 055297/2017, art. 51)\n\n"
         "*Fuentes*\n"
         "- Ley 11273/1995, art. 34 (santa-fe)\n"
         "- Ley 11273/1995, art. 33 (santa-fe)\n"
@@ -845,7 +845,7 @@ def test_limitaciones_agrupa_por_aplicacion_y_lista_las_excepciones():
     )
 
 
-def test_limitaciones_a_una_distancia_muestra_la_prohibicion_y_sus_excepciones():
+def test_limitaciones_a_una_distancia_muestra_que_aplicaciones_y_bandas_se_pueden():
     resultado = ResultadoTool(
         estado="ok",
         datos={
@@ -858,15 +858,13 @@ def test_limitaciones_a_una_distancia_muestra_la_prohibicion_y_sus_excepciones()
         citas=_citas(AEREA_II, EXCEPCION, TERRESTRE),
     )
     texto = _un_mensaje(RespuestaAgente(tipo="limitaciones"), [resultado])
-    assert texto.startswith("*A 1000 m en Rosario*\n\n")
-    assert (
-        "- Zona urbana · aérea · banda II: a menos de 3000 m no se puede aplicar "
-        "(Ley 11273/1995, art. 33)\n"
-        "  *Excepciones posibles:*\n"
-        "  - Zona urbana · aérea · banda II: se puede aplicar desde 500 m, si: ordenanza que la "
-        "autorice (Ley 055297/2017, art. 51)"
-    ) in texto
-    assert "  No hay excepciones cargadas para esa distancia." in texto
+    assert texto.startswith(
+        "*A 1000 m de la zona urbana en Rosario*\n"
+        "- *Terrestre:* ✅ III y IV · ❌ Ia, Ib y II\n"
+        "- *Aérea:* ✅ Ia, Ib, III y IV · ⚠️ II solo con excepción (Ley 055297/2017, art. 51)"
+        "\n\n*Fuentes*"
+    )
+    assert "ordenanza que la autorice" not in texto
 
 
 def test_limitaciones_a_una_distancia_que_cumple_todo():
@@ -879,7 +877,7 @@ def test_limitaciones_a_una_distancia_que_cumple_todo():
     )
 
 
-def test_limitaciones_marca_lo_leido_del_pdf_y_las_observaciones():
+def test_limitaciones_marca_lo_leido_del_pdf_y_no_transcribe_las_observaciones():
     regla = _regla("zona_urbana", "aerea", ["todas"], 500, "ley-1-2000", "3",
                    extraida_de_pdf=True, observaciones="Aviso previo")
     resultado = ResultadoTool(
@@ -889,7 +887,7 @@ def test_limitaciones_marca_lo_leido_del_pdf_y_las_observaciones():
         },
     )
     texto = _un_mensaje(RespuestaAgente(tipo="limitaciones"), [resultado])
-    assert "  ⚠️ Aviso previo" in texto
+    assert "Aviso previo" not in texto
     assert "  ⚠️ Distancia leída del texto de la norma: verificala con la norma." in texto
 
 
@@ -1066,9 +1064,9 @@ def test_dos_consultas_en_un_turno_se_contestan_las_dos():
         RespuestaAgente(tipo="consulta_articulo"),
         [_limitaciones("El Trébol", distancia=1000), _resultado_articulo(["Texto del art. 33."])],
     )
-    assert "*A 1000 m en El Trébol*" in texto
+    assert "*A 1000 m de la zona urbana en El Trébol*" in texto
     assert "*Ley 11273/1995, art. 33 (santa-fe)*\nTexto del art. 33." in texto
-    assert texto.index("A 1000 m en El Trébol") < texto.index("Ley 11273/1995, art. 33")
+    assert texto.index("A 1000 m de la zona urbana") < texto.index("*Ley 11273/1995, art. 33")
 
 
 def test_dos_localidades_en_un_turno_muestran_cada_una():
