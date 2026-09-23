@@ -1,41 +1,13 @@
-"""Los mensajes de esta tool: lo que pregunta cuando no pudo leer un dato, lo que
-ve el agente de lo leído y cómo se le muestra la receta al operario para que la
-confirme (la plantilla del tipo de respuesta `confirmacion_receta`)."""
+"""Los mensajes de esta tool: lo que ve el agente de lo leído y cómo se le muestra la
+receta al operario (la plantilla del tipo de respuesta `confirmacion_receta`, que usa
+también `completar_receta`). Las preguntas por los datos obligatorios están en
+`servicios/receta.py`."""
 
 from fitosanitarios.dominio.modelos import RespuestaAgente, ResultadoTool
-from fitosanitarios.servicios.formato import num, primer_dato
-
-# --- preguntas y motivos de la tool ---
-
-MOTIVO_CAMPO_ILEGIBLE = "no se pudo leer con confianza suficiente en la imagen"
-MOTIVO_SIN_PRODUCTOS = "no se pudo leer ningún producto con confianza suficiente"
-PREGUNTA_POR_CAMPO = {
-    "cultivo": "¿Qué cultivo es?",
-    "lote": "¿Cuál es el número o nombre del lote?",
-    "superficie_ha": "¿Cuántas hectáreas tiene el lote?",
-    "productos": "¿Qué producto y dosis indica la receta?",
-}
+from fitosanitarios.servicios.formato import num
+from fitosanitarios.servicios.receta import NOMBRE_CAMPO, datos_para_llm
 
 # --- lo que ve el agente (el LLM orquestador) de lo leído ---
-
-
-def datos_para_llm(datos: dict) -> str:
-    """Lo leído, en texto: es lo ÚNICO que el agente sabe de la receta (el
-    formateador arma el mensaje al usuario desde el artifact, no desde acá).
-    Sin esto el LLM completaba cultivo, producto, dosis y localidad por su
-    cuenta y evaluaba datos inventados (bug real, ver DIFICULTADES.md)."""
-    productos = "; ".join(
-        f"{i['producto_nombre']} (dosis: {i.get('dosis_declarada') or 'NO FIGURA'})"
-        for i in datos.get("items", [])
-    )
-    campos = {
-        "cultivo": datos.get("cultivo"), "lote": datos.get("lote"),
-        "superficie_ha": datos.get("superficie_ha"),
-        "tipo_aplicacion": datos.get("tipo_aplicacion"),
-        "localidad": datos.get("localidad"), "adversidad": datos.get("adversidad"),
-        "productos": productos or None,
-    }
-    return "; ".join(f"{k}={v if v not in (None, '') else 'NO FIGURA'}" for k, v in campos.items())
 
 
 def resumen_para_llm(resultado: ResultadoTool) -> str:
@@ -46,7 +18,12 @@ def resumen_para_llm(resultado: ResultadoTool) -> str:
         )
         if resultado.faltantes:
             campos = ", ".join(f.campo for f in resultado.faltantes)
-            texto += f" No se leyeron con confianza: {campos}."
+            texto += (
+                f" Faltan datos obligatorios: {campos}; ya se le preguntaron al operario. "
+                "Cuando los dé (o corrija un dato), llamá `completar_receta` con esos datos."
+            )
+        else:
+            texto += " Si el operario corrige un dato, llamá `completar_receta` con ese dato."
         return texto
     if resultado.estado == "ok":
         return "Receta leída correctamente, todos los campos con confianza suficiente."
@@ -59,41 +36,33 @@ def resumen_para_llm(resultado: ResultadoTool) -> str:
 # --- plantilla del resultado (tipo de respuesta `confirmacion_receta`) ---
 
 
-def plantilla_confirmacion_receta(
-    respuesta: RespuestaAgente, resultados: list[ResultadoTool]
-) -> str:
-    """`cultivo`, `lote`, `superficie`, `producto` y `tipo_aplicacion` son los
-    campos que alimentan un chequeo legal más adelante (el tipo define la banda
-    y la distancia mínima que se informan; ver `utils.py`): si faltan se
-    muestran igual, con ⚠️. El resto de los campos (ver `Receta`, DECISIONES.md)
-    son descriptivos de la receta real -- se muestran solo si se pudieron leer,
-    sin ⚠️ ni bloquear la confirmación."""
-    datos = primer_dato(resultados) or {}
-    numero_txt = f" N.° {datos['numero']}" if datos.get("numero") else ""
-    lineas = [f"*Leí la receta{numero_txt}*. Confirmá los datos:"]
-    lineas.append(f"- *Cultivo:* {datos.get('cultivo') or 'no figura ⚠️'}")
-    lineas.append(f"- *Lote:* {datos.get('lote') or 'no figura ⚠️'}")
-    lineas.append(f"- *Localidad:* {datos.get('localidad') or 'no figura ⚠️'}")
-    lineas.append(
-        f"- *Superficie:* {num(datos['superficie_ha'])} ha"
-        if datos.get("superficie_ha") is not None
-        else "- *Superficie:* no figura ⚠️"
-    )
+def _con_datos(resultados: list[ResultadoTool]) -> ResultadoTool | None:
+    return next((r for r in resultados if r.datos), None)
+
+
+def _lineas_leidas(datos: dict) -> list[str]:
+    """Lo que tiene la receta, sin los datos que faltan (esos se preguntan aparte)."""
+    lineas = []
+    for campo in ("cultivo", "lote", "localidad"):
+        if datos.get(campo):
+            lineas.append(f"- *{NOMBRE_CAMPO[campo]}:* {datos[campo]}")
+    if datos.get("superficie_ha") is not None:
+        lineas.append(f"- *Superficie:* {num(datos['superficie_ha'])} ha")
     if datos.get("adversidad"):
         lineas.append(f"- *Adversidad:* {datos['adversidad']}")
     for item in datos.get("items", []):
         producto = item.get("producto_nombre", "producto sin nombre")
-        dosis = item.get("dosis_declarada") or "sin dosis"
+        dosis = f" — {item['dosis_declarada']}" if item.get("dosis_declarada") else ""
         detalle = " · ".join(
             p for p in (item.get("principio_activo"), item.get("clase_toxicologica")) if p
         )
         sufijo = f" ({detalle})" if detalle else ""
-        lineas.append(f"- *Producto:* {producto} — {dosis}{sufijo}")
+        lineas.append(f"- *Producto:* {producto}{dosis}{sufijo}")
         if item.get("adversidad"):
             lineas.append(f"  Plaga/maleza: {item['adversidad']}")
-    if not datos.get("items"):
-        lineas.append("- *Producto:* no figura ⚠️")
-    lineas.append(f"- *Tipo de aplicación:* {datos.get('tipo_aplicacion') or 'no figura ⚠️'}")
+    if datos.get("tipo_aplicacion"):
+        tipo = "aérea" if datos["tipo_aplicacion"] == "aerea" else datos["tipo_aplicacion"]
+        lineas.append(f"- *Tipo de aplicación:* {tipo}")
     if datos.get("caudal"):
         lineas.append(f"- *Caudal:* {datos['caudal']}")
     if datos.get("ubic_poblado"):
@@ -108,5 +77,35 @@ def plantilla_confirmacion_receta(
         lineas.append(f"- *Fecha de emisión:* {datos['fecha_emision']}")
     if datos.get("validez_dias") is not None:
         lineas.append(f"- *Validez:* {num(datos['validez_dias'])} días")
-    lineas.append("[Confirmar] [Corregir]")
-    return "\n".join(lineas)
+    return lineas
+
+
+def plantilla_confirmacion_receta(
+    respuesta: RespuestaAgente, resultados: list[ResultadoTool]
+) -> str:
+    """Con todos los datos obligatorios, la receta para confirmar ([Confirmar]
+    [Corregir]). Si falta alguno, no se ofrece confirmar: primero se pregunta lo que
+    falta y se muestra aparte lo que sí se leyó (pedido del usuario, 23/09/2026: antes
+    se mostraba "no figura ⚠️" y se podía confirmar igual)."""
+    resultado = _con_datos(resultados)
+    datos = resultado.datos if resultado else {}
+    numero_txt = f" N.° {datos['numero']}" if datos.get("numero") else ""
+    leidas = _lineas_leidas(datos)
+    faltantes = resultado.faltantes if resultado else []
+
+    if faltantes:
+        preguntas = [
+            f"{i}. *{NOMBRE_CAMPO.get(f.campo, f.campo)}:* {f.pregunta_sugerida}"
+            for i, f in enumerate(faltantes, start=1)
+        ]
+        secciones = [
+            f"*Leí la receta{numero_txt}*. Falta la siguiente información obligatoria:",
+            "\n".join(preguntas),
+        ]
+        if leidas:
+            secciones.append("\n".join(["*Lo que pude leer:*", *leidas]))
+        return "\n\n".join(secciones)
+
+    return "\n".join(
+        [f"*Leí la receta{numero_txt}*. Confirmá los datos:", *leidas, "[Confirmar] [Corregir]"]
+    )

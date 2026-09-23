@@ -42,8 +42,11 @@ def hay_receta_sin_confirmar(mensajes: list) -> bool:
                     llamada.get("name") == "RespuestaAgente"
                     and (llamada.get("args") or {}).get("tipo") == "confirmacion_receta"
                 )
-                # `leer_receta` en este mismo turno: la confirmación todavía no se mostró
-                if es_confirmacion_mostrada or llamada.get("name") == "leer_receta":
+                # `leer_receta` o `completar_receta` en este mismo turno: la confirmación
+                # (de la receta como quedó) todavía no se mostró
+                if es_confirmacion_mostrada or llamada.get("name") in (
+                    "leer_receta", "completar_receta"
+                ):
                     pendiente = True
         elif isinstance(m, HumanMessage) and pendiente and es_confirmacion(str(m.content)):
             pendiente = False

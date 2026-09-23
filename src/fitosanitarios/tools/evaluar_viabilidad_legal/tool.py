@@ -14,6 +14,7 @@ from fitosanitarios.dominio.motivos import MotivoNoResuelto
 from fitosanitarios.servicios.condiciones_aplicacion import calcular_condiciones
 from fitosanitarios.servicios.confirmacion import hay_receta_sin_confirmar
 from fitosanitarios.servicios.dictamen import armar_dictamen
+from fitosanitarios.servicios.receta import faltantes_para_evaluar
 from fitosanitarios.servicios.ubicacion import resolver_ubicacion_o_cortar
 from fitosanitarios.servicios.validacion_producto import resolver_y_validar_producto
 from fitosanitarios.tools.evaluar_viabilidad_legal import mensajes
@@ -128,6 +129,15 @@ def evaluar_viabilidad_legal(
         pendiente = ResultadoTool(
             estado="faltan_datos", faltantes=[mensajes.faltante_confirmacion()]
         )
+        return mensajes.resumen_para_llm(pendiente, "-"), pendiente
+
+    # Una receta a la que le falta un dato obligatorio no se evalúa, aunque el LLM lo
+    # haya completado con "NO FIGURA" (ver `servicios/receta.py`).
+    faltantes = faltantes_para_evaluar(
+        runtime.state.get("messages", []), cultivo, tipo_aplicacion
+    )
+    if faltantes:
+        pendiente = ResultadoTool(estado="faltan_datos", faltantes=faltantes)
         return mensajes.resumen_para_llm(pendiente, "-"), pendiente
 
     args = EvaluarViabilidadLegalArgs(

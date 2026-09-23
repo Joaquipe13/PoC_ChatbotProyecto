@@ -15,6 +15,7 @@ from fitosanitarios.dominio.modelos import RespuestaAgente, ResultadoTool
 
 TIPO_POR_TOOL = {
     "leer_receta": "confirmacion_receta",
+    "completar_receta": "confirmacion_receta",
     "validar_producto_registro": "consulta_producto",
     "consultar_productos": "consulta_producto",
     "evaluar_viabilidad_legal": "dictamen",

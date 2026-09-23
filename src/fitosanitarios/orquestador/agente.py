@@ -25,6 +25,7 @@ from fitosanitarios.config import Settings
 from fitosanitarios.dominio.modelos import RespuestaAgente
 from fitosanitarios.orquestador.prompt_sistema import PROMPT_SISTEMA
 from fitosanitarios.tools.agendar_aplicacion import agendar_aplicacion
+from fitosanitarios.tools.completar_receta import completar_receta
 from fitosanitarios.tools.consultar_agenda import consultar_agenda
 from fitosanitarios.tools.consultar_articulo import consultar_articulo
 from fitosanitarios.tools.consultar_productos import consultar_productos
@@ -48,6 +49,7 @@ LIMITE_TOOLS_POR_TURNO = 4
 
 TOOLS = [
     leer_receta,
+    completar_receta,
     validar_producto_registro,
     consultar_productos,
     evaluar_riesgo,

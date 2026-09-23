@@ -26,6 +26,7 @@ def _extraccion_completa() -> RecetaExtraidaLLM:
         superficie_ha=35.0,
         confianza_superficie_ha=0.9,
         tipo_aplicacion="terrestre",
+        localidad="El Trébol",
         caudal="100 L/ha",
         ubic_poblado="a 500 m del pueblo",
         condiciones="sin viento",
@@ -64,7 +65,6 @@ def test_conversion_campos_descriptivos_ausentes_no_generan_faltantes():
     """Son descriptivos (ver DECISIONES.md): si el LLM no los leyó, la receta
     se arma igual con el resto -- nunca bloquean con una repregunta."""
     extraccion = _extraccion_completa()
-    extraccion.tipo_aplicacion = None
     extraccion.adversidad = None
     extraccion.caudal = None
     extraccion.ubic_poblado = None
@@ -77,7 +77,6 @@ def test_conversion_campos_descriptivos_ausentes_no_generan_faltantes():
     receta, faltantes = convertir_a_receta_y_faltantes(extraccion)
 
     assert faltantes == []
-    assert receta.tipo_aplicacion is None
     assert receta.adversidad is None
     assert receta.caudal is None
     assert receta.fecha_emision is None
@@ -227,3 +226,27 @@ def test_extraer_receta_de_imagen_distintas_imagenes_no_comparten_cache():
     assert a.cultivo == "Soja"
     assert b.cultivo == "Maiz"
     assert len(fake.llamadas) == 2
+
+
+def test_conversion_localidad_tipo_de_aplicacion_y_dosis_ausentes_son_faltantes():
+    """Sin estos datos no se puede evaluar: se preguntan antes de confirmar (pedido del
+    usuario, 23/09/2026)."""
+    extraccion = _extraccion_completa()
+    extraccion.localidad = None
+    extraccion.tipo_aplicacion = None
+    extraccion.productos[0].dosis_declarada = None
+
+    _, faltantes = convertir_a_receta_y_faltantes(extraccion)
+
+    assert [(f.campo, f.pregunta_sugerida) for f in faltantes] == [
+        ("localidad", "¿En qué localidad se aplica?"),
+        ("tipo_aplicacion", "¿Es aplicación terrestre o aérea?"),
+        ("dosis", "¿Qué dosis de Glifosato 48% indica la receta?"),
+    ]
+
+
+def test_conversion_normaliza_el_tipo_de_aplicacion():
+    extraccion = _extraccion_completa()
+    extraccion.tipo_aplicacion = "Aérea"
+    receta, _ = convertir_a_receta_y_faltantes(extraccion)
+    assert receta.tipo_aplicacion == "aerea"

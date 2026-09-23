@@ -1,7 +1,7 @@
 """Auxiliares de `leer_receta`: extracción multimodal de datos de una receta
 agronómica desde una foto, con confianza por campo (ver skill, RF1/RF2 y contrato
-`Receta`). El prompt de extracción está en `prompts.py` y las preguntas de
-repregunta en `mensajes.py`.
+`Receta`). El prompt de extracción está en `prompts.py` y qué datos son
+obligatorios, con sus preguntas, en `servicios/receta.py`.
 
 El LLM nunca decide solo: acá se convierte su salida en `Receta` + lista de
 `CampoFaltante` para los campos con confianza baja o ausentes, que es lo que
@@ -20,7 +20,7 @@ from typing import Protocol
 from pydantic import BaseModel, Field, ValidationError
 
 from fitosanitarios.dominio.modelos import CampoFaltante, Receta, RecetaItem
-from fitosanitarios.tools.leer_receta import mensajes
+from fitosanitarios.servicios.receta import faltantes_de_receta, normalizar_tipo_aplicacion
 from fitosanitarios.tools.leer_receta.prompts import PROMPT_SISTEMA_EXTRACCION
 
 logger = logging.getLogger(__name__)
@@ -162,34 +162,19 @@ def _fecha_o_none(texto: str | None):
 def convertir_a_receta_y_faltantes(
     extraccion: RecetaExtraidaLLM, umbral: float = UMBRAL_CONFIANZA_CAMPO
 ) -> tuple[Receta, list[CampoFaltante]]:
-    """Separa lo que se leyó con confianza suficiente (va a la `Receta`) de lo
-    que no. Solo `cultivo`, `lote`, `superficie_ha` y `productos` -- los que
-    alimentan un chequeo legal más adelante -- generan `CampoFaltante` (para
-    que el orquestador pueda repreguntar). El resto de los campos (ver
-    `Receta`, DECISIONES.md) son descriptivos: si el LLM no los pudo leer
-    quedan en `None` sin bloquear nada -- la receta se arma igual con lo que
-    sí se pudo leer, y el hueco se ve en la confirmación ("no figura")."""
-    faltantes: list[CampoFaltante] = []
+    """Separa lo que se leyó con confianza suficiente (va a la `Receta`) de lo que
+    no: `cultivo`, `lote`, `superficie_ha` y cada producto se descartan si su
+    confianza no llega al umbral. Los faltantes son los datos obligatorios que no
+    quedaron (`servicios/receta.py::faltantes_de_receta`: además de esos, la
+    localidad, el tipo de aplicación y la dosis de cada producto), y se preguntan
+    antes de mostrar la confirmación. El resto de los campos son descriptivos: si
+    no se leyeron quedan en `None` sin bloquear nada."""
     confianza_por_campo: dict[str, float] = {}
 
-    def _campo_o_faltante(nombre: str, valor):
+    def _si_hay_confianza(nombre: str, valor):
         confianza = getattr(extraccion, f"confianza_{nombre}", 0.0)
         confianza_por_campo[nombre] = confianza
-        if valor is None or confianza < umbral:
-            faltantes.append(
-                CampoFaltante(
-                    campo=nombre,
-                    motivo=mensajes.MOTIVO_CAMPO_ILEGIBLE,
-                    pregunta_sugerida=mensajes.PREGUNTA_POR_CAMPO[nombre],
-                    tipo_entrada="texto",
-                )
-            )
-            return None
-        return valor
-
-    cultivo = _campo_o_faltante("cultivo", extraccion.cultivo)
-    lote = _campo_o_faltante("lote", extraccion.lote)
-    superficie_ha = _campo_o_faltante("superficie_ha", extraccion.superficie_ha)
+        return valor if confianza >= umbral else None
 
     items = [
         RecetaItem(
@@ -202,27 +187,18 @@ def convertir_a_receta_y_faltantes(
         for p in extraccion.productos
         if p.confianza >= umbral
     ]
-    if not items:
-        confianza_por_campo["productos"] = 0.0
-        faltantes.append(
-            CampoFaltante(
-                campo="productos",
-                motivo=mensajes.MOTIVO_SIN_PRODUCTOS,
-                pregunta_sugerida=mensajes.PREGUNTA_POR_CAMPO["productos"],
-                tipo_entrada="texto",
-            )
-        )
-    else:
-        confianza_por_campo["productos"] = min(p.confianza for p in extraccion.productos)
+    confianza_por_campo["productos"] = (
+        min(p.confianza for p in extraccion.productos) if items else 0.0
+    )
 
     receta = Receta(
         numero=extraccion.numero,
-        cultivo=cultivo,
-        lote=lote,
+        cultivo=_si_hay_confianza("cultivo", extraccion.cultivo),
+        lote=_si_hay_confianza("lote", extraccion.lote),
         adversidad=extraccion.adversidad,
         items=items,
-        superficie_ha=superficie_ha,
-        tipo_aplicacion=extraccion.tipo_aplicacion,
+        superficie_ha=_si_hay_confianza("superficie_ha", extraccion.superficie_ha),
+        tipo_aplicacion=normalizar_tipo_aplicacion(extraccion.tipo_aplicacion),
         caudal=extraccion.caudal,
         localidad=extraccion.localidad,
         ubic_poblado=extraccion.ubic_poblado,
@@ -233,4 +209,4 @@ def convertir_a_receta_y_faltantes(
         validez_dias=extraccion.validez_dias,
         confianza_por_campo=confianza_por_campo,
     )
-    return receta, faltantes
+    return receta, faltantes_de_receta(receta.model_dump(mode="json"))

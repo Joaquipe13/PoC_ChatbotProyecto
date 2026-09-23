@@ -25,6 +25,7 @@ RESPUESTA_COMPLETA = json.dumps(
         "superficie_ha": 35.0,
         "confianza_superficie_ha": 0.9,
         "tipo_aplicacion": "terrestre",
+        "localidad": "El Trébol",
     }
 )
 
@@ -63,11 +64,11 @@ def test_receta_con_campos_faltantes_devuelve_faltan_datos():
     resultado = leer_receta_logica(b"imagen-fake", fake)
 
     assert resultado.estado == "faltan_datos"
-    campos = {f.campo for f in resultado.faltantes}
-    # tipo_aplicacion y adversidad son descriptivos/opcionales (ver
-    # DECISIONES.md): ausentes no generan CampoFaltante, la receta se arma
-    # igual sin ellos.
-    assert campos == {"lote", "superficie_ha"}
+    # En el orden en que se preguntan. La localidad y el tipo de aplicación son
+    # obligatorios desde el 23/09/2026 (ver `servicios/receta.py`); la adversidad no.
+    assert [f.campo for f in resultado.faltantes] == [
+        "localidad", "tipo_aplicacion", "lote", "superficie_ha"
+    ]
     # Los datos parciales que sí se leyeron no se pierden
     assert resultado.datos["cultivo"] == "Algodon"
     assert resultado.datos["tipo_aplicacion"] is None
@@ -135,5 +136,9 @@ def test_el_agente_recibe_los_datos_leidos_y_la_localidad():
 def test_un_dato_que_no_figura_se_le_marca_al_agente_para_que_no_lo_invente():
     from fitosanitarios.tools.leer_receta.mensajes import resumen_para_llm as _resumen_para_llm
 
-    resultado = leer_receta_logica(b"img", ClienteLLMFake(respuestas=[RESPUESTA_COMPLETA]))
-    assert "localidad=NO FIGURA" in _resumen_para_llm(resultado)
+    resultado = leer_receta_logica(
+        b"img", ClienteLLMFake(respuestas=[RESPUESTA_CON_FALTANTES])
+    )
+    resumen = _resumen_para_llm(resultado)
+    assert "localidad=NO FIGURA" in resumen
+    assert "llamá `completar_receta`" in resumen

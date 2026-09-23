@@ -16,12 +16,12 @@ def _un_mensaje(respuesta, resultados) -> str:
 def test_confirmacion_receta():
     respuesta = RespuestaAgente(tipo="confirmacion_receta")
     resultado = ResultadoTool(
-        estado="faltan_datos",
+        estado="ok",
         datos={
-            "numero": "0042", "cultivo": "soja", "lote": "4",
+            "numero": "0042", "cultivo": "soja", "lote": "4", "localidad": "El Trébol",
             "adversidad": "malezas de hoja ancha",
             "items": [{"producto_nombre": "Glifosato 48%", "dosis_declarada": "2 L/ha"}],
-            "superficie_ha": 35, "tipo_aplicacion": None,
+            "superficie_ha": 35, "tipo_aplicacion": "aerea",
         },
     )
     texto = _un_mensaje(respuesta, [resultado])
@@ -29,29 +29,42 @@ def test_confirmacion_receta():
         "*Leí la receta N.° 0042*. Confirmá los datos:\n"
         "- *Cultivo:* soja\n"
         "- *Lote:* 4\n"
-        "- *Localidad:* no figura ⚠️\n"
+        "- *Localidad:* El Trébol\n"
         "- *Superficie:* 35 ha\n"
         "- *Adversidad:* malezas de hoja ancha\n"
         "- *Producto:* Glifosato 48% — 2 L/ha\n"
-        "- *Tipo de aplicación:* no figura ⚠️\n"
+        "- *Tipo de aplicación:* aérea\n"
         "[Confirmar] [Corregir]"
     )
 
 
-def test_confirmacion_receta_cultivo_lote_y_superficie_faltantes_muestran_alerta():
-    respuesta = RespuestaAgente(tipo="confirmacion_receta")
-    resultado = ResultadoTool(estado="faltan_datos", datos={"items": []})
-    texto = _un_mensaje(respuesta, [resultado])
+def test_confirmacion_receta_con_datos_obligatorios_faltantes_los_pregunta_sin_ofrecer_confirmar():
+    """El caso real del 23/09/2026: la receta 1001 sin cultivo ni localidad se mostraba con
+    "no figura ⚠️" y [Confirmar]; ahora se pregunta lo que falta antes de confirmar."""
+    from fitosanitarios.servicios.receta import faltantes_de_receta
+
+    datos = {
+        "numero": "1001", "cultivo": None, "lote": "8", "localidad": None,
+        "adversidad": "Chinche de la alfalfa", "superficie_ha": 40,
+        "items": [{"producto_nombre": "Flyer 10 Ec", "dosis_declarada": "170 cm3/ha"}],
+        "tipo_aplicacion": "terrestre",
+    }
+    resultado = ResultadoTool(
+        estado="faltan_datos", datos=datos, faltantes=faltantes_de_receta(datos)
+    )
+    texto = _un_mensaje(RespuestaAgente(tipo="confirmacion_receta"), [resultado])
     assert texto == (
-        "*Leí la receta*. Confirmá los datos:\n"
-        "- *Cultivo:* no figura ⚠️\n"
-        "- *Lote:* no figura ⚠️\n"
-        "- *Localidad:* no figura ⚠️\n"
-        "- *Superficie:* no figura ⚠️\n"
-        "- *Producto:* no figura ⚠️\n"
-        "- *Tipo de aplicación:* no figura ⚠️\n"
-        "[Confirmar] [Corregir]"
+        "*Leí la receta N.° 1001*. Falta la siguiente información obligatoria:\n\n"
+        "1. *Cultivo:* ¿Qué cultivo es?\n"
+        "2. *Localidad:* ¿En qué localidad se aplica?\n\n"
+        "*Lo que pude leer:*\n"
+        "- *Lote:* 8\n"
+        "- *Superficie:* 40 ha\n"
+        "- *Adversidad:* Chinche de la alfalfa\n"
+        "- *Producto:* Flyer 10 Ec — 170 cm3/ha\n"
+        "- *Tipo de aplicación:* terrestre"
     )
+    assert "[Confirmar]" not in texto
 
 
 def test_confirmacion_receta_con_campos_descriptivos_completos():
@@ -61,7 +74,7 @@ def test_confirmacion_receta_con_campos_descriptivos_completos():
     resultado = ResultadoTool(
         estado="ok",
         datos={
-            "cultivo": "soja", "lote": "4", "superficie_ha": 35,
+            "cultivo": "soja", "lote": "4", "localidad": "El Trébol", "superficie_ha": 35,
             "items": [{
                 "producto_nombre": "Glifosato 48%", "dosis_declarada": "2 L/ha",
                 "adversidad": "yuyo colorado", "principio_activo": "Glifosato",
@@ -79,7 +92,7 @@ def test_confirmacion_receta_con_campos_descriptivos_completos():
         "*Leí la receta*. Confirmá los datos:\n"
         "- *Cultivo:* soja\n"
         "- *Lote:* 4\n"
-        "- *Localidad:* no figura ⚠️\n"
+        "- *Localidad:* El Trébol\n"
         "- *Superficie:* 35 ha\n"
         "- *Producto:* Glifosato 48% — 2 L/ha (Glifosato · IV)\n"
         "  Plaga/maleza: yuyo colorado\n"
