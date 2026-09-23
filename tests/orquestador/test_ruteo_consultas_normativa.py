@@ -103,8 +103,9 @@ def test_puedo_aplicar_a_1000_metros():
         ),
         mensaje_respuesta_estructurada({"tipo": "limitaciones"}),
     ])
-    assert mensajes[0].startswith("*A 1000 m en El Trébol*")
-    assert "No hay excepciones cargadas para esa distancia." in mensajes[0]
+    assert mensajes[0].startswith(
+        "*A 1000 m de la zona urbana en El Trébol*\n- *Aérea:* ✅ III y IV · ❌ Ia, Ib y II"
+    )
 
 
 def test_si_el_llm_elige_otro_tipo_igual_se_formatea_lo_que_devolvio_la_tool_que_repregunta(
