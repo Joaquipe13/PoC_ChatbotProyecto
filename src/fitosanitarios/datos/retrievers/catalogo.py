@@ -153,30 +153,38 @@ def resolver_entidad_por_nombre(
     return fila[0]
 
 
-def fragmentos_de_marbete_por_similitud(
-    conn: psycopg.Connection, embedding_pregunta, producto_id: int, top_k: int = 5
+def fragmentos_de_marbete(
+    conn: psycopg.Connection, embedding_pregunta, producto_id: int
 ) -> list[dict]:
-    """El retriever del RAG de marbetes (ver DECISIONES.md, "RAG de marbetes"): los
-    fragmentos del marbete del producto (filtro relacional primero), ordenados por
-    similitud coseno con la pregunta. Vacío si el producto no tiene marbete con texto."""
+    """El retriever del RAG de marbetes (ver DECISIONES.md, "RAG de marbetes" y "Búsqueda
+    híbrida en los marbetes"): todos los fragmentos del marbete del producto (unos 25),
+    con su similitud coseno con la pregunta y sus palabras llevadas a la raíz por el
+    full-text en español de Postgres, una vez por cada aparición (para BM25). El ranking
+    lo arma `servicios/busqueda_hibrida.py`. Vacío si el producto no tiene marbete con
+    texto."""
     with conn.cursor() as cur:
         cur.execute(
             """
-            SELECT f.id, f.pagina, f.texto, d.ruta_archivo,
-                   1 - (f.embedding <=> %(emb)s::vector) AS score
+            SELECT f.id, f.pagina, f.texto,
+                   1 - (f.embedding <=> %(emb)s::vector) AS score,
+                   ARRAY(
+                       SELECT u.lexeme
+                       FROM unnest(to_tsvector('spanish', f.texto)) u,
+                            generate_series(1, COALESCE(array_length(u.positions, 1), 1))
+                   ) AS palabras
             FROM catalogo.fragmento_marbete f
-            JOIN catalogo.documento d ON d.id = f.documento_id
             WHERE f.producto_id = %(producto_id)s
-            -- Por `score` y no por `embedding <=> ...`: así Postgres filtra por producto
-            -- (unos 20 fragmentos) y ordena exacto, en vez de usar el índice HNSW sobre
-            -- toda la tabla y filtrar después, que puede devolver menos filas o ninguna.
-            ORDER BY score DESC
-            LIMIT %(top_k)s
+            ORDER BY f.pagina, f.orden
             """,
-            {
-                "emb": _vector_literal(embedding_pregunta), "producto_id": producto_id,
-                "top_k": top_k,
-            },
+            {"emb": _vector_literal(embedding_pregunta), "producto_id": producto_id},
         )
         columnas = [d.name for d in cur.description]
         return [dict(zip(columnas, fila, strict=True)) for fila in cur.fetchall()]
+
+
+def palabras_de(conn: psycopg.Connection, texto: str) -> list[str]:
+    """Las palabras de un texto llevadas a la raíz, sin las vacías ("que", "para", "al"),
+    con el mismo full-text en español que `fragmentos_de_marbete`."""
+    with conn.cursor() as cur:
+        cur.execute("SELECT tsvector_to_array(to_tsvector('spanish', %s))", (texto,))
+        return list(cur.fetchone()[0] or [])

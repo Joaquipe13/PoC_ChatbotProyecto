@@ -18,10 +18,10 @@ VERTIMEC = CandidatoProducto(
     estado_producto="Activo", score=0.9,
 )
 FRAGMENTOS = [
-    {"id": 1, "pagina": 7, "texto": "Carencia: cítricos 7 días.", "ruta_archivo": "x",
-     "score": 0.6},
-    {"id": 2, "pagina": 2, "texto": "Precauciones generales.", "ruta_archivo": "x",
-     "score": 0.3},
+    {"id": 1, "pagina": 7, "texto": "Carencia: cítricos 7 días.", "score": 0.6,
+     "palabras": ["carenci", "citric", "7", "dias"]},
+    {"id": 2, "pagina": 2, "texto": "Precauciones generales.", "score": 0.3,
+     "palabras": ["precaucion", "general"]},
 ]
 
 
@@ -34,9 +34,8 @@ class ModeloFalso:
 @pytest.fixture
 def retriever(monkeypatch):
     monkeypatch.setattr(modulo, "buscar_productos_por_nombre", lambda c, n, m: [VERTIMEC])
-    monkeypatch.setattr(
-        modulo, "fragmentos_de_marbete_por_similitud", lambda c, e, pid, top_k: FRAGMENTOS
-    )
+    monkeypatch.setattr(modulo, "fragmentos_de_marbete", lambda c, e, pid: FRAGMENTOS)
+    monkeypatch.setattr(modulo, "palabras_de", lambda c, t: ["carenci", "citric"])
 
 
 def _consultar(respuesta_llm: dict | str, umbral: float = 0.42):

@@ -1,6 +1,7 @@
 """Tool `consultar_marbete`: RAG sobre el marbete de SENASA de un producto (ver
 DECISIONES.md, "RAG de marbetes"). Resuelve el producto con el matching de siempre
-(trigram + embedding), recupera por similitud los fragmentos de su marbete, y el LLM
+(trigram + embedding), recupera los fragmentos de su marbete con búsqueda híbrida
+(similitud + palabras, `servicios/busqueda_hibrida.py`), y el LLM
 responde solo con esos fragmentos. Cada página que cita se verifica en código contra lo
 recuperado: si no está, se descarta; sin ninguna cita verificada no hay respuesta."""
 
@@ -12,10 +13,12 @@ from pydantic import BaseModel
 
 from fitosanitarios.datos.retrievers.catalogo import (
     buscar_productos_por_nombre,
-    fragmentos_de_marbete_por_similitud,
+    fragmentos_de_marbete,
+    palabras_de,
 )
 from fitosanitarios.dominio.modelos import CampoFaltante, Cita, ResultadoTool
 from fitosanitarios.dominio.motivos import MotivoNoResuelto
+from fitosanitarios.servicios.busqueda_hibrida import seleccionar
 from fitosanitarios.servicios.matching import Candidato, hay_empate_ambiguo, rankear_candidatos
 from fitosanitarios.tools.consultar_marbete import mensajes
 from fitosanitarios.tools.consultar_marbete.prompts import (
@@ -65,14 +68,16 @@ def consultar_marbete_logica(
         )
     producto = candidatos[0]
 
-    # Retrieval: los fragmentos del marbete de ese producto, por similitud con la pregunta.
-    fragmentos = [
-        f for f in fragmentos_de_marbete_por_similitud(
-            conn, modelo_embeddings.encode(args.pregunta).tolist(), producto.id,
-            top_k=TOP_K_FRAGMENTOS,
-        )
-        if f["score"] >= umbral_similitud
-    ]
+    # Retrieval híbrido: los fragmentos del marbete de ese producto, rankeados por
+    # similitud de significado y por palabras (BM25), fusionados.
+    del_marbete = fragmentos_de_marbete(
+        conn, modelo_embeddings.encode(args.pregunta).tolist(), producto.id
+    )
+    elegidos = seleccionar(
+        [f["score"] for f in del_marbete], [f["palabras"] for f in del_marbete],
+        palabras_de(conn, args.pregunta), umbral_similitud, TOP_K_FRAGMENTOS,
+    )
+    fragmentos = [del_marbete[p.indice] for p in elegidos]
     sin_respaldo = ResultadoTool(
         estado="no_resuelto", motivo=MotivoNoResuelto.MARBETE_SIN_RESPALDO
     )

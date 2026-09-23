@@ -61,3 +61,31 @@ def test_carga_un_marbete_con_sus_fragmentos(conexion, modelo_embeddings, tmp_pa
                 (producto_id,),
             )
         conexion.commit()
+
+
+def test_el_retriever_trae_las_palabras_en_su_raiz(conexion, modelo_embeddings, tmp_path):
+    from fitosanitarios.datos.retrievers.catalogo import fragmentos_de_marbete, palabras_de
+
+    with conexion.cursor() as cur:
+        cur.execute("SELECT id, numero_inscripcion FROM catalogo.producto ORDER BY id LIMIT 1")
+        producto_id, registro = cur.fetchone()
+    _pdf(tmp_path / f"{registro}_1_Marbete.pdf", [
+        "No reingresar al area tratada hasta que el producto se haya secado. " * 3,
+    ])
+    try:
+        cargar_marbetes(conexion, tmp_path, modelo_embeddings, solo_faltantes=False)
+        pregunta = "¿cuándo puedo reingresar al lote?"
+        fragmentos = fragmentos_de_marbete(
+            conexion, modelo_embeddings.encode(pregunta).tolist(), producto_id
+        )
+        assert fragmentos and "reingres" in fragmentos[0]["palabras"]
+        assert fragmentos[0]["palabras"].count("reingres") == 3  # una por aparición
+        assert "reingres" in palabras_de(conexion, pregunta)
+        assert "al" not in palabras_de(conexion, pregunta)  # palabra vacía
+    finally:
+        with conexion.cursor() as cur:
+            cur.execute(
+                "DELETE FROM catalogo.documento WHERE producto_id = %s AND tipo = 'marbete'",
+                (producto_id,),
+            )
+        conexion.commit()
