@@ -13,21 +13,23 @@ from pydantic import BaseModel
 from fitosanitarios.dominio.modelos import CampoFaltante, ResultadoTool
 from fitosanitarios.servicios.conversacion import thread_id_de_config
 from fitosanitarios.servicios.eventos import consultar_agenda_logica
-from fitosanitarios.servicios.fechas import fecha_legible, resolver_fecha
+from fitosanitarios.servicios.fechas import fecha_legible, resolver_dias
 from fitosanitarios.tools.consultar_agenda import mensajes
 from fitosanitarios.tools.consultar_agenda.prompts import DESCRIPCION
 
 
 class ConsultarAgendaArgs(BaseModel):
-    fecha: str | None = None  # texto del operario o ISO; None = hoy, resuelto en código
+    # texto del operario ("martes", "jueves y viernes", "semanal") o ISO; None = hoy,
+    # resuelto en código
+    fecha: str | None = None
 
 
 def consultar_agenda_tool_logica(
     args: ConsultarAgendaArgs, conn, thread_id: str, hoy: date | None = None
 ) -> ResultadoTool:
     hoy = hoy or date.today()
-    fecha = resolver_fecha(args.fecha, hoy) if args.fecha else hoy
-    if fecha is None:
+    fechas = resolver_dias(args.fecha, hoy) if args.fecha else [hoy]
+    if fechas is None:
         return ResultadoTool(
             estado="faltan_datos",
             faltantes=[
@@ -37,12 +39,19 @@ def consultar_agenda_tool_logica(
                 )
             ],
         )
-    tareas = consultar_agenda_logica(conn, thread_id, fecha)
+    dias = [
+        {
+            "fecha": f.isoformat(), "fecha_legible": fecha_legible(f),
+            "tareas": consultar_agenda_logica(conn, thread_id, f),
+        }
+        for f in fechas
+    ]
+    tareas = [t for d in dias for t in d["tareas"]]
     return ResultadoTool(
         estado="ok",
         datos={
-            "fecha": fecha.isoformat(), "fecha_legible": fecha_legible(fecha),
-            "tareas": tareas, "total": len(tareas),
+            "fecha": dias[0]["fecha"], "fecha_legible": dias[0]["fecha_legible"],
+            "tareas": tareas, "total": len(tareas), "dias": dias,
         },
     )
 

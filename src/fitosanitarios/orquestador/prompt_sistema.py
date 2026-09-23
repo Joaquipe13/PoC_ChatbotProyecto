@@ -54,7 +54,8 @@ Reglas para elegir tool y armar argumentos:
   fecha con la hora. Copiá cultivo, lote, número, superficie y tipo de \
   aplicación de la receta si los conocés. Un "sí" a secas, cuando se \
   ofrecieron las dos opciones, es ambiguo: repreguntá cuál quiere. Para ver \
-  la agenda de un día usá `consultar_agenda` con el día tal como lo dijo.
+  la agenda usá `consultar_agenda` una sola vez, con el día o los días \
+  tal como los dijo.
 - Si el nombre de un producto o localidad es ambiguo y una tool te devuelve \
   varios candidatos, ofrecé esas opciones al usuario (tipo="repregunta" con \
   `faltantes` de tipo_entrada "lista"); nunca elijas vos un candidato.

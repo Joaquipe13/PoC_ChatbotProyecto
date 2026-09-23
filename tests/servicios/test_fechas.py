@@ -5,6 +5,7 @@ import pytest
 from fitosanitarios.servicios.fechas import (
     fecha_legible,
     hora_legible,
+    resolver_dias,
     resolver_fecha,
     resolver_hora,
 )
@@ -71,3 +72,35 @@ def test_hora_no_entendida_devuelve_none(texto):
 def test_formatos_legibles():
     assert fecha_legible(date(2026, 9, 22)) == "martes 22/09/2026"
     assert hora_legible(time(8, 5)) == "08:05"
+
+
+MIERCOLES = date(2026, 9, 23)
+
+
+@pytest.mark.parametrize(
+    ("texto", "esperado"),
+    [
+        ("semanal", [date(2026, 9, d) for d in range(21, 27)]),
+        ("Dame la agenda semanal", [date(2026, 9, d) for d in range(21, 27)]),
+        ("la semana que viene", [date(2026, 9, 28), date(2026, 9, 29), date(2026, 9, 30),
+                                 date(2026, 10, 1), date(2026, 10, 2), date(2026, 10, 3)]),
+        ("Y el jueves y viernes?", [date(2026, 9, 24), date(2026, 9, 25)]),
+        ("hoy y mañana", [date(2026, 9, 23), date(2026, 9, 24)]),
+        ("lunes, martes y jueves", [date(2026, 9, 28), date(2026, 9, 29), date(2026, 10, 1)]),
+        ("del lunes al miércoles", [date(2026, 9, 28), date(2026, 9, 29), date(2026, 9, 30)]),
+        ("del 24/09 al 26/09", [date(2026, 9, 24), date(2026, 9, 25), date(2026, 9, 26)]),
+        ("martes", [date(2026, 9, 29)]),
+        ("mañana", [date(2026, 9, 24)]),
+    ],
+)
+def test_resolver_dias(texto, esperado):
+    assert resolver_dias(texto, MIERCOLES) == esperado
+
+
+def test_resolver_dias_el_domingo_la_semana_es_la_que_empieza():
+    domingo = date(2026, 9, 27)
+    assert resolver_dias("semana", domingo)[0] == date(2026, 9, 28)
+
+
+def test_resolver_dias_no_entendido():
+    assert resolver_dias("cualquier cosa", MIERCOLES) is None

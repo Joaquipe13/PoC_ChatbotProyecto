@@ -57,6 +57,60 @@ def resolver_fecha(texto: str | None, hoy: date) -> date | None:
     return None
 
 
+_MAX_DIAS_RANGO = 31
+_RE_RANGO = re.compile(r"^(?:del?\s+)?(.+?)\s+(?:al|a|hasta(?:\s+el)?)\s+(.+)$")
+_RE_SEPARADOR_DIAS = re.compile(r"\s*(?:,|\by\b|\be\b)\s*")
+
+
+def resolver_dias(texto: str | None, hoy: date) -> list[date] | None:
+    """Los días que pide el operario, en orden: "semana" (o "semanal") es de lunes a
+    sábado de esta semana ("la semana que viene", de la próxima); "del lunes al
+    miércoles" es un rango; "jueves y viernes", una lista; si no, un solo día como
+    `resolver_fecha`. `None` si no se entiende. En un rango o una lista, cada día
+    es el primero que cae desde el anterior: "jueves y viernes" es ese jueves y el
+    viernes que le sigue."""
+    if not texto or not texto.strip():
+        return None
+    t = _normalizar(texto)
+
+    if "semana" in t:
+        lunes = hoy - timedelta(days=hoy.weekday())
+        if hoy.weekday() == 6 or re.search(r"que viene|proxima|siguiente", t):
+            lunes += timedelta(days=7)
+        return [lunes + timedelta(days=i) for i in range(6)]
+
+    rango = _RE_RANGO.match(t)
+    if rango:
+        desde = resolver_fecha(rango[1], hoy)
+        hasta = _desde(rango[2], desde, hoy) if desde else None
+        if desde and hasta and 0 <= (hasta - desde).days < _MAX_DIAS_RANGO:
+            return [desde + timedelta(days=i) for i in range((hasta - desde).days + 1)]
+
+    partes = [p for p in _RE_SEPARADOR_DIAS.split(t) if p]
+    if len(partes) > 1:
+        dias: list[date] = []
+        for parte in partes:
+            dia = _desde(parte, dias[-1], hoy) if dias else resolver_fecha(parte, hoy)
+            if dia is None:
+                break
+            dias.append(dia)
+        else:
+            return sorted(set(dias))
+
+    dia = resolver_fecha(texto, hoy)
+    return [dia] if dia else None
+
+
+def _desde(texto: str, desde: date, hoy: date) -> date | None:
+    """Como `resolver_fecha`, pero un día de la semana es el primero desde `desde`
+    inclusive, no desde el día siguiente a hoy ("mañana" o "25/09" siguen siendo
+    relativos a hoy)."""
+    for indice, dia in enumerate(DIAS_SEMANA):
+        if re.search(rf"\b{dia}\b", texto):
+            return desde + timedelta(days=(indice - desde.weekday()) % 7)
+    return resolver_fecha(texto, hoy)
+
+
 def _fecha_valida(anio: int, mes: int, dia: int) -> date | None:
     try:
         return date(anio, mes, dia)
