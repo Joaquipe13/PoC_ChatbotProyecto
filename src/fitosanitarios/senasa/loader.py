@@ -86,10 +86,17 @@ def cargar_catalogo(
     cache_cultivo: dict[str, int] = {}
     cache_adversidad: dict[str, int] = {}
 
+    # Los embeddings de producto se calculan en lote: uno por uno, la carga de
+    # los 7.370 productos tardaba ~15 minutos (ver DECISIONES.md, Fase 2).
+    textos = [_texto_embedding_producto(item) for item, _ in productos]
+    embeddings = modelo_embeddings.encode(textos, batch_size=64) if textos else []
+
     with conn.cursor() as cur:
-        for item, detalle in productos:
+        for (item, detalle), embedding in zip(productos, embeddings):
             firma_id = _upsert_firma(cur, item.nombre_firma, cache_firma, resumen)
-            producto_id = _upsert_producto(cur, item, detalle, firma_id, modelo_embeddings, resumen)
+            producto_id = _upsert_producto(
+                cur, item, detalle, firma_id, _vector_literal(embedding.tolist()), resumen
+            )
             if detalle is None:
                 continue
             _cargar_principios_activos(
@@ -121,12 +128,15 @@ def _upsert_firma(cur, nombre_firma_crudo: str, cache: dict[str, int], resumen: 
     return firma_id
 
 
-def _upsert_producto(cur, item: ProductoListado, detalle: DetalleProducto | None,
-                      firma_id: int, modelo_embeddings, resumen: dict) -> int:
+def _texto_embedding_producto(item: ProductoListado) -> str:
     marca = normalizar_nombre(item.marca)
     sustancias_limpias = limpiar_html(item.sustancias_activas)
-    texto_embedding = f"{marca} {sustancias_limpias}".strip() or marca or item.numero_inscripcion
-    embedding = _vector_literal(modelo_embeddings.encode(texto_embedding).tolist())
+    return f"{marca} {sustancias_limpias}".strip() or marca or item.numero_inscripcion
+
+
+def _upsert_producto(cur, item: ProductoListado, detalle: DetalleProducto | None,
+                      firma_id: int, embedding: str, resumen: dict) -> int:
+    marca = normalizar_nombre(item.marca)
 
     # Sin el detalle de SENASA (que trae la banda normalizada) la banda sale de
     # la clase del listado: es el mismo valor (Ia/Ib/II/III/IV), y sin ella la
@@ -211,6 +221,14 @@ def _cargar_principios_activos(cur, detalle: DetalleProducto, producto_id: int,
 def _cargar_usos_registrados(cur, detalle: DetalleProducto, producto_id: int, modelo_embeddings,
                               cache_cultivo: dict[str, int], cache_adversidad: dict[str, int],
                               resumen: dict) -> None:
+    # `uso_registrado` no tiene clave natural para un ON CONFLICT: se reemplazan
+    # los usos de SENASA del producto en cada carga. Sin esto, cada recarga los
+    # duplicaba (la base de dev llegó a tener 26.303 filas de 999 distintas).
+    cur.execute(
+        "DELETE FROM catalogo.uso_registrado"
+        " WHERE producto_id = %s AND fuente = 'senasa_estructurado'",
+        (producto_id,),
+    )
     for aplicacion in detalle.aplicaciones_por_producto:
         if not aplicacion.cultivo:
             continue
