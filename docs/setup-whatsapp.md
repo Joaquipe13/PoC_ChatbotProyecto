@@ -62,6 +62,26 @@ Copiar la URL HTTPS que da el túnel (cambia cada vez que se reinicia, salvo
 que se use un túnel nombrado/pago) -- se usa en el paso siguiente como
 `https://<url-del-tunel>/webhook`.
 
+**URL fija con ngrok (recomendado).** La cuenta gratis de ngrok trae un
+dominio fijo (dashboard.ngrok.com > Domains). Se configura una vez en el
+`ngrok.yml` de la máquina (`ngrok config edit`; en Windows,
+`%LOCALAPPDATA%
+grok
+grok.yml`), no en el proyecto:
+
+```yaml
+tunnels:
+  bot:
+    proto: http
+    addr: 8000
+    domain: <tu-dominio>.ngrok-free.dev
+```
+
+Desde ahí el túnel se levanta con `ngrok start bot`, la URL del webhook en
+Meta se carga una sola vez y no hay que tocarla más. Abierta desde un
+navegador, la URL muestra una advertencia de ngrok (`ERR_NGROK_6024`): es
+normal en la cuenta gratis y a Meta no le aparece.
+
 ## 5. Suscribir el webhook
 
 1. Levantar el servidor local con `USE_FIXTURES=false` (en `.env` o en la
