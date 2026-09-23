@@ -180,5 +180,7 @@ class RespuestaAgente(BaseModel):  # response_format del agente
         # limitaciones de una localidad.
         "consulta_articulo",
         "limitaciones",
+        # RAG de marbetes de SENASA (`consultar_marbete`).
+        "consulta_marbete",
     ]
     faltantes: list[CampoFaltante] = Field(default_factory=list)  # solo si repregunta sin tools

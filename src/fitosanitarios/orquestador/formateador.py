@@ -23,6 +23,7 @@ from fitosanitarios.servicios.formato import primer_dato
 from fitosanitarios.tools.agendar_aplicacion.mensajes import plantilla_agendar_aplicacion
 from fitosanitarios.tools.consultar_agenda.mensajes import plantilla_agenda
 from fitosanitarios.tools.consultar_articulo.mensajes import plantilla_consulta_articulo
+from fitosanitarios.tools.consultar_marbete.mensajes import plantilla_consulta_marbete
 from fitosanitarios.tools.consultar_productos.mensajes import plantilla_listado
 from fitosanitarios.tools.evaluar_riesgo.mensajes import plantilla_detalle_bandas, plantilla_riesgo
 from fitosanitarios.tools.evaluar_viabilidad_legal.mensajes import plantilla_dictamen
@@ -127,7 +128,8 @@ def _plantilla_ayuda(respuesta: RespuestaAgente, resultados: list[ResultadoTool]
     return (
         "Hola 👋 Soy el asistente de recetas fitosanitarias. Puedo:\n"
         "- Leer una foto de tu receta y decirte si es apta para aplicar.\n"
-        "- Buscar si un producto está registrado en SENASA.\n"
+        "- Buscar si un producto está registrado en SENASA y qué dice su marbete "
+        "(carencia, precauciones, mezclas).\n"
         "- Responder dudas sobre la normativa de aplicación de tu localidad, mostrarte el "
         "texto de un artículo o decirte qué limitaciones tiene.\n"
         "- Registrar cuando empezás y terminás de aplicar.\n"
@@ -163,6 +165,7 @@ _PLANTILLAS = {
     "agendar_aplicacion": plantilla_agendar_aplicacion,
     "consulta_articulo": plantilla_consulta_articulo,
     "limitaciones": plantilla_limitaciones,
+    "consulta_marbete": plantilla_consulta_marbete,
 }
 
 
@@ -283,6 +286,7 @@ _FORMAS_PROPIAS = {
         isinstance(datos.get("prohibiciones"), list) or isinstance(datos.get("restricciones"), list)
     ),
     "consulta_articulo": lambda datos: isinstance(datos.get("partes"), list),
+    "consulta_marbete": lambda datos: "respuesta" in datos and "numero_inscripcion" in datos,
     "consulta_normativa": lambda datos: "veredicto" in datos and "regla" in datos,
     # el listado de `consultar_productos` trae `total` (los datos de `evaluar_riesgo` también
     # traen `productos`, pero no `total`); uno vacío no tiene qué mostrar: no cuenta

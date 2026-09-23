@@ -18,6 +18,7 @@ TIPO_POR_TOOL = {
     "completar_receta": "confirmacion_receta",
     "validar_producto_registro": "consulta_producto",
     "consultar_productos": "consulta_producto",
+    "consultar_marbete": "consulta_marbete",
     "evaluar_viabilidad_legal": "dictamen",
     "responder_consulta_normativa": "consulta_normativa",
     "consultar_articulo": "consulta_articulo",

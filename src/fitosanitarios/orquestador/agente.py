@@ -28,6 +28,7 @@ from fitosanitarios.tools.agendar_aplicacion import agendar_aplicacion
 from fitosanitarios.tools.completar_receta import completar_receta
 from fitosanitarios.tools.consultar_agenda import consultar_agenda
 from fitosanitarios.tools.consultar_articulo import consultar_articulo
+from fitosanitarios.tools.consultar_marbete import consultar_marbete
 from fitosanitarios.tools.consultar_productos import consultar_productos
 from fitosanitarios.tools.evaluar_riesgo import evaluar_riesgo
 from fitosanitarios.tools.evaluar_viabilidad_legal import evaluar_viabilidad_legal
@@ -52,6 +53,7 @@ TOOLS = [
     completar_receta,
     validar_producto_registro,
     consultar_productos,
+    consultar_marbete,
     evaluar_riesgo,
     evaluar_viabilidad_legal,
     responder_consulta_normativa,

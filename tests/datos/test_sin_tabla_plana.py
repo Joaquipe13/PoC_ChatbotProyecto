@@ -57,6 +57,8 @@ def test_cada_tabla_con_columna_vector_es_una_entidad_propia_del_dominio(conexio
         # artículo) y cada regla de distancia escrita como oración (la propia entidad).
         ("territorio", "fragmento_norma"),
         ("territorio", "regla_distancia"),
+        # RAG de marbetes: cada fragmento cuelga de su documento y su producto.
+        ("catalogo", "fragmento_marbete"),
     }
     assert tablas_con_vector == esperadas
 

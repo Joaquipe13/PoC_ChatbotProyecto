@@ -151,3 +151,32 @@ def resolver_entidad_por_nombre(
     if fila is None or fila[1] < umbral_score:
         return None
     return fila[0]
+
+
+def fragmentos_de_marbete_por_similitud(
+    conn: psycopg.Connection, embedding_pregunta, producto_id: int, top_k: int = 5
+) -> list[dict]:
+    """El retriever del RAG de marbetes (ver DECISIONES.md, "RAG de marbetes"): los
+    fragmentos del marbete del producto (filtro relacional primero), ordenados por
+    similitud coseno con la pregunta. Vacío si el producto no tiene marbete con texto."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT f.id, f.pagina, f.texto, d.ruta_archivo,
+                   1 - (f.embedding <=> %(emb)s::vector) AS score
+            FROM catalogo.fragmento_marbete f
+            JOIN catalogo.documento d ON d.id = f.documento_id
+            WHERE f.producto_id = %(producto_id)s
+            -- Por `score` y no por `embedding <=> ...`: así Postgres filtra por producto
+            -- (unos 20 fragmentos) y ordena exacto, en vez de usar el índice HNSW sobre
+            -- toda la tabla y filtrar después, que puede devolver menos filas o ninguna.
+            ORDER BY score DESC
+            LIMIT %(top_k)s
+            """,
+            {
+                "emb": _vector_literal(embedding_pregunta), "producto_id": producto_id,
+                "top_k": top_k,
+            },
+        )
+        columnas = [d.name for d in cur.description]
+        return [dict(zip(columnas, fila, strict=True)) for fila in cur.fetchall()]

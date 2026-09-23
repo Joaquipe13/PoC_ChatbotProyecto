@@ -25,6 +25,8 @@ class MotivoNoResuelto(StrEnum):
     SIN_EVENTO_EN_CURSO = "sin_evento_en_curso"
     # Consulta de un artículo por número (`consultar_articulo`).
     ARTICULO_NO_ENCONTRADO = "articulo_no_encontrado"
+    # RAG de marbetes (`consultar_marbete`).
+    MARBETE_SIN_RESPALDO = "marbete_sin_respaldo"
 
 
 DESCRIPCION_MOTIVO: dict[MotivoNoResuelto, str] = {
@@ -68,5 +70,9 @@ DESCRIPCION_MOTIVO: dict[MotivoNoResuelto, str] = {
     ),
     MotivoNoResuelto.ARTICULO_NO_ENCONTRADO: (
         "No hay un artículo con ese número en la normativa cargada para esa consulta."
+    ),
+    MotivoNoResuelto.MARBETE_SIN_RESPALDO: (
+        "El marbete de ese producto no está disponible con texto, o no dice nada sobre "
+        "lo que preguntaste."
     ),
 }

@@ -91,12 +91,14 @@ Requisito de la cátedra: PostgreSQL con JSON y vectores, consultado con RAG a t
 | `catalogo.cultivo` | 1:N uso_registrado | sinonimos | nombre + sinónimos |
 | `catalogo.adversidad` | 1:N uso_registrado | sinonimos | nombre común + científico ("yuyo colorado" → Amaranthus) |
 | `catalogo.uso_registrado` | N:1 producto, cultivo, adversidad, documento | dosis (texto, min, max, unidad, base), condiciones (momento, volumen, carencia) | — |
-| `catalogo.documento` | N:1 producto | extraccion (salida del LLM + confianza) | — |
+| `catalogo.documento` | N:1 producto | extraccion (salida del LLM + confianza; en los marbetes, páginas y si tiene texto) | — |
+| `catalogo.fragmento_marbete` | N:1 documento, producto | — | fragmento de una página del marbete (RAG de marbetes) |
 | `territorio.provincia` | 1:N localidad, norma | — | — |
 | `territorio.localidad` | N:1 provincia · 1:N zona_protegida, norma | limite (GeoJSON) | — |
 | `territorio.zona_protegida` | N:1 localidad | geometria (GeoJSON), propiedades | — |
 | `territorio.norma` | N:1 localidad, provincia o nacional · 1:N articulo, regla_distancia | metadatos | — |
 | `territorio.articulo` | N:1 norma | metadatos (capítulo, página, OCR) | texto del artículo |
+| `territorio.fragmento_norma` | N:1 norma, articulo (NULL en fallos y normas sin PDF) | — | fragmento de 800 caracteres (RAG de normativa) |
 | `territorio.regla_distancia` | N:1 norma, articulo | — (bandas TEXT[]) | — |
 | `operacion.receta` | N:1 localidad · 1:N receta_item, dictamen | datos_extraidos (campos + confianza), ubicacion | — |
 | `operacion.receta_item` | N:1 receta, producto (null hasta resolverlo) | dosis_declarada | — |
@@ -116,6 +118,7 @@ Más las tablas propias del checkpointer de LangGraph.
 | `validar_producto_registro` | candidatos por embedding de producto + trigram; joins a activos y usos; cultivo y adversidad resueltos por embedding | validación en código |
 | `evaluar_riesgo` | localidad por nombre, reglas de localidad + provincia + nación con norma y artículo, banda de cada producto, dosis del uso registrado | banda de la aplicación (la más peligrosa), distancia mínima por tipo de zona y rango de dosis en código |
 | `responder_consulta_normativa` | artículos por embedding (+ full-text) con join a norma, filtrados por localidad, provincia y nacional | el LLM responde solo con esos artículos; citas verificadas en código |
+| `consultar_marbete` | el producto por trigram + embedding; los fragmentos de SU marbete por similitud con la pregunta | el LLM responde solo con esos fragmentos; cada página citada se verifica en código |
 | `consultar_productos` | productos registrados por cultivo, adversidad, principio activo, aptitud o banda: términos resueltos por embedding, después joins y filtros | lista con registro, banda y dosis registrada. Informa lo registrado; no recomienda qué aplicar (eso lo prescribe el agrónomo) |
 
 ### Otras tools de normativa (deterministas, sin RAG)
@@ -171,7 +174,7 @@ class RespuestaAgente(BaseModel):      # response_format del agente
 - Las tools devuelven contenido y artifact (`response_format="content_and_artifact"`): un resumen corto para el LLM y el `ResultadoTool` completo como artifact. El formateador toma `RespuestaAgente.tipo` y renderiza los artifacts de las tools ejecutadas en el turno actual, así el LLM no puede alterar números ni citas.
 - Toda afirmación sobre normativa o registro lleva su `Cita`.
 - **`intro` (una línea que el LLM redactaba) se sacó** ("Menos tokens por turno", ver DECISIONES.md): el formateador ya la ignoraba en casi todos los tipos y sacarla evitó una segunda llamada a Gemini solo para escribirla.
-- **`return_direct=True` en 11 de las 13 tools** (todas menos `evaluar_riesgo` y `resolver_vehiculo`): el turno termina apenas corre la tool, sin una segunda llamada al modelo para elegir `tipo`. Ese `tipo` sale de `orquestador/respuesta_directa.py::TIPO_POR_TOOL` (una tabla tool → tipo) según el nombre de la tool y su `estado` (`no_resuelto`/`faltan_datos` pisan el tipo por defecto). `evaluar_riesgo` sigue pasando por el modelo porque su resultado puede ser un dictamen completo o solo el detalle de bandas, según de qué se venía hablando; `resolver_vehiculo` porque alimenta a otra tool, no termina el turno.
+- **`return_direct=True` en 12 de las 14 tools** (todas menos `evaluar_riesgo` y `resolver_vehiculo`): el turno termina apenas corre la tool, sin una segunda llamada al modelo para elegir `tipo`. Ese `tipo` sale de `orquestador/respuesta_directa.py::TIPO_POR_TOOL` (una tabla tool → tipo) según el nombre de la tool y su `estado` (`no_resuelto`/`faltan_datos` pisan el tipo por defecto). `evaluar_riesgo` sigue pasando por el modelo porque su resultado puede ser un dictamen completo o solo el detalle de bandas, según de qué se venía hablando; `resolver_vehiculo` porque alimenta a otra tool, no termina el turno.
 
 ### Catálogo `MotivoNoResuelto`
 
@@ -189,6 +192,7 @@ class RespuestaAgente(BaseModel):      # response_format del agente
 | `VEHICULO_NO_ENCONTRADO` | Fase 9: `resolver_vehiculo` no reconoce la descripción |
 | `SIN_EVENTO_EN_CURSO` | Fase 9: `registrar_evento("finalizar")` sin un `iniciar` previo |
 | `ARTICULO_NO_ENCONTRADO` | `consultar_articulo`: el número no está en la norma (o en ninguna, o en varias sin desambiguar) |
+| `MARBETE_SIN_RESPALDO` | `consultar_marbete`: el producto no tiene marbete con texto, ningún fragmento pasa el umbral o el LLM no cita ninguna página verificable |
 
 Fuera de dominio no es un motivo de tool: lo decide el orquestador antes de llamar tools.
 
@@ -204,6 +208,7 @@ Fuera de dominio no es un motivo de tool: lo decide el orquestador antes de llam
 | `agendar_aplicacion` | fecha, hora (texto del operario, resuelto en código) | datos de la receta | fecha: pregunta el día. Hora: muestra la agenda de ese día y pregunta el horario |
 | `responder_consulta_normativa` | pregunta, jurisdicción (explícita o de la receta en curso) | tipo de aplicación, tipo de zona | jurisdicción: lista de las localidades cargadas |
 | `consultar_productos` | al menos uno: cultivo, adversidad o principio activo | aptitud, banda máxima | pedir cultivo o plaga |
+| `consultar_marbete` | producto, pregunta | — | producto ambiguo: lista de candidatos |
 | `consultar_articulo` | número de artículo | norma, localidad, provincia | número: pedirlo. Número en varias normas: lista para elegir |
 | `listar_limitaciones` | localidad (o de la receta en curso) | provincia, tipo de aplicación, banda, tipo de zona, distancia_m | localidad: lista de las cargadas |
 | `resolver_vehiculo` | descripción del vehículo | — | no se repregunta: si no lo reconoce, `VEHICULO_NO_ENCONTRADO` y lo resuelve quien la llama |
@@ -225,7 +230,7 @@ Por cada mensaje:
 5. Leer el estado del resultado: `ok`/`observado` → responder. `faltan_datos` → repregunta. `no_resuelto` → informar. `error` → mensaje de error y log.
 6. Emitir `RespuestaAgente`.
 
-Los pasos 5 y 6 los decide el LLM solo para `evaluar_riesgo` y `resolver_vehiculo`: las otras 11 tools tienen `return_direct=True`, el turno termina apenas corren y el `tipo` sale de una tabla fija (`orquestador/respuesta_directa.py`), sin una segunda llamada al modelo (ver "Contratos", más abajo). Si la tool rechaza los argumentos antes de devolver un `ResultadoTool` (falla la validación del schema), sí vuelve a llamarse al modelo una vez para que vea el error y decida.
+Los pasos 5 y 6 los decide el LLM solo para `evaluar_riesgo` y `resolver_vehiculo`: las otras 12 tools tienen `return_direct=True`, el turno termina apenas corren y el `tipo` sale de una tabla fija (`orquestador/respuesta_directa.py`), sin una segunda llamada al modelo (ver "Contratos", más abajo). Si la tool rechaza los argumentos antes de devolver un `ResultadoTool` (falla la validación del schema), sí vuelve a llamarse al modelo una vez para que vea el error y decida.
 
 Reglas de repregunta:
 
@@ -267,7 +272,8 @@ Estado: checkpointer de LangGraph en Postgres con `thread_id` = número de Whats
 
 ### RAG de normativa
 
-- Chunk = un artículo, con metadata `ambito` (municipal/provincial/nacional, según la carpeta), `jurisdiccion_id` (localidad, provincia o nacional), `norma`, `articulo`, `pagina` y `archivo`.
+- Índice (23/09/2026, ver DECISIONES.md, "RAG de limitaciones"): `territorio.fragmento_norma`, cada norma partida con el `RecursiveCharacterTextSplitter` de la cursada (800/120, `servicios/fragmentos.py`), incluidos los fallos y normas sin PDF; y cada regla de `reglas.csv` con `texto` + `embedding`. `contexto_normativo_por_similitud` busca los dos juntos. La tabla de qué se puede a una distancia (`listar_limitaciones`) sigue siendo determinista.
+- Chunk para `consultar_articulo` = un artículo, con metadata `ambito` (municipal/provincial/nacional, según la carpeta), `jurisdiccion_id` (localidad, provincia o nacional), `norma`, `articulo`, `pagina` y `archivo`.
 - PDF sin capa de texto: OCR (Tesseract) antes de chunkear, marcado para revisión manual.
 - Filtro previo en la misma consulta SQL, con join `articulo → norma`: normas de la localidad del lote, provinciales de su provincia y nacionales. Después, similitud con pgvector.
 - Por debajo de `RAG_UMBRAL_SIMILITUD`: `NORMATIVA_SIN_RESPALDO`.
