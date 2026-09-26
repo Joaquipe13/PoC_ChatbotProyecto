@@ -80,8 +80,8 @@ Contratos
 class Cita(BaseModel):
     fuente: Literal["normativa", "senasa"]
     jurisdiccion_id: str | None
-    norma: str | None          # "Ordenanza 914/2018"
-    articulo: str | None       # "8"
+    norma: str | None          # "Ordenanza 841/2010"
+    articulo: str | None       # "7"
     registro_senasa: str | None
     documento: str | None      # "marbete", "detalle API", nombre del PDF
 
@@ -189,19 +189,17 @@ Confirmación de receta
 [Confirmar] [Corregir]
 Dictamen
 
-*Dictamen* — Lote 4 · San Carlos Centro
+*Dictamen* — El Trébol
 *Resultado:* ❌ OBSERVADA
 
 *Observaciones*
-1. Distancia a escuela insuficiente: el lote está a 80 m y el mínimo es 100 m.
-2. Dosis de Glifosato Full 48 SL: 5 L/ha, por encima del rango registrado para soja (2–3 L/ha).
+1. Dosis 500.0 cm3/ha: por encima del rango registrado (160.0-180.0 cm3/ha), 178% de desvío.
 
-*Productos*
-- Glifosato Full 48 SL · Reg. SENASA 12345 · Banda IV (verde) · autorizado para soja ✅
+*Condiciones de aplicación* — El Trébol · terrestre · banda II (amarilla)
+- *Distancia mínima a zona urbana:* 500 m (Ley 11273/1995, art. 34)
 
 *Fuentes*
-- Ordenanza 914/2018, art. 8 (San Carlos Centro)
-- SENASA, Reg. 12345 (marbete)
+- SENASA, Reg. 41881 (detalle API)
 Repregunta
 
 Para evaluar la receta me faltan 2 datos:
@@ -227,10 +225,10 @@ Es lo que figura en el registro; qué aplicar lo define la receta del ingeniero 
 - SENASA, vademécum (datos al 11/09/2026)
 Consulta normativa
 
-*No.* En San Carlos Centro la distancia mínima para aplicación terrestre a establecimientos educativos es de 100 m.
+*Depende.* Se prohíben las pulverizaciones cuando los vientos superen los 8 km/hora y puedan producir derivas hacia la planta urbana.
 
 *Fuentes*
-- Ordenanza 914/2018, art. 8 (San Carlos Centro)
+- Ordenanza 841/2010, art. 4 (el-trebol)
 Fuera de dominio
 
 Solo puedo ayudarte con recetas de fitosanitarios: leer y validar recetas, verificar productos registrados en SENASA y responder dudas sobre la normativa de aplicación de las localidades cargadas. ¿Me mandás una receta o una consulta sobre eso?
@@ -246,9 +244,9 @@ Formato propuesto; se congela al cerrar la Fase 1 y cualquier cambio va a DECISI
 
 data/insumos/
 ├── localidades/
-│   └── <jurisdiccion_id>/          p. ej. san-carlos-centro
+│   └── <jurisdiccion_id>/          p. ej. el-trebol
 │       ├── localidad.geojson
-│       ├── ordenanza-914-2018.pdf  normas municipales vigentes (una o más)
+│       ├── ordenanza-841-2010.pdf  normas municipales vigentes (una o más)
 │       └── reglas.csv
 └── normativa-general/
     ├── provincial/
@@ -259,14 +257,14 @@ data/insumos/
         ├── ley-NNNNN-AAAA.pdf
         └── reglas.csv              opcional
 Nombres de carpeta (jurisdiccion_id, provincia): minúsculas, sin tildes, palabras separadas por guion. Son la clave que une geometría, normativa y reglas.
-PDFs: <tipo>-<numero>-<anio>.pdf, con tipo ordenanza | decreto | resolucion | ley. De ahí sale la cita ("Ordenanza 914/2018") y el ámbito (municipal, provincial o nacional) sale de la carpeta. Solo normas vigentes; si una fue modificada, va también la modificatoria o el texto ordenado.
+PDFs: <tipo>-<numero>-<anio>.pdf, con tipo ordenanza | decreto | resolucion | ley. De ahí sale la cita ("Ordenanza 841/2010") y el ámbito (municipal, provincial o nacional) sale de la carpeta. Solo normas vigentes; si una fue modificada, va también la modificatoria o el texto ordenado.
 localidad.geojson: FeatureCollection en EPSG:4326 (lat/lon). Cada feature lleva la propiedad tipo:
 limite: exactamente una, Polygon o MultiPolygon, con propiedades nombre y provincia (igual al nombre de su carpeta en provincial/).
 escuela, curso_agua, zona_urbana u otro: zonas protegidas, con propiedad nombre. Pueden ser Point, LineString o Polygon (una escuela como punto, un arroyo como línea); la distancia se calcula igual.
 reglas.csv: columnas tipo_zona, tipo_aplicacion, bandas, distancia_min_m, norma, articulo, observaciones.
 Una fila significa: dentro de distancia_min_m de una zona tipo_zona no se puede hacer una aplicación tipo_aplicacion con productos de las bandas indicadas.
 tipo_zona: los valores de tipo del GeoJSON, salvo limite. tipo_aplicacion: terrestre | aerea | todas. bandas: todas o lista con ; (Ia;Ib;II).
-norma: nombre de un PDF de la misma carpeta, sin extensión (ordenanza-914-2018). articulo: número.
+norma: nombre de un PDF de la misma carpeta, sin extensión (ordenanza-841-2010). articulo: número.
 observaciones: condiciones que el modelo no cubre (aviso previo, horarios, viento). El dictamen las muestra como advertencia.
 Cada zona protegida pertenece a la localidad de su carpeta, pero la búsqueda de distancias considera también zonas de localidades vecinas dentro del radio.
 El validador falla con mensajes claros si: a una carpeta de localidad le falta localidad.geojson, al menos un PDF o reglas.csv; el GeoJSON no tiene exactamente un limite o trae un tipo desconocido; una geometría es inválida o cae fuera de Argentina; una regla cita una norma que no está en su carpeta; un nombre de archivo o carpeta no respeta la convención.
