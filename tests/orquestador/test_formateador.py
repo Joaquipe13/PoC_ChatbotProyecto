@@ -396,6 +396,23 @@ def test_consulta_producto_listado():
     assert "*Fuentes*" not in texto
 
 
+def test_consulta_producto_listado_largo_dice_cuantos_muestra_y_la_plaga():
+    """Se muestran 10: el encabezado lo dice. El mismo producto aparece una vez por plaga
+    registrada; sin la plaga, las filas se veían repetidas."""
+    respuesta = RespuestaAgente(tipo="consulta_producto")
+    productos = [
+        {"marca": "2,4-db 93.1 Brilliance", "numero_inscripcion": "41974",
+         "banda_toxicologica": "III", "adversidad": f"Maleza {i}",
+         "dosis": {"texto_original": "40 cm3/ha"}}
+        for i in range(20)
+    ]
+    resultado = ResultadoTool(estado="ok", datos={"total": 20, "productos": productos})
+    texto = _un_mensaje(respuesta, [resultado])
+    assert "*Productos registrados* (10 de 20)" in texto
+    assert "Banda III · Maleza 0 · 40 cm3/ha" in texto
+    assert "Maleza 10" not in texto
+
+
 def test_consulta_producto_puntual():
     respuesta = RespuestaAgente(tipo="consulta_producto")
     resultado = ResultadoTool(

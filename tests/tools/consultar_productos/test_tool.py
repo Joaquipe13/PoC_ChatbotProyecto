@@ -25,7 +25,7 @@ def test_consulta_con_banda_maxima_filtra_bandas_mas_peligrosas(conexion, modelo
     args = ConsultarProductosArgs(cultivo="Soja", banda_maxima="III")
     resultado = consultar_productos_logica(args, conexion, modelo_embeddings)
     for p in resultado.datos["productos"]:
-        assert p["banda_toxicologica"] in ("Ia", "Ib", "II", "III", None)
+        assert p["banda_toxicologica"] in ("III", "IV")
 
 
 def test_sin_ningun_filtro_falla_la_validacion_de_args():

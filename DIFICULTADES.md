@@ -232,3 +232,7 @@ La primera corrida del loop de Fase 12 (`evals/runs/20260921-192037/informe.md`)
 - **H3, un mensaje con dos pedidos se contestó a medias.** El formateador mostraba solo el primer resultado del turno. Ahora arma una sección por cada consulta distinta que el turno contestó (sin repetir llamadas idénticas) y, al final, lo que una tool todavía necesita saber. Además, el prompt pide una tool por pregunta.
 
 Aparte: `evaluar_riesgo`, `evaluar_viabilidad_legal` y `agendar_aplicacion` usaban `tipo_aplicacion` tal como lo escribía Gemini. Un "aérea" con tilde no coincidía con ninguna regla y el dictamen quedaba sin distancia. La normalización (que ya tenía `listar_limitaciones`) pasó a `servicios/reglas.py` y se aplica en `calcular_condiciones`.
+
+### Filtro por banda de `consultar_productos` invertido (26/09/2026)
+
+Encontrado probando preguntas de bandas por el chat: "¿qué productos banda verde hay para soja?" devolvía productos banda III. `banda_maxima` es la banda más peligrosa que se acepta (lo dicen la descripción de la tool y `docs/testing-manual.md`: "III" = III y IV), pero `_BANDAS_HASTA` hacía lo contrario: "IV" traía todas las bandas. El test de la tool verificaba el comportamiento invertido y, contra la base de test, podía pasar con un listado vacío. Arreglado, con tests sin base (`tests/tools/consultar_productos/test_utils.py`). En el mismo listado, el encabezado decía "20 de 20" mostrando 10, y el mismo producto se veía repetido (una fila por plaga registrada, sin la plaga): ahora dice cuántos muestra y cada fila lleva su plaga.

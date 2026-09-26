@@ -36,13 +36,19 @@ def plantilla_listado(respuesta: RespuestaAgente, resultados: list[ResultadoTool
     total = datos.get("total", len(productos))
     if not productos:
         return SIN_PRODUCTOS
-    lineas = [f"*Productos registrados* ({len(productos)} de {total})"]
-    for i, p in enumerate(productos[:_MAXIMO_LISTADO], start=1):
+    mostrados = productos[:_MAXIMO_LISTADO]
+    lineas = [f"*Productos registrados* ({len(mostrados)} de {total})"]
+    for i, p in enumerate(mostrados, start=1):
         dosis = p.get("dosis") or {}
         dosis_txt = dosis.get("texto_original", "sin dosis registrada")
         marca = p.get("marca", "(sin marca)")
         registro = p.get("numero_inscripcion", "-")
         banda = p.get("banda_toxicologica") or "S/D"
-        lineas.append(f"{i}. *{marca}* · Reg. SENASA {registro} · Banda {banda} · {dosis_txt}")
+        # Cada fila es un uso registrado: el mismo producto aparece una vez por plaga, y sin
+        # la plaga las filas se veían repetidas.
+        adversidad = f" · {p['adversidad']}" if p.get("adversidad") else ""
+        lineas.append(
+            f"{i}. *{marca}* · Reg. SENASA {registro} · Banda {banda}{adversidad} · {dosis_txt}"
+        )
     lineas.append(_AVISO_REGISTRO)
     return "\n".join(lineas)
