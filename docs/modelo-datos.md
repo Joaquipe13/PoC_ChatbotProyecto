@@ -1,6 +1,6 @@
 # Modelo de datos
 
-Diagrama ER de los tres schemas (`catalogo`, `territorio`, `operacion`) y la consulta SQL que ejecuta el retriever de cada una de las 4 tools RAG. Migraciones fuente: `src/fitosanitarios/datos/migraciones/00{1,2,3}_*.sql`. Contratos de dominio: `src/fitosanitarios/dominio/modelos.py`.
+Diagrama ER de los tres schemas (`catalogo`, `territorio`, `operacion`) y la consulta SQL que ejecuta el retriever de cada una de las 5 tools RAG. Migraciones fuente: `src/fitosanitarios/datos/migraciones/00{1..7}_*.sql` (la 006 y la 007 agregan los índices de fragmentos de normas y de marbetes). Contratos de dominio: `src/fitosanitarios/dominio/modelos.py`.
 
 Material para la defensa (ver Fase 10 de `plandefases.md`).
 
@@ -15,6 +15,8 @@ erDiagram
     CULTIVO ||--o{ USO_REGISTRADO : para
     ADVERSIDAD ||--o{ USO_REGISTRADO : contra
     DOCUMENTO ||--o{ USO_REGISTRADO : origina
+    DOCUMENTO ||--o{ FRAGMENTO_MARBETE : "se parte en"
+    PRODUCTO ||--o{ FRAGMENTO_MARBETE : "filtra por"
 
     PROVINCIA ||--o{ LOCALIDAD : contiene
     PROVINCIA ||--o{ NORMA : promulga
@@ -23,6 +25,8 @@ erDiagram
     NORMA ||--o{ ARTICULO : contiene
     NORMA ||--o{ REGLA_DISTANCIA : define
     ARTICULO ||--o{ REGLA_DISTANCIA : cita
+    NORMA ||--o{ FRAGMENTO_NORMA : "se parte en"
+    ARTICULO ||--o{ FRAGMENTO_NORMA : "se parte en"
 
     LOCALIDAD ||--o{ RECETA : ubica
     RECETA ||--o{ RECETA_ITEM : contiene
@@ -75,8 +79,18 @@ erDiagram
     DOCUMENTO {
         bigint id PK
         bigint producto_id FK
-        text tipo
-        jsonb extraccion
+        text tipo "marbete"
+        text ruta_archivo
+        jsonb extraccion "paginas, sin_texto"
+    }
+    FRAGMENTO_MARBETE {
+        bigint id PK
+        bigint documento_id FK
+        bigint producto_id FK
+        int pagina
+        int orden
+        text texto
+        vector embedding "768d"
     }
 
     PROVINCIA {
@@ -111,6 +125,14 @@ erDiagram
         text texto
         vector embedding "768d"
     }
+    FRAGMENTO_NORMA {
+        bigint id PK
+        bigint norma_id FK
+        bigint articulo_id FK "NULL en fallos y normas sin PDF"
+        int orden
+        text texto
+        vector embedding "768d"
+    }
     REGLA_DISTANCIA {
         bigint id PK
         bigint norma_id FK
@@ -121,6 +143,8 @@ erDiagram
         numeric distancia_min_m
         boolean permitido "false = prohibicion (N); true = condicional (S)"
         text condiciones
+        text texto "la regla escrita como oración"
+        vector embedding "768d"
     }
 
     RECETA {
@@ -166,7 +190,7 @@ Nota: `TURNO` (log por turno de conversación) no se grafica arriba por simplici
 
 ## Consultas SQL de cada tool RAG
 
-Las 4 queries siguen el mismo patrón: **filtro relacional primero** (jurisdicción, cultivo, tipo de zona — lo que se pueda resolver por columnas/joins), **similitud vectorial después** (`embedding <=> :query_embedding`, distancia coseno con el índice HNSW). Los parámetros con prefijo `:` se bindean desde Python; los `*_id` de cultivo/adversidad/principio activo llegan ya resueltos por un paso previo de matching (trigram + embedding), nunca se busca por texto libre directo en estas queries. Son borradores para orientar la Fase 5, no el SQL final: se ajustan ahí al implementar los retrievers de verdad contra datos reales.
+Las 5 queries siguen el mismo patrón: **filtro relacional primero** (jurisdicción, cultivo, tipo de zona — lo que se pueda resolver por columnas/joins), **similitud vectorial después** (`embedding <=> :query_embedding`, distancia coseno con el índice HNSW). Los parámetros con prefijo `:` se bindean desde Python; los `*_id` de cultivo/adversidad/principio activo llegan ya resueltos por un paso previo de matching (trigram + embedding), nunca se busca por texto libre directo en estas queries. Las de `validar_producto_registro`, `evaluar_riesgo` y `consultar_productos` son borradores de la Fase 1 para orientar los retrievers; las de `responder_consulta_normativa` y `consultar_marbete` son las que se ejecutan hoy (copiadas de `datos/retrievers/territorio.py` y `datos/retrievers/catalogo.py`).
 
 ### `validar_producto_registro`
 
@@ -245,30 +269,65 @@ WHERE rd.permitido = :permitido
 
 ### `responder_consulta_normativa`
 
-Filtro relacional por jurisdicción (join `articulo → norma`) y luego similitud vectorial.
+Busca en dos índices a la vez: los fragmentos de las normas (artículos partidos con el `RecursiveCharacterTextSplitter` de la cursada, 800 caracteres con 120 de solapamiento, más los fallos y las normas sin PDF) y las reglas de `reglas.csv` escritas como oración. Filtro relacional por jurisdicción primero (la localidad, su provincia y la nación) y similitud después.
 
 ```sql
-SELECT
-    a.id,
-    a.numero AS articulo,
-    a.texto,
-    a.pagina,
-    n.archivo AS norma,
-    n.ambito,
-    COALESCE(l.jurisdiccion_id, pr.nombre, 'nacional') AS jurisdiccion_id,
-    1 - (a.embedding <=> :embedding_pregunta) AS score
-FROM territorio.articulo a
-JOIN territorio.norma n ON n.id = a.norma_id
-LEFT JOIN territorio.localidad l ON l.id = n.localidad_id
-LEFT JOIN territorio.provincia pr ON pr.id = n.provincia_id
-WHERE (n.ambito = 'municipal' AND n.localidad_id = :localidad_id)
-   OR (n.ambito = 'provincial' AND n.provincia_id = :provincia_id)
-   OR (n.ambito = 'nacional')
-ORDER BY a.embedding <=> :embedding_pregunta
+SELECT * FROM (
+    SELECT 'fragmento' AS tipo, f.id, a.numero, f.texto, n.archivo, n.ambito,
+           COALESCE(l.jurisdiccion_id, pr.nombre, 'nacional') AS jurisdiccion_id,
+           1 - (f.embedding <=> :embedding_consulta) AS score
+    FROM territorio.fragmento_norma f
+    JOIN territorio.norma n ON n.id = f.norma_id
+    LEFT JOIN territorio.articulo a ON a.id = f.articulo_id
+    LEFT JOIN territorio.localidad l ON l.id = n.localidad_id
+    LEFT JOIN territorio.provincia pr ON pr.id = n.provincia_id
+    WHERE (n.ambito = 'municipal' AND n.localidad_id = :localidad_id)
+       OR (n.ambito = 'provincial' AND n.provincia_id = :provincia_id)
+       OR (n.ambito = 'nacional')
+    UNION ALL
+    SELECT 'regla', r.id, a.numero, r.texto, n.archivo, n.ambito,
+           COALESCE(l.jurisdiccion_id, pr.nombre, 'nacional'),
+           1 - (r.embedding <=> :embedding_consulta)
+    FROM territorio.regla_distancia r
+    JOIN territorio.norma n ON n.id = r.norma_id
+    LEFT JOIN territorio.articulo a ON a.id = r.articulo_id
+    LEFT JOIN territorio.localidad l ON l.id = n.localidad_id
+    LEFT JOIN territorio.provincia pr ON pr.id = n.provincia_id
+    WHERE r.embedding IS NOT NULL
+      AND ((n.ambito = 'municipal' AND n.localidad_id = :localidad_id)
+        OR (n.ambito = 'provincial' AND n.provincia_id = :provincia_id)
+        OR (n.ambito = 'nacional'))
+) contexto
+ORDER BY score DESC
 LIMIT 8;
 ```
 
-En código: se descartan los resultados con `score < RAG_UMBRAL_SIMILITUD`; si no queda ninguno → `NORMATIVA_SIN_RESPALDO`. El LLM solo puede citar artículos presentes en este resultado (verificación de citas en código, ver skill sección "RAG de normativa").
+`:embedding_consulta` no es el de la pregunta tal cual: antes de buscar, el LLM reformula la pregunta con los términos que usaría la norma ("¿a cuánto del pueblo?" → "planta urbana, ejido, distancia mínima") y se busca con la pregunta más esa línea (`servicios/reformulacion.py`). Si el LLM dice que la pregunta no es del tema (`FUERA`), no se busca.
+
+En código: se descartan los resultados con `score < RAG_UMBRAL_SIMILITUD`; si no queda ninguno → `NORMATIVA_SIN_RESPALDO`. El LLM responde solo con esos fragmentos, y cada artículo que cita se verifica contra lo recuperado: si no está, se descarta la cita; sin ninguna cita verificada tampoco hay respuesta.
+
+### `consultar_marbete`
+
+RAG sobre el marbete de SENASA de un producto (carencia, precauciones, mezclas, reingreso, derrames). El producto se resuelve antes con el matching de `validar_producto_registro`; la consulta trae **todos** los fragmentos del marbete de ese producto (unos 25), con su similitud y sus palabras llevadas a la raíz, para rankearlos en Python.
+
+```sql
+SELECT f.id, f.pagina, f.texto,
+       1 - (f.embedding <=> :embedding_consulta) AS score,
+       ARRAY(
+           SELECT u.lexeme
+           FROM unnest(to_tsvector('spanish', f.texto)) u,
+                generate_series(1, COALESCE(array_length(u.positions, 1), 1))
+       ) AS palabras  -- cada palabra en su raíz, una vez por aparición (para BM25)
+FROM catalogo.fragmento_marbete f
+WHERE f.producto_id = :producto_id
+ORDER BY f.pagina, f.orden;
+```
+
+Se ordena por página y no por `embedding <=> ...` a propósito: así Postgres filtra por producto con el índice común y calcula la similitud exacta de esos 25 fragmentos, en vez de usar el índice HNSW sobre los 76.000 fragmentos de toda la tabla y filtrar después (que puede devolver menos filas, o ninguna).
+
+Búsqueda híbrida en Python (`servicios/busqueda_hibrida.py`): los fragmentos se rankean por similitud y por palabras (BM25 sobre esos 25 fragmentos, así "reingresar", que aparece en una página, pesa mucho más que "lote", que aparece en todas), y los dos rankings se fusionan con Reciprocal Rank Fusion (k = 60). Entran al contexto los 5 primeros que pasan `RAG_UMBRAL_SIMILITUD`, o que entran por palabras con BM25 ≥ 2 y una similitud mínima de 0,30. Como en normativa, la consulta es la pregunta más la línea que escribe el LLM con los términos del marbete.
+
+Sin ningún fragmento, o sin ninguna página citada que esté entre lo recuperado → `MARBETE_SIN_RESPALDO`. Las citas se muestran como "SENASA, Reg. 30596 (marbete, pág. 8)".
 
 ### `consultar_productos`
 
@@ -301,4 +360,6 @@ Al menos uno de `cultivo_id` / `adversidad_id` / `principio_activo_id` es requer
 
 ## Por qué no es una tabla plana
 
-Criterio transversal de aceptación de la cátedra (ver `plandefases.md`, sección "Reglas para escribir el plan"): no existe ninguna tabla genérica `documento + embedding + metadata`. Cada entidad que se busca por significado (`producto`, `principio_activo`, `cultivo`, `adversidad`, `articulo`) tiene su propia tabla relacional con su propia columna `vector`, sus propias FK y sus propias columnas para filtrar (banda, tipo de zona, ámbito, etc.). `tests/datos/test_sin_tabla_plana.py` (Fase 5) verifica esto por consulta a `information_schema`.
+Criterio transversal de aceptación de la cátedra (ver `plandefases.md`, sección "Reglas para escribir el plan"): no existe ninguna tabla genérica `documento + embedding + metadata`. Cada entidad que se busca por significado (`producto`, `principio_activo`, `cultivo`, `adversidad`, `articulo`, `regla_distancia`) tiene su propia tabla relacional con su propia columna `vector`, sus propias FK y sus propias columnas para filtrar (banda, tipo de zona, ámbito, etc.). `tests/datos/test_sin_tabla_plana.py` (Fase 5) verifica esto por consulta a `information_schema`.
+
+Los fragmentos de los RAG tampoco son una tabla genérica: `catalogo.fragmento_marbete` cuelga de su documento y de su producto (se busca siempre dentro del marbete de un producto) y `territorio.fragmento_norma` de su norma y, cuando lo hay, de su artículo (se filtra por jurisdicción y se cita el artículo). Son dos tablas distintas, en su schema, con sus FK.

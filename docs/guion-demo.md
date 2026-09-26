@@ -14,6 +14,11 @@ manda el mensaje (WhatsApp real vs. celda de la notebook).
 Requisitos antes de arrancar: `docker compose up -d db`, al menos una
 `GEMINI_API_KEY_*` real en `.env`.
 
+**Ojo (26/09/2026):** los casos 1, 2 y 8 usan San Carlos Centro, que es una
+localidad de las fixtures de los tests: en la base de desarrollo no está (las
+localidades con normativa cargada son El Trébol, Sastre y San Jorge). Hay que
+pasarlos a una de esas localidades y volver a ensayarlos antes de la defensa.
+
 ## Los 6 casos obligatorios
 
 ### 1. Dictamen APTA
@@ -159,6 +164,71 @@ Después del caso 1: "más info" → banda de cada producto y de la aplicación;
 agenda de ese día y pregunta el horario; "a las 8:30" → confirma. Las fechas
 y horas las resuelve el código (`servicios/fechas.py`), no el LLM.
 
+### 11. Consulta al marbete de un producto (RAG de marbetes)
+
+> "¿Qué hago con los bidones vacíos de Vertimec?"
+
+**Esperado:** `tipo=consulta_marbete`. Con Gemini real (26/09/2026): "*Vertimec* ·
+Reg. SENASA 30116 — Los envases vacíos deben someterse a triple lavado o lavado
+a presión, inutilizarlos perforándolos sin dañar la etiqueta y enviarse a
+centros de acopio transitorio habilitados según la ley 27.279, estando
+prohibido reutilizarlos, enterrarlos o quemarlos", con la fuente *SENASA, Reg.
+30116 (marbete, pág. 10)*. Otras que contestaron bien el mismo día: "¿lo puedo
+tirar junto con otro producto?" sobre Tordon D 30 (pág. 8) y "¿me puede quemar
+el cultivo?" sobre Tordon D 30 (pág. 8).
+
+**Qué señalar:** esto no está en el registro estructurado de SENASA (registro,
+banda, cultivos y dosis): sale del texto del marbete en PDF, partido en
+fragmentos por página. La búsqueda es solo dentro del marbete de ese producto, y
+la página que cita el LLM se verifica en código contra lo recuperado; si no
+está, no se muestra. Hay marbete para buscar en 3.217 de los 7.370 productos: el
+resto no tiene marbete descargado o es un escaneo sin texto (no hay OCR).
+
+### 12. Reformulación de la pregunta (modo prueba)
+
+Requiere `MODO_DEMO_REFORMULACION=true` en `.env` y reiniciar el bot. Con eso,
+las consultas al marbete y a la normativa se contestan dos veces en el mismo
+mensaje: con la pregunta tal cual y con la reformulada.
+
+> "¿Qué hago si se me vuelca Banvel en el galpón?"
+
+**Esperado** (Gemini real, 26/09/2026): con la pregunta original, "⚠️ No pude
+completar la consulta"; la pregunta reformulada agrega "derrame, contención,
+absorción, limpieza de derrames, almacenamiento", y con esa contesta "Cubra el
+derrame con tierra o arena, barra el material absorbente y colóquelo en
+recipientes identificados para su destrucción. Luego, lave las superficies
+contaminadas con agua jabonosa o carbonatada", con la fuente *SENASA, Reg.
+30596 (marbete, pág. 8)*.
+
+**Qué señalar:** el operario pregunta con sus palabras ("se me vuelca en el
+galpón") y el marbete usa otras ("derrame"). Ni la similitud ni la búsqueda por
+palabras encuentran la página con la pregunta tal cual; el LLM escribe los
+términos que usaría el marbete y con eso aparece. En la evaluación con 40
+marbetes, la recuperación pasó de 76 % a 95 % (ver `DECISIONES.md`,
+"Reformulación de la pregunta").
+
+**Advertencias (probado el 26/09/2026 con Gemini real, 8 preguntas):**
+
+- Es el único de los 8 casos probados con un contraste claro. En la mayoría
+  las dos respuestas son equivalentes: la pregunta tal cual ya encontraba la
+  página.
+- En normativa no mostró mejora. "¿Necesito una receta del ingeniero para
+  aplicar?" en El Trébol contestó bien sin reformular (Ley 11.273, art. 28) y
+  peor con la reformulación ("Depende… no hay información suficiente").
+  "¿Qué me pasa si aplico sin receta?" en Sastre contestó a medias sin
+  reformular y nada con la reformulación. No usar normativa para mostrar
+  este caso.
+- "¿Cuándo puedo volver a entrar al lote?" sobre Banvel no contesta en
+  ninguno de los dos casos, aunque la pág. 5 dice "no reingresar al área
+  tratada": ese fragmento tiene similitud 0,22-0,26, debajo del piso de 0,30
+  que exige la búsqueda híbrida.
+- Las respuestas de Gemini varían entre corridas: ensayar la pregunta antes
+  de la defensa.
+- Los casos 11 y 12 se probaron llamando a la tool directamente, con el
+  producto y la pregunta ya separados. Por el chat, el orquestador arma el
+  argumento `pregunta` y puede escribirlo distinto: ensayarlos por el canal
+  que se vaya a usar en la defensa.
+
 ## Modelo de datos (para la parte de arquitectura de la defensa)
 
 Mostrar `docs/modelo-datos.md`:
@@ -181,6 +251,11 @@ Mostrar `docs/modelo-datos.md`:
      aplicación (la más peligrosa de la mezcla) y la distancia más
      restrictiva se calculan en Python — remarcar que el LLM nunca escribe
      ni ve este SQL, solo elige la tool y sus argumentos tipados.
+   - `consultar_marbete` (si preguntan por los RAG): filtro por producto
+     primero y similitud después, sobre `catalogo.fragmento_marbete`; el
+     ranking híbrido (similitud + BM25) se arma en Python. Mostrar que los
+     fragmentos cuelgan de su documento y su producto: no es una tabla
+     genérica de "texto + embedding".
 
 ## Checklist final antes de la entrega
 
