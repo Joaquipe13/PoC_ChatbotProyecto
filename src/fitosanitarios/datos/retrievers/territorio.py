@@ -330,3 +330,45 @@ def normas_de_alcance(
         )
         columnas = [d.name for d in cur.description]
         return [dict(zip(columnas, fila, strict=True)) for fila in cur.fetchall()]
+
+
+def centro_de_localidad(
+    conn: psycopg.Connection, localidad_id: int
+) -> tuple[float, float] | None:
+    """(lat, lon) del centro de la localidad, para pedir el pronóstico; `None` si no se
+    cargó (`data/insumos/localidades.csv`)."""
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT centro_lat, centro_lon FROM territorio.localidad WHERE id = %s",
+            (localidad_id,),
+        )
+        fila = cur.fetchone()
+    if fila is None or fila[0] is None or fila[1] is None:
+        return None
+    return float(fila[0]), float(fila[1])
+
+
+def reglas_de_viento(
+    conn: psycopg.Connection, localidad_id: int | None, provincia_id: int | None
+) -> list[dict]:
+    """Las normas que se refieren al viento, de la localidad y de su provincia."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT n.archivo AS norma, a.numero AS articulo, l.jurisdiccion_id,
+                   rv.viento_max_kmh, rv.descripcion
+            FROM territorio.regla_viento rv
+            JOIN territorio.norma n ON n.id = rv.norma_id
+            LEFT JOIN territorio.articulo a ON a.id = rv.articulo_id
+            LEFT JOIN territorio.localidad l ON l.id = n.localidad_id
+            WHERE (n.ambito = 'municipal' AND n.localidad_id = %(localidad_id)s)
+               OR (n.ambito = 'provincial' AND n.provincia_id = %(provincia_id)s)
+            ORDER BY rv.viento_max_kmh
+            """,
+            {"localidad_id": localidad_id, "provincia_id": provincia_id},
+        )
+        columnas = [d.name for d in cur.description]
+        filas = [dict(zip(columnas, f, strict=True)) for f in cur.fetchall()]
+    for f in filas:
+        f["viento_max_kmh"] = float(f["viento_max_kmh"])
+    return filas

@@ -1,0 +1,4 @@
+provincia,jurisdiccion,centro_lat,centro_lon,fuente
+santa-fe,el-trebol,-32.19857,-61.70208,GeoNames 3856436 (geocoding de Open-Meteo)
+santa-fe,sastre,-31.76672,-61.82872,GeoNames 3835695 (geocoding de Open-Meteo)
+santa-fe,san-jorge,-31.89706,-61.85993,GeoNames 3837441 (geocoding de Open-Meteo)

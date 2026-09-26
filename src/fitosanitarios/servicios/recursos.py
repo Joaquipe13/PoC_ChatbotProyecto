@@ -66,3 +66,19 @@ def precargar_modelo_embeddings() -> None:
         f"Modelo de embeddings cargado ({time.monotonic() - inicio:.0f} s).",
         file=sys.stderr, flush=True,
     )
+
+
+_cliente_meteo = None
+
+
+def cliente_meteorologia(settings):
+    """El cliente de Open-Meteo, uno por proceso (así su caché sirve entre turnos).
+    `None` con `USE_FIXTURES=true`: todo el flujo corre sin red, sin pronóstico."""
+    global _cliente_meteo
+    if settings.use_fixtures:
+        return None
+    if _cliente_meteo is None:
+        from fitosanitarios.servicios.meteorologia import ClienteOpenMeteo
+
+        _cliente_meteo = ClienteOpenMeteo(settings.meteo_base_url)
+    return _cliente_meteo

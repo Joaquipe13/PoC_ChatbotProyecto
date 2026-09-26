@@ -47,3 +47,13 @@ def agendar_aplicacion(
         receta_id = cur.fetchone()[0]
     conn.commit()
     return receta_id, choques
+
+
+def guardar_pronostico(conn, receta_id: int, pronostico: dict) -> None:
+    """El pronóstico que se mostró al agendar, para que quede registrado qué se sabía."""
+    with conn.cursor() as cur:
+        cur.execute(
+            "UPDATE operacion.receta SET pronostico = %s::jsonb WHERE id = %s",
+            (json.dumps(pronostico), receta_id),
+        )
+    conn.commit()

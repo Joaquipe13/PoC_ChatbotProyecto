@@ -1,8 +1,8 @@
 """Los mensajes de esta tool: lo que pregunta, lo que avisa y cómo se le muestra
 el resultado al operario (la plantilla del tipo de respuesta `agendar_aplicacion`)."""
 
-from fitosanitarios.dominio.modelos import RespuestaAgente, ResultadoTool
-from fitosanitarios.servicios.formato import lineas_agenda, unir_secciones
+from fitosanitarios.dominio.modelos import Cita, RespuestaAgente, ResultadoTool
+from fitosanitarios.servicios.formato import cita_norma, lineas_agenda, num, unir_secciones
 
 # --- preguntas y motivos de la tool ---
 
@@ -49,6 +49,58 @@ _EJEMPLOS_FECHA = (
 )
 
 
+_VERIFICAR = "Es un pronóstico: verificá el viento en el lote antes de empezar."
+
+
+def _rango(minimo, maximo, unidad: str) -> str:
+    if minimo is None or maximo is None:
+        return "no figura"
+    if round(minimo) == round(maximo):
+        return f"{num(round(maximo))} {unidad}"
+    return f"{num(round(minimo))} a {num(round(maximo))} {unidad}"
+
+
+def seccion_pronostico(pronostico: dict | None, fecha_legible: str) -> str:
+    """El pronóstico de la franja agendada, como información (no controla nada). La norma
+    de viento de la localidad, si el viento pronosticado supera su umbral, va como
+    referencia."""
+    if not pronostico:
+        return ""
+    if pronostico["estado"] == "lejano":
+        return (
+            f"🌤️ Todavía no hay un pronóstico confiable para el {fecha_legible}: se muestra "
+            f"a partir de {pronostico['horizonte_dias']} días antes."
+        )
+    if pronostico["estado"] != "ok":
+        return "🌤️ No pude consultar el pronóstico del tiempo."
+
+    p = pronostico
+    lineas = [
+        f"*Pronóstico en {p['localidad']}, de {p['desde']} a {p['hasta']}* "
+        f"(Open-Meteo, consultado el {p['consultado']})"
+    ]
+    viento = _rango(p["viento_min_kmh"], p["viento_max_kmh"], "km/h")
+    if p.get("viene_de"):
+        viento = f"del {p['viene_de']} (empuja hacia el {p['empuja_hacia']}), {viento}"
+    if p.get("rafagas_max_kmh") is not None:
+        viento += f", ráfagas de hasta {num(round(p['rafagas_max_kmh']))} km/h"
+    lineas.append(f"- Viento {viento}")
+    if p.get("lluvia_mm") is not None:
+        lluvia = f"- Lluvia: {num(p['lluvia_mm'])} mm"
+        if p.get("lluvia_probabilidad_max") is not None:
+            lluvia += f" (probabilidad de hasta {num(p['lluvia_probabilidad_max'])} %)"
+        lineas.append(lluvia)
+    clima = f"- Temperatura: {_rango(p['temperatura_min'], p['temperatura_max'], '°C')}"
+    if p.get("humedad_min") is not None:
+        clima += f" · humedad desde {num(p['humedad_min'])} %"
+    lineas.append(clima)
+    for n in p.get("normas") or []:
+        cita = cita_norma(Cita(fuente="normativa", norma=n["norma"], articulo=n["articulo"]))
+        lineas.append(f"📋 {cita}: {n['descripcion']}.")
+    lineas.append(_VERIFICAR)
+    return "\n".join(lineas)
+
+
 def plantilla_agendar_aplicacion(
     respuesta: RespuestaAgente, resultados: list[ResultadoTool]
 ) -> str:
@@ -62,7 +114,10 @@ def plantilla_agendar_aplicacion(
         if datos.get("lote"):
             lineas.append(f"- *Lote:* {datos['lote']}")
         lineas.extend(f"⚠️ {a}" for a in resultado.advertencias)
-        return "\n".join(lineas)
+        return unir_secciones(
+            "\n".join(lineas),
+            seccion_pronostico(datos.get("pronostico"), datos["fecha_legible"]),
+        )
 
     faltante = resultado.faltantes[0] if resultado and resultado.faltantes else None
     if faltante is None:

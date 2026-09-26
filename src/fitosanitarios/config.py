@@ -51,6 +51,12 @@ class Settings(BaseSettings):
     rag_umbral_similitud: float = 0.35
     radio_busqueda_zonas_m: float = 2000.0
 
+    # Pronóstico del tiempo al agendar (Open-Meteo, ver servicios/meteorologia.py). Es
+    # información: no controla nada. Más allá del horizonte el pronóstico de viento sirve
+    # poco, así que no se muestra.
+    meteo_base_url: str = "https://api.open-meteo.com/v1/forecast"
+    meteo_horizonte_dias: int = 5
+
     # Presentación: las tools con RAG muestran la respuesta con y sin reformular la
     # pregunta (ver `servicios/demo_reformulacion.py`).
     modo_demo_reformulacion: bool = False

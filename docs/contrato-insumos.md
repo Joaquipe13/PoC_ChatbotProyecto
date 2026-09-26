@@ -21,6 +21,10 @@ data/insumos/
 
 **Cambio (21/09/2026, ver `DECISIONES.md`):** un único `reglas.csv` en la raíz de `data/insumos/` reemplaza a los `reglas.csv` por carpeta.
 
+**Cambio (26/09/2026, ver `DECISIONES.md`, "Pronóstico del tiempo al agendar"):** dos archivos opcionales nuevos en la raíz de `data/insumos/`, que carga `insumos/loader_meteorologia.py` (después de `loader_geo` y `loader_normativa`):
+- `localidades.csv` — `provincia, jurisdiccion, centro_lat, centro_lon, fuente`: el centro de cada localidad, para pedir el pronóstico del tiempo. Una localidad que no está cargada es un error.
+- `reglas_viento.csv` — `provincia, jurisdiccion, viento_max_kmh, norma, articulo, descripcion`: normas que se refieren al viento, que se mencionan junto al pronóstico si el viento pronosticado supera `viento_max_kmh`. `provincia` vacía para una norma provincial, como en `reglas.csv`. Una norma o un artículo que no están cargados son un error.
+
 **Cambio (22/09/2026, ver `DECISIONES.md`, "Localidades y normas sin fuente oficial: Sastre y San Jorge"):** `localidad.geojson` pasa a ser opcional, y una norma puede citarse desde un `.md` en vez de un PDF cuando no hay texto oficial disponible (un fallo judicial, o una norma citada solo por fuente secundaria).
 
 - `provincia` y `jurisdiccion_id` (nombres de carpeta): minúsculas, sin tildes, palabras separadas por guion. Son la clave que une geometría, normativa y reglas entre sí y con la base (`territorio.localidad.jurisdiccion_id`, `territorio.provincia.nombre`).

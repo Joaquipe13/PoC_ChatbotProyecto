@@ -4,13 +4,17 @@ argumentos. Es el "cuándo usar" y el cómo completar cada dato (ver
 
 DESCRIPCION = """\
 Agenda la aplicación de la receta cuando el operario lo pide ("agendala", "agendala
-para el martes"). La tool pregunta lo que falta: no inventes ni calcules fechas.
+para el martes") y muestra el pronóstico del tiempo de ese momento en la localidad. La
+tool pregunta lo que falta: no inventes ni calcules fechas.
 
 Args:
     fecha: el día tal como lo dijo ("martes", "25/09"), sin convertirlo; si no dijo
         ninguno, no completar. Si una respuesta anterior de la tool informó
         `fecha=AAAA-MM-DD`, pasar esa.
     hora: el horario tal como lo dijo ("8", "3 de la tarde"); si no lo dijo, no completar.
+    localidad: la localidad donde se aplica, tal como la nombró el operario en este
+        mensaje o antes en la conversación ("en Sastre", "El Trébol"). Pasala siempre que
+        se conozca: con ella se muestra el pronóstico del tiempo.
     numero: número de la receta, si se conoce.
     cultivo: cultivo de la receta, si se conoce.
     lote: lote de la receta, si se conoce.
