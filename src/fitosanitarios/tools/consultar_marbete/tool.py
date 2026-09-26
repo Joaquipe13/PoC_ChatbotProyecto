@@ -21,6 +21,7 @@ from fitosanitarios.dominio.modelos import CampoFaltante, Cita, ResultadoTool
 from fitosanitarios.dominio.motivos import MotivoNoResuelto
 from fitosanitarios.servicios.busqueda_hibrida import seleccionar
 from fitosanitarios.servicios.matching import Candidato, hay_empate_ambiguo, rankear_candidatos
+from fitosanitarios.servicios.reformulacion import consulta_de_busqueda
 from fitosanitarios.tools.consultar_marbete import mensajes
 from fitosanitarios.tools.consultar_marbete.prompts import (
     DESCRIPCION,
@@ -28,13 +29,11 @@ from fitosanitarios.tools.consultar_marbete.prompts import (
     PLANTILLA_PROMPT_USUARIO,
     PROMPT_REFORMULACION,
     PROMPT_SISTEMA_MARBETE,
-    RESPUESTA_FUERA_DE_TEMA,
 )
 
 logger = logging.getLogger(__name__)
 
 TOP_K_FRAGMENTOS = 5
-LARGO_MAXIMO_REFORMULACION = 400  # una línea de términos; más es el LLM divagando
 
 
 class ConsultarMarbeteArgs(BaseModel):
@@ -50,22 +49,6 @@ def _parsear_json(respuesta: str) -> dict | None:
         logger.warning("El LLM no devolvió JSON válido para consultar_marbete")
         return None
     return datos if isinstance(datos, dict) else None
-
-
-def consulta_de_busqueda(pregunta: str, cliente_llm) -> str | None:
-    """La pregunta del operario más los términos técnicos y sinónimos que usaría el marbete
-    (los escribe el LLM), para buscar con las dos. `None` si el LLM dice que la pregunta no
-    es sobre el producto; si falla, se busca con la pregunta tal cual."""
-    try:
-        reformulada = cliente_llm.generar(
-            f"Pregunta: {pregunta}", system=PROMPT_REFORMULACION
-        ).strip().splitlines()[0].strip()
-    except Exception:  # sin la reformulación se puede buscar igual
-        logger.warning("No se pudo reformular la pregunta para el marbete", exc_info=True)
-        return pregunta
-    if reformulada.upper().strip(" .") == RESPUESTA_FUERA_DE_TEMA:
-        return None
-    return f"{pregunta} {reformulada[:LARGO_MAXIMO_REFORMULACION]}"
 
 
 def consultar_marbete_logica(
@@ -92,7 +75,7 @@ def consultar_marbete_logica(
         estado="no_resuelto", motivo=MotivoNoResuelto.MARBETE_SIN_RESPALDO
     )
     # Reformulación: la pregunta más los términos que usaría el marbete.
-    consulta = consulta_de_busqueda(args.pregunta, cliente_llm)
+    consulta = consulta_de_busqueda(args.pregunta, cliente_llm, PROMPT_REFORMULACION)
     if consulta is None:
         return sin_respaldo
 

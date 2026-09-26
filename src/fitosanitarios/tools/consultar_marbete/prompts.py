@@ -1,6 +1,8 @@
 """Lo que el LLM lee en esta tool: la descripción para el orquestador y los prompts del
 LLM que redacta la respuesta a partir de los fragmentos del marbete."""
 
+from fitosanitarios.servicios.reformulacion import RESPUESTA_FUERA_DE_TEMA
+
 DESCRIPCION = """\
 Responde qué dice el marbete (la etiqueta aprobada por SENASA) de un producto: tiempo de
 carencia, precauciones, compatibilidad o mezclas, reingreso al lote, primeros auxilios,
@@ -15,7 +17,6 @@ Args:
 # Reformulación de la pregunta antes de buscar (el paso "contextualizar la pregunta" del
 # notebook de RAG de la cursada): el operario pregunta "¿cuándo puedo volver a entrar al
 # lote?" y el marbete dice "reingresar al área tratada".
-RESPUESTA_FUERA_DE_TEMA = "FUERA"
 PROMPT_REFORMULACION = (
     "Reescribís preguntas de operarios rurales para buscar la respuesta en el marbete "
     "(la etiqueta aprobada por SENASA) de un producto fitosanitario. Devolvé una sola línea "

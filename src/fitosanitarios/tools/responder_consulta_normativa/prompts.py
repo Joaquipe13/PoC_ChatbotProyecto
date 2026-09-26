@@ -1,6 +1,8 @@
 """Lo que el LLM lee en esta tool: la descripción para el orquestador y los prompts
 del LLM que redacta la respuesta a partir de los fragmentos recuperados."""
 
+from fitosanitarios.servicios.reformulacion import RESPUESTA_FUERA_DE_TEMA
+
 DESCRIPCION = """\
 Responde una pregunta de contenido sobre la normativa de aplicación en una localidad
 cargada, citando norma y artículo: leyes, ordenanzas y fallos judiciales ("¿hay que
@@ -40,3 +42,18 @@ PROMPT_SISTEMA_CONSULTA_NORMATIVA = (
 # Cómo se le presenta al LLM la pregunta y cada fragmento de artículo recuperado.
 PLANTILLA_PROMPT_USUARIO = "Pregunta: {pregunta}\n\nFragmentos disponibles:\n{contexto}"
 PLANTILLA_FRAGMENTO = "[{norma}, {referencia}, jurisdicción: {jurisdiccion_id}]\n{texto}"
+
+# Reformulación de la pregunta antes de buscar (`servicios/reformulacion.py`): el operario
+# pregunta "¿a cuánto del pueblo puedo fumigar con avión?" y la norma dice "aplicación
+# aérea ... de la planta urbana".
+PROMPT_REFORMULACION = (
+    "Reescribís preguntas de operarios rurales para buscar la respuesta en la normativa de "
+    "aplicación de fitosanitarios (leyes y decretos provinciales, ordenanzas municipales y "
+    "fallos judiciales de Argentina). Devolvé una sola línea con la pregunta en palabras "
+    "simples seguida de los términos que usaría la norma para ese tema (por ejemplo: 'fumigar "
+    "cerca del pueblo con avión' -> aplicación aérea, zona urbana, planta urbana, ejido, "
+    "distancia mínima, prohibición). No agregues datos, números ni respuestas: solo palabras "
+    "para buscar. Sin comillas ni explicaciones. Si la pregunta no es sobre la aplicación, "
+    "venta, transporte o manejo de fitosanitarios, respondé solo "
+    f"{RESPUESTA_FUERA_DE_TEMA}."
+)

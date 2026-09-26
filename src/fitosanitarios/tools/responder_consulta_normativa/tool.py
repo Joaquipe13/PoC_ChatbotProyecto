@@ -10,9 +10,13 @@ from fitosanitarios.datos.retrievers.territorio import (
 )
 from fitosanitarios.dominio.modelos import CampoFaltante, ResultadoTool
 from fitosanitarios.dominio.motivos import MotivoNoResuelto
+from fitosanitarios.servicios.reformulacion import consulta_de_busqueda
 from fitosanitarios.servicios.ubicacion import resolver_ubicacion_o_cortar
 from fitosanitarios.tools.responder_consulta_normativa import mensajes
-from fitosanitarios.tools.responder_consulta_normativa.prompts import DESCRIPCION
+from fitosanitarios.tools.responder_consulta_normativa.prompts import (
+    DESCRIPCION,
+    PROMPT_REFORMULACION,
+)
 from fitosanitarios.tools.responder_consulta_normativa.utils import (
     FragmentoNormativa,
     filtrar_por_umbral,
@@ -60,9 +64,17 @@ def responder_consulta_normativa_logica(
         else [mensajes.aclaracion_sin_normativa_municipal(ubicacion.nombre)]
     )
 
+    # Reformulación: la pregunta más los términos que usaría la norma.
+    consulta = consulta_de_busqueda(args.pregunta, cliente_llm, PROMPT_REFORMULACION)
+    if consulta is None:
+        return ResultadoTool(
+            estado="no_resuelto", motivo=MotivoNoResuelto.NORMATIVA_SIN_RESPALDO,
+            advertencias=aclaracion,
+        )
+
     # Retrieval: fragmentos de normas (artículos, fallos) y reglas cargadas, de la
-    # localidad, su provincia y la nación, por similitud con la pregunta.
-    embedding_pregunta = modelo_embeddings.encode(args.pregunta).tolist()
+    # localidad, su provincia y la nación, por similitud con la consulta.
+    embedding_pregunta = modelo_embeddings.encode(consulta).tolist()
     filas = contexto_normativo_por_similitud(
         conn, embedding_pregunta, ubicacion.localidad_id, ubicacion.provincia_id, top_k=8
     )

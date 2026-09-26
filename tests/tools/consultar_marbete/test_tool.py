@@ -96,11 +96,13 @@ def test_una_pregunta_fuera_de_tema_no_busca_ni_responde(monkeypatch):
 
 
 def test_se_busca_con_la_pregunta_mas_la_reformulacion():
-    from fitosanitarios.tools.consultar_marbete.tool import consulta_de_busqueda
+    from fitosanitarios.servicios.reformulacion import consulta_de_busqueda
+    from fitosanitarios.tools.consultar_marbete.prompts import PROMPT_REFORMULACION
 
     consulta = consulta_de_busqueda(
         "¿cuándo puedo volver a entrar al lote?",
         ClienteLLMFake(respuestas=["reingreso, reingresar al área tratada\notra línea"]),
+        PROMPT_REFORMULACION,
     )
     assert consulta == (
         "¿cuándo puedo volver a entrar al lote? reingreso, reingresar al área tratada"
@@ -108,10 +110,13 @@ def test_se_busca_con_la_pregunta_mas_la_reformulacion():
 
 
 def test_si_la_reformulacion_falla_se_busca_con_la_pregunta_tal_cual():
-    from fitosanitarios.tools.consultar_marbete.tool import consulta_de_busqueda
+    from fitosanitarios.servicios.reformulacion import consulta_de_busqueda
+    from fitosanitarios.tools.consultar_marbete.prompts import PROMPT_REFORMULACION
 
     class LLMCaido:
         def generar(self, prompt, system=None):
             raise RuntimeError("429")
 
-    assert consulta_de_busqueda("¿qué carencia tiene?", LLMCaido()) == "¿qué carencia tiene?"
+    assert consulta_de_busqueda(
+        "¿qué carencia tiene?", LLMCaido(), PROMPT_REFORMULACION
+    ) == "¿qué carencia tiene?"
