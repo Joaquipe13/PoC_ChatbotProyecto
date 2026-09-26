@@ -136,6 +136,37 @@ def _linea_condicional(r: dict) -> list[str]:
     return [f"- {detalle}: se puede {desde}con condiciones ({_referencia(r)})"]
 
 
+def _tramo(tramo: dict, todas: bool) -> str:
+    bandas = "todas las bandas" if todas else _bandas_legibles(tramo["bandas"])
+    regla = tramo["regla"]
+    if regla is None:
+        return f"{bandas}: sin distancia fija"
+    if regla["distancia_min_m"] >= DISTANCIA_SIN_LIMITE_M:
+        alcance = "en toda la jurisdicción"
+    else:
+        alcance = f"{num(regla['distancia_min_m'])} m"
+    excepciones = ", salvo excepciones" if tramo["con_excepciones"] else ""
+    return f"{bandas}: {alcance}{excepciones} ({_referencia(regla)})"
+
+
+def _seccion_que_rige(que_rige: list[dict], filtro_bandas: list[str] | None) -> str:
+    """Arriba de la lista: la distancia que manda para cada zona y aplicación. Cuando la
+    ley dice 500 m y la ordenanza 3000 m, el operario tenía que deducir que manda la de
+    3000 m (hallazgo del 26/09/2026)."""
+    if not que_rige:
+        return ""
+    lineas = ["*Distancia mínima que rige*"]
+    for d in que_rige:
+        tramos = d["tramos"]
+        todas = not filtro_bandas and len(tramos) == 1
+        detalle = "; ".join(_tramo(t, todas) for t in tramos)
+        lineas.append(
+            f"- {_zona_legible(d['tipo_zona'])} · {_NOMBRE_APLICACION[d['tipo_aplicacion']]}: "
+            f"{detalle}"
+        )
+    return "\n".join(lineas)
+
+
 def _cubre(regla: dict, aplicacion: str, banda: str) -> bool:
     return regla["tipo_aplicacion"] in (aplicacion, "todas") and (
         regla["bandas"] == ["todas"] or banda in regla["bandas"]
@@ -235,6 +266,9 @@ def plantilla_limitaciones(respuesta: RespuestaAgente, resultados: list[Resultad
     secciones = [
         f"*Limitaciones en {datos.get('localidad', '')}*",
         _linea_producto(datos.get("producto")), aclaracion,
+        _seccion_que_rige(
+            datos.get("que_rige") or [], (datos.get("filtros") or {}).get("bandas")
+        ),
     ]
     prohibiciones = datos.get("prohibiciones", [])
     for aplicacion in _ORDEN_APLICACION:

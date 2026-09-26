@@ -24,8 +24,10 @@ from fitosanitarios.servicios.ubicacion import resolver_ubicacion_o_cortar
 from fitosanitarios.tools.listar_limitaciones import mensajes
 from fitosanitarios.tools.listar_limitaciones.prompts import DESCRIPCION
 from fitosanitarios.tools.listar_limitaciones.utils import (
+    distancias_que_rigen,
     equipo_sin_norma,
     filtrar_reglas,
+    nombra_los_dos_tipos,
     normalizar_bandas,
     normalizar_tipo_aplicacion,
     normalizar_tipo_zona,
@@ -105,8 +107,12 @@ def listar_limitaciones_logica(
     if not ubicacion.con_normativa_municipal:
         advertencias.append(mensajes.aviso_sin_normativa_municipal(ubicacion.nombre))
 
-    tipo_aplicacion = normalizar_tipo_aplicacion(args.tipo_aplicacion)
-    if args.tipo_aplicacion and args.tipo_aplicacion.strip() and tipo_aplicacion is None:
+    compara = nombra_los_dos_tipos(args.tipo_aplicacion)
+    tipo_aplicacion = None if compara else normalizar_tipo_aplicacion(args.tipo_aplicacion)
+    if (
+        args.tipo_aplicacion and args.tipo_aplicacion.strip() and tipo_aplicacion is None
+        and not compara
+    ):
         advertencias.append(mensajes.aviso_tipo_aplicacion_no_entendido(args.tipo_aplicacion.strip()))
     equipo = equipo_sin_norma(args.tipo_aplicacion)
     if equipo is not None and tipo_aplicacion is not None:
@@ -157,6 +163,20 @@ def listar_limitaciones_logica(
         "prohibiciones": [regla_a_dict(r) for r in prohibiciones],
         "condicionales": [regla_a_dict(r) for r in condicionales],
         "producto": producto,
+        "que_rige": [
+            {
+                "tipo_zona": d.tipo_zona, "tipo_aplicacion": d.tipo_aplicacion,
+                "tramos": [
+                    {
+                        "bandas": t.bandas,
+                        "regla": regla_a_dict(t.regla) if t.regla else None,
+                        "con_excepciones": t.con_excepciones,
+                    }
+                    for t in d.tramos
+                ],
+            }
+            for d in distancias_que_rigen(prohibiciones, condicionales, tipo_aplicacion, bandas)
+        ],
     }
     reglas_citadas = prohibiciones + condicionales
     if args.distancia_m is not None:

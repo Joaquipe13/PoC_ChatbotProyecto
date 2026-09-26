@@ -12,6 +12,7 @@ from fitosanitarios.servicios.reglas import (
     ReglaCandidata,
     excepciones_aplicables,
     normalizar_tipo_aplicacion,  # noqa: F401 -- se reexporta para la tool
+    reglas_aplicables,
 )
 from fitosanitarios.servicios.reglas import (
     texto_plano as _plano,
@@ -24,6 +25,16 @@ BANDAS = ["Ia", "Ib", "II", "III", "IV"]
 # autopropulsados"). Se muestran con el tipo que corresponde y se avisa que es una
 # suposición.
 _EQUIPOS_SIN_NORMA = {"dron": "drone", "mochila": "mochila"}
+
+
+def nombra_los_dos_tipos(texto: str | None) -> bool:
+    """"aérea y terrestre", "avión o mosquito": el operario compara, no filtra. Gemini
+    llegó a pasar "aerea y terrestre" y la normalización se quedaba con la primera."""
+    palabras = _plano(texto or "").split()
+    return (
+        any(normalizar_tipo_aplicacion(p) == "aerea" for p in palabras)
+        and any(normalizar_tipo_aplicacion(p) == "terrestre" for p in palabras)
+    )
 
 
 def equipo_sin_norma(texto: str | None) -> str | None:
@@ -149,4 +160,75 @@ def restricciones_a_distancia(
                     if e not in habilitantes and _puede_levantar(e, p):
                         habilitantes.append(e)
         resultado.append(RestriccionADistancia(p, habilitantes))
+    return resultado
+
+
+@dataclass
+class TramoQueRige:
+    """Bandas contiguas a las que rige la misma prohibición (la más restrictiva)."""
+
+    bandas: list[str]
+    regla: ReglaCandidata | None  # None: ninguna prohibición para esas bandas
+    con_excepciones: bool = False
+
+
+@dataclass
+class DistanciaQueRige:
+    tipo_zona: str
+    tipo_aplicacion: str
+    tramos: list[TramoQueRige] = field(default_factory=list)
+
+
+def distancias_que_rigen(
+    prohibiciones: list[ReglaCandidata],
+    condicionales: list[ReglaCandidata],
+    tipo_aplicacion: str | None = None,
+    bandas: list[str] | None = None,
+) -> list[DistanciaQueRige]:
+    """Para cada zona, tipo de aplicación y banda, la prohibición más restrictiva: cuando
+    rigen a la vez la ley (500 m) y una ordenanza (3000 m), manda la de 3000 m. Mismo
+    criterio que el dictamen (`calcular_condiciones`). Las bandas seguidas con la misma
+    regla se agrupan. `con_excepciones`: hay una condicional que cubre ese caso y puede
+    levantar esa prohibición (`_puede_levantar`)."""
+    if tipo_aplicacion:
+        aplicaciones = [tipo_aplicacion]
+    else:
+        aplicaciones = [
+            a for a in ("aerea", "terrestre")
+            if any(p.tipo_aplicacion in (a, "todas") for p in prohibiciones)
+        ]
+    consultadas = [b for b in BANDAS if not bandas or b in bandas]
+    resultado = []
+    for zona in dict.fromkeys(p.tipo_zona for p in prohibiciones):
+        for aplicacion in aplicaciones:
+            tramos: list[TramoQueRige] = []
+            for banda in consultadas:
+                aplicables = reglas_aplicables(prohibiciones, zona, aplicacion, banda)
+                # A igual distancia se cita la norma más local: es la que ninguna excepción
+                # más general puede levantar.
+                rige = max(
+                    aplicables, key=lambda r: (r.distancia_min_m, _es_municipal(r))
+                ) if aplicables else None
+                # Una excepción cuenta si habilita más cerca que la distancia que rige y
+                # levanta todas las prohibiciones que seguirían vigentes ahí (en Sastre, el
+                # art. 51 no levanta los 3000 m de la ordenanza, aunque sí los de la ley; y
+                # "banda II desde 1200 m con condiciones" no habilita nada antes de 1000 m).
+                con_excepciones = rige is not None and any(
+                    e.distancia_min_m < rige.distancia_min_m
+                    and all(
+                        _puede_levantar(e, p) for p in aplicables
+                        if p.distancia_min_m > e.distancia_min_m
+                    )
+                    for e in excepciones_aplicables(
+                        condicionales, zona, aplicacion, banda, float("inf")
+                    )
+                )
+                if tramos and tramos[-1].regla == rige and (
+                    tramos[-1].con_excepciones == con_excepciones
+                ):
+                    tramos[-1].bandas.append(banda)
+                else:
+                    tramos.append(TramoQueRige([banda], rige, con_excepciones))
+            if any(t.regla is not None for t in tramos):
+                resultado.append(DistanciaQueRige(zona, aplicacion, tramos))
     return resultado

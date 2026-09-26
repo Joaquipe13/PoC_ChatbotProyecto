@@ -127,3 +127,45 @@ def test_con_producto_a_una_distancia_tambien_dice_la_banda():
     )
     texto = plantilla_limitaciones(None, [resultado])
     assert "Para *Roundup*: banda IV (verde), la de todas sus variantes registradas" in texto
+
+
+def test_arriba_de_la_lista_dice_la_distancia_que_rige():
+    regla = _regla(3000, "aerea", ["todas"])
+    resultado = ResultadoTool(
+        estado="ok",
+        datos={
+            "localidad": "Sastre", "filtros": {"bandas": ["III"]},
+            "prohibiciones": [regla], "condicionales": [],
+            "que_rige": [{
+                "tipo_zona": "zona_urbana", "tipo_aplicacion": "aerea",
+                "tramos": [{"bandas": ["III"], "regla": regla, "con_excepciones": False}],
+            }],
+        },
+    )
+    texto = plantilla_limitaciones(None, [resultado])
+    assert "*Distancia mínima que rige*\n- Zona urbana · aérea: banda III: 3000 m (" in texto
+    assert texto.index("Distancia mínima que rige") < texto.index("*Aplicación aérea*")
+
+
+def test_la_distancia_que_rige_marca_excepciones_y_bandas_sin_distancia():
+    regla = _regla(500, "terrestre", ["Ia", "Ib", "II"])
+    resultado = ResultadoTool(
+        estado="ok",
+        datos={
+            "localidad": "El Trébol", "filtros": {},
+            "prohibiciones": [regla], "condicionales": [],
+            "que_rige": [{
+                "tipo_zona": "zona_urbana", "tipo_aplicacion": "terrestre",
+                "tramos": [
+                    {"bandas": ["Ia", "Ib", "II"], "regla": regla, "con_excepciones": True},
+                    {"bandas": ["III", "IV"], "regla": None, "con_excepciones": False},
+                ],
+            }],
+        },
+    )
+    texto = plantilla_limitaciones(None, [resultado])
+    assert (
+        "- Zona urbana · terrestre: bandas Ia, Ib, II: 500 m, salvo excepciones "
+        in texto
+    )
+    assert "bandas III, IV: sin distancia fija" in texto

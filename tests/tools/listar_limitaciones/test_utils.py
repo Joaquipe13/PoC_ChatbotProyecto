@@ -4,6 +4,7 @@ import pytest
 
 from fitosanitarios.servicios.reglas import ReglaCandidata
 from fitosanitarios.tools.listar_limitaciones.utils import (
+    distancias_que_rigen,
     filtrar_reglas,
     normalizar_bandas,
     normalizar_tipo_aplicacion,
@@ -133,3 +134,66 @@ def test_una_excepcion_municipal_si_levanta_la_prohibicion_provincial():
     )
     res = restricciones_a_distancia([AEREA_II], [autorizacion], 1500.0)
     assert _excepciones(res, AEREA_II) == [autorizacion]
+
+
+# --- la distancia que rige: la más restrictiva ---
+
+# Sastre: la ordenanza prohíbe la aérea a menos de 3000 m para todas las bandas.
+ORDENANZA_AEREA = ReglaCandidata(
+    tipo_zona="zona_urbana", tipo_aplicacion="aerea", bandas=["todas"], distancia_min_m=3000,
+    norma="ordenanza-1174-2019", articulo=None, jurisdiccion_id="sastre", permitido=False,
+)
+
+
+def test_rige_la_mas_restrictiva_entre_la_ley_y_la_ordenanza():
+    """La ley dice 500 m para bandas III y IV; la ordenanza, 3000 m: manda la ordenanza."""
+    rigen = distancias_que_rigen(
+        [AEREA_CD, ORDENANZA_AEREA], [], tipo_aplicacion="aerea", bandas=["III"]
+    )
+    assert len(rigen) == 1
+    (tramo,) = rigen[0].tramos
+    assert tramo.bandas == ["III"]
+    assert tramo.regla == ORDENANZA_AEREA
+
+
+def test_las_bandas_con_la_misma_regla_se_agrupan():
+    rigen = distancias_que_rigen(PROHIBICIONES, [], tipo_aplicacion="aerea")
+    tramos = rigen[0].tramos
+    assert [t.bandas for t in tramos] == [["Ia", "Ib"], ["II"], ["III", "IV"]]
+    assert [t.regla.distancia_min_m for t in tramos] == [3000, 3000, 500]
+
+
+def test_una_excepcion_provincial_no_levanta_una_prohibicion_municipal():
+    """El art. 51 del decreto admite la aérea de banda II desde 500 m, pero la ordenanza
+    de Sastre la prohíbe a menos de 3000 m: esa excepción no está disponible."""
+    rigen = distancias_que_rigen(
+        [AEREA_II, ORDENANZA_AEREA], [AEREA_II_EXC], tipo_aplicacion="aerea", bandas=["II"]
+    )
+    (tramo,) = rigen[0].tramos
+    assert tramo.regla == ORDENANZA_AEREA
+    assert tramo.con_excepciones is False
+
+
+def test_con_la_ley_sola_la_excepcion_se_marca():
+    rigen = distancias_que_rigen(
+        PROHIBICIONES, [AEREA_II_EXC], tipo_aplicacion="aerea", bandas=["II"]
+    )
+    (tramo,) = rigen[0].tramos
+    assert tramo.regla == AEREA_II
+    assert tramo.con_excepciones is True
+
+
+def test_bandas_sin_prohibicion_quedan_sin_distancia_fija():
+    rigen = distancias_que_rigen([TERRESTRE_AB], [], tipo_aplicacion="terrestre")
+    tramos = rigen[0].tramos
+    assert tramos[-1].bandas == ["III", "IV"]
+    assert tramos[-1].regla is None
+
+
+def test_una_condicional_mas_lejos_que_la_distancia_que_rige_no_es_excepcion():
+    """Sastre: la terrestre de banda II se puede "desde 1200 m con condiciones", pero lo
+    que rige son 1000 m: esa condicional no habilita nada más cerca."""
+    rige = _regla("zona_urbana", "terrestre", ["todas"], 1000, None)
+    desde_1200 = _regla("zona_urbana", "terrestre", ["II"], 1200, None, True, "condiciones")
+    rigen = distancias_que_rigen([rige], [desde_1200], tipo_aplicacion="terrestre", bandas=["II"])
+    assert rigen[0].tramos[0].con_excepciones is False

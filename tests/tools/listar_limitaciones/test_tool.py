@@ -210,3 +210,13 @@ def test_mochila_muestra_las_reglas_terrestres_y_lo_avisa(base):
 def test_los_equipos_que_la_norma_contempla_no_llevan_aviso(base):
     for equipo in ("avión", "la mosquito", "terrestre"):
         assert _listar(tipo_aplicacion=equipo).advertencias == []
+
+
+def test_si_nombra_los_dos_tipos_no_filtra_ni_avisa(base):
+    """Gemini pasó "aerea y terrestre" para "¿es lo mismo por avión que por tierra?" y se
+    filtraba solo aérea."""
+    for texto in ("aerea y terrestre", "avión o mosquito"):
+        r = _listar(tipo_aplicacion=texto)
+        assert r.datos["filtros"]["tipo_aplicacion"] is None
+        assert r.advertencias == []
+        assert {p["tipo_aplicacion"] for p in r.datos["prohibiciones"]} == {"aerea", "terrestre"}
