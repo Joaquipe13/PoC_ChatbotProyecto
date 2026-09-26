@@ -45,23 +45,22 @@ def _pdf_sin_texto(ruta: Path) -> None:
     pdf.output(str(ruta))
 
 
-# --- Fixtures sintéticas reales: deben validar limpio ---
+# --- Insumos reales (copia congelada en tests/fixtures): deben validar sin errores ---
 
 
-def test_fixtures_sinteticas_son_validas():
-    for carpeta in [
-        FIXTURES / "santa-fe" / "san-carlos-centro",
-        FIXTURES / "santa-fe" / "colonia-vecina",
-    ]:
-        resultado = validar_carpeta_localidad(carpeta)
+def test_las_localidades_reales_son_validas():
+    for localidad in ("el-trebol", "sastre", "san-jorge"):
+        resultado = validar_carpeta_localidad(FIXTURES / "santa-fe" / localidad)
         assert resultado.es_valido, resultado.errores
 
 
 def test_validar_insumos_sobre_fixtures_completas_sin_errores():
     resultados = validar_insumos(FIXTURES)
-    assert len(resultados) == 4  # 2 localidades + provincial santa-fe + nacional
+    assert len(resultados) == 4  # 3 localidades + provincial santa-fe
     for clave, resultado in resultados.items():
         assert resultado.es_valido, f"{clave}: {resultado.errores}"
+    # Sastre y San Jorge no tienen localidad.geojson: es válido, pero avisa (A5).
+    assert [a.codigo for a in resultados["santa-fe/sastre"].advertencias] == ["A5"]
 
 
 # --- F1: falta algún archivo requerido ---
@@ -86,7 +85,7 @@ def test_sin_filas_en_reglas_csv_la_localidad_es_valida_y_avisa_que_se_leera_del
 def test_la_normativa_nacional_no_avisa_que_se_leera_del_pdf(tmp_path):
     nacional = tmp_path / "normativa-general" / "nacional"
     nacional.mkdir(parents=True)
-    _pdf_con_texto(nacional / "ley-27302-2016.pdf")
+    _pdf_con_texto(nacional / "ley-1-2000.pdf")
     resultado = validar_insumos(tmp_path)["normativa-general/nacional"]
     assert resultado.es_valido and resultado.advertencias == []
 
@@ -251,20 +250,20 @@ def test_f9_jurisdiccion_sin_carpeta(tmp_path):
 
 
 def test_una_regla_nacional_se_valida_contra_la_carpeta_nacional(tmp_path):
-    ruta = _csv(tmp_path, ",ARGENTINA,zona_urbana,todas,todas,10,N,,ley-27302-2016,1,")
-    assert validar_reglas_csv(ruta, {("nacional",): {"ley-27302-2016"}}) == {}
+    ruta = _csv(tmp_path, ",ARGENTINA,zona_urbana,todas,todas,10,N,,ley-1-2000,1,")
+    assert validar_reglas_csv(ruta, {("nacional",): {"ley-1-2000"}}) == {}
 
 
 # --- F6: nombre de archivo/carpeta no respeta la convención ---
 
 
 def test_f6_nombre_de_carpeta_invalido(tmp_path):
-    resultado = validar_nombre_carpeta("San Carlos Centro", tmp_path)
+    resultado = validar_nombre_carpeta("El Trébol", tmp_path)
     assert any(e.codigo == "F6" for e in resultado.errores)
 
 
 def test_f6_nombre_de_carpeta_valido(tmp_path):
-    resultado = validar_nombre_carpeta("san-carlos-centro", tmp_path)
+    resultado = validar_nombre_carpeta("el-trebol", tmp_path)
     assert resultado.es_valido
 
 

@@ -1,6 +1,6 @@
-"""Borrador de filas de `reglas.csv` desde los PDF: sin base, sobre las fixtures
-sintéticas (`tests/fixtures/insumos`). Es una ayuda para revisar, no una fuente
-de datos: nunca toca el `reglas.csv`."""
+"""Borrador de filas de `reglas.csv` desde los PDF: sin base, sobre los insumos reales
+congelados en `tests/fixtures/insumos` (la Ley 11.273 y su decreto). Es una ayuda para
+revisar, no una fuente de datos: nunca toca el `reglas.csv`."""
 
 import csv
 import shutil
@@ -49,24 +49,38 @@ def _filas_del_csv(alcance):
 
 def test_borrador_de_una_carpeta_con_filas_en_reglas_csv_no_pisa_nada_y_las_compara(tmp_path):
     carpeta = tmp_path / "santa-fe"
-    shutil.copytree(FIXTURES / "santa-fe", carpeta, ignore=shutil.ignore_patterns("san-carlos*",
-                                                                                  "colonia*"))
+    shutil.copytree(
+        FIXTURES / "santa-fe", carpeta, ignore=shutil.ignore_patterns("el-trebol", "sastre",
+                                                                      "san-jorge"),
+    )
     csv_original = (FIXTURES / "reglas.csv").read_text(encoding="utf-8")
 
     resumen = borrador_de_carpeta(carpeta, PROVINCIAL, _filas_del_csv(PROVINCIAL))
-    # La regla del CSV lleva "salvo que una norma municipal fije una distancia mayor":
-    # el extractor la descarta (condicional), así que sale como pendiente y como
-    # "solo en el CSV", que es lo que hay que mirar al revisar. La fila S (condicional)
-    # no se compara: el extractor solo lee prohibiciones.
-    assert resumen.tiene_csv and resumen.filas == [] and resumen.solo_en_borrador == []
-    assert [f["norma"] for f in resumen.solo_en_csv] == ["ley-13740-2017"]
-    assert len(resumen.pendientes) == 1 and "300 metros" in resumen.pendientes[0]
-    escribir_borrador(resumen)
+    assert resumen.tiene_csv
 
+    def clave(f):
+        return f["articulo"], f["tipo_aplicacion"], f["banda_toxicologica"], f["distancia_min_m"]
+
+    # Art. 34 (terrestre, A y B, 500 m): el extractor lee lo mismo que el CSV.
+    assert ("34", "terrestre", "Ia;Ib;II", "500") in {clave(f) for f in resumen.filas}
+    assert "34" not in {f["articulo"] for f in resumen.solo_en_borrador + resumen.solo_en_csv}
+    # Art. 33 (aérea, 3000 m): el CSV lo separa por banda y el extractor lo junta, así que
+    # sale como diferencia de los dos lados; es lo que hay que mirar al revisar.
+    assert [clave(f) for f in resumen.solo_en_borrador] == [("33", "aerea", "Ia;Ib;II", "3000")]
+    assert {clave(f) for f in resumen.solo_en_csv} == {
+        ("33", "aerea", "Ia;Ib", "3000"), ("33", "aerea", "II", "3000"),
+        ("33", "aerea", "III;IV", "500"),
+    }
+    # La excepción del art. 51 del decreto no se toma: queda como pendiente.
+    assert any(p.startswith("ley-055297-2017 art. 51:") for p in resumen.pendientes)
+
+    escribir_borrador(resumen)
     assert (FIXTURES / "reglas.csv").read_text(encoding="utf-8") == csv_original
     with (carpeta / "reglas.borrador.csv").open(encoding="utf-8") as f:
-        assert list(csv.DictReader(f)) == []  # solo el encabezado
-    assert "300 metros" in (carpeta / "reglas.borrador-pendientes.txt").read_text(encoding="utf-8")
+        assert {(r["articulo"], r["distancia_min_m"]) for r in csv.DictReader(f)} == {
+            ("33", "3000"), ("34", "500"),
+        }
+    assert "art. 51" in (carpeta / "reglas.borrador-pendientes.txt").read_text(encoding="utf-8")
 
 
 def test_las_filas_del_borrador_traen_provincia_y_jurisdiccion_para_copiarlas_al_csv(tmp_path):

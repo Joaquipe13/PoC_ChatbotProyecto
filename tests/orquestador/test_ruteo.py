@@ -17,7 +17,7 @@ from tests.orquestador.fake_chat_model import (
     mensaje_respuesta_estructurada,
 )
 
-LOCALIDAD = "San Carlos Centro"
+LOCALIDAD = "El Trébol"
 
 
 def _turno_con_respuestas(respuestas, mensaje="mensaje de prueba", thread_id="t-ruteo"):
@@ -82,8 +82,8 @@ def test_ruteo_evaluar_viabilidad_legal(conexion):
 def test_ruteo_responder_consulta_normativa(conexion):
     respuesta, mensajes, _ = _turno_con_respuestas([
         mensaje_llama_tool("responder_consulta_normativa", {
-            "pregunta": "¿a qué distancia de una escuela puedo aplicar por tierra?",
-            "jurisdiccion_id": "san-carlos-centro",
+            "pregunta": "¿puedo fumigar con viento?",
+            "jurisdiccion_id": "el-trebol",
         }),
     ])
     # Con el LLM de fixtures la tool puede no obtener un JSON válido: el tipo sale de lo que

@@ -5,17 +5,17 @@ from fitosanitarios.insumos.loader_normativa import chunkear_articulos, extraer_
 FIXTURES = Path(__file__).resolve().parent.parent / "fixtures" / "insumos"
 
 
-def test_chunkea_pdf_real_con_3_articulos():
-    ruta = FIXTURES / "santa-fe" / "san-carlos-centro" / "ordenanza-914-2018.pdf"
+def test_chunkea_la_ordenanza_real_de_el_trebol():
+    ruta = FIXTURES / "santa-fe" / "el-trebol" / "ordenanza-841-2010.pdf"
     texto, requiere_revision = extraer_texto_o_ocr(ruta)
     assert requiere_revision is False
 
     articulos = chunkear_articulos(texto)
 
-    assert len(articulos) == 3
-    numeros = [numero for numero, _ in articulos]
-    assert numeros == ["8", "9", "10"]
-    assert "100 metros" in articulos[0][1]
+    assert [numero for numero, _ in articulos] == [str(n) for n in range(1, 17)]
+    articulo_4 = articulos[3][1]
+    assert articulo_4.startswith("Prohíbese las pulverizaciones de cualquier tipo")
+    assert "8 km/hora" in " ".join(articulo_4.split())
 
 
 def test_chunkea_con_formato_articulo_punto():

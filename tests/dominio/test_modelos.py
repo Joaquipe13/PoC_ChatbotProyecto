@@ -149,15 +149,15 @@ def test_dictamen_observada_con_citas():
         resultado="OBSERVADA",
         observaciones=[
             Observacion(
-                descripcion="Distancia a escuela insuficiente: 80 m, mínimo 100 m.",
-                citas=[Cita(fuente="normativa", norma="Ordenanza 914/2018", articulo="8")],
+                descripcion="Aplicación aérea con banda II a menos de 3000 m de la zona urbana.",
+                citas=[Cita(fuente="normativa", norma="Ordenanza 841/2010", articulo="7")],
             )
         ],
         chequeos_no_realizados=[],
     )
     assert dictamen.resultado == "OBSERVADA"
     assert len(dictamen.observaciones) == 1
-    assert dictamen.observaciones[0].citas[0].articulo == "8"
+    assert dictamen.observaciones[0].citas[0].articulo == "7"
 
 
 def test_dictamen_no_evaluable_lista_chequeos_no_realizados():

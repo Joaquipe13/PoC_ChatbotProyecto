@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS territorio.provincia (
 
 CREATE TABLE IF NOT EXISTS territorio.localidad (
     id BIGSERIAL PRIMARY KEY,
-    jurisdiccion_id TEXT NOT NULL UNIQUE, -- ej. "san-carlos-centro"
+    jurisdiccion_id TEXT NOT NULL UNIQUE, -- ej. "el-trebol"
     nombre TEXT NOT NULL,
     provincia_id BIGINT NOT NULL REFERENCES territorio.provincia (id),
     limite JSONB NOT NULL, -- GeoJSON Polygon/MultiPolygon, EPSG:4326
@@ -59,7 +59,7 @@ CREATE TABLE IF NOT EXISTS territorio.norma (
     tipo TEXT NOT NULL CHECK (tipo IN ('ordenanza', 'decreto', 'resolucion', 'ley')),
     numero TEXT NOT NULL,
     anio INT NOT NULL,
-    archivo TEXT NOT NULL, -- nombre del PDF sin extensión, ej. "ordenanza-914-2018"
+    archivo TEXT NOT NULL, -- nombre del PDF sin extensión, ej. "ordenanza-841-2010"
     metadatos JSONB NOT NULL DEFAULT '{}'::jsonb,
     CONSTRAINT norma_ambito_referencia CHECK (
         (ambito = 'municipal' AND localidad_id IS NOT NULL AND provincia_id IS NULL)

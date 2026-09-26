@@ -28,7 +28,8 @@ estado. Para WhatsApp real: `docs/testing-manual.md` y el pendiente de la URL de
 |---|---|---|
 | Santa Fe (provincia) | Ley 11.273 y su decreto reglamentario (figura como "Ley 055297/2017") | Real |
 | El Trébol | Ordenanza 841/2010 | Real |
-| San Carlos Centro, Colonia Vecina | Ordenanzas 914/2018 y 45/2019 | **Ficticias** (fixtures de prueba) |
+| Sastre | Ordenanza 1174/2019 y fallo de 2020 | Reales, desde fuente secundaria (prensa): sin PDF oficial |
+| San Jorge | Fallo de 2009 | Real, desde fuente secundaria: sin ordenanza propia |
 | Los otros 359 municipios y comunas de Santa Fe | — | Sin ordenanzas: rige la provincial y el bot lo aclara |
 
 Reglas de distancia cargadas (`data/insumos/reglas.csv`): en zona urbana, aérea clases A y B
@@ -87,12 +88,13 @@ El texto sale literal de la norma, sin que el LLM lo reescriba.
 
 ## 4. Duda de contenido (sin número ni distancia)
 
-Va por la búsqueda semántica con Gemini. Solo hay ordenanzas ficticias para probarlo bien.
+Va por la búsqueda semántica con Gemini. Salidas verificadas con Gemini real el 26/09/2026 (las
+ordenanzas inventadas de San Carlos Centro y Colonia Vecina se sacaron ese día).
 
 | # | Escribí | Esperado | Es falla si |
 |---|---|---|---|
-| C1 | `hay que avisarle a la escuela antes de fumigar con avion en San Carlos Centro?` | *Sí.* Notificar a la dirección del establecimiento con 48 horas de anticipación (aplicación aérea a menos de 200 m). *Fuentes*: Ordenanza 914/2018, art. 9. | Sin fuente, o una fuente que no es esa. |
-| C2 | `¿a cuántos metros de una escuela puedo aplicar por tierra en San Carlos Centro?` | Es una pregunta de distancia: la responde la lista de limitaciones. "Escuelas · todas las bandas: a menos de 100 m (Ordenanza 914/2018, art. 8)". | Responde con otra distancia. |
+| C1 | `¿se puede fumigar con viento en El Trébol?` | *Depende.* Se prohíben las pulverizaciones cuando los vientos superen los 8 km/hora y puedan producir derivas hacia la planta urbana. *Fuentes*: Ordenanza 841/2010, art. 4. | Sin fuente, o una fuente que no es esa. |
+| C2 | `¿a cuántos metros de una escuela puedo aplicar por tierra en Sastre?` | Es una pregunta de distancia: la responde la lista de limitaciones. "Escuelas · terrestre: todas las bandas: 200 m (Ordenanza 1174/2019)". | Responde con otra distancia. |
 
 ## 5. Controles de otras tools
 

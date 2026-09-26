@@ -9,7 +9,17 @@ from fitosanitarios.tools.responder_consulta_normativa import (
 UMBRAL_SIMILITUD = 0.3  # bajo a propósito: separa el caso "sin respaldo" del "con respaldo"
 
 # La primera llamada al LLM es la reformulación de la pregunta (ver servicios/reformulacion.py).
-REFORMULADA = "aplicación terrestre, escuela, establecimiento educativo, distancia mínima"
+REFORMULADA = (
+    "vientos, deriva hacia la planta urbana, pulverizaciones, intensidad del viento en km/h"
+)
+PREGUNTA = "¿puedo fumigar con viento?"
+# Ordenanza 841/2010 de El Trébol, art. 4: prohíbe pulverizar con vientos de más de 8 km/h
+# que puedan producir derivas hacia la planta urbana.
+RESPUESTA_ART_4 = json.dumps({
+    "veredicto": "Depende",
+    "regla": "Con viento de más de 8 km/h que lleve la deriva hacia la planta urbana, no.",
+    "articulos_citados": [{"norma": "ordenanza-841-2010", "articulo": "4"}],
+})
 
 
 def test_pregunta_sin_jurisdiccion_repregunta_con_lista(conexion, modelo_embeddings):
@@ -20,7 +30,7 @@ def test_pregunta_sin_jurisdiccion_repregunta_con_lista(conexion, modelo_embeddi
     )
     assert resultado.estado == "faltan_datos"
     assert resultado.faltantes[0].campo == "jurisdiccion_id"
-    assert "san-carlos-centro" in resultado.faltantes[0].opciones
+    assert "el-trebol" in resultado.faltantes[0].opciones
 
 
 def test_localidad_desconocida_se_vuelve_a_pedir(conexion, modelo_embeddings):
@@ -55,11 +65,11 @@ def test_localidad_sin_normativa_local_responde_con_la_provincial_y_lo_aclara(
 ):
     respuesta_llm = json.dumps({
         "veredicto": "No",
-        "regla": "La distancia minima a la zona urbana es de 300 metros.",
-        "articulos_citados": [{"norma": "ley-13740-2017", "articulo": "2"}],
+        "regla": "Con banda amarilla, a menos de 500 metros de la planta urbana no.",
+        "articulos_citados": [{"norma": "ley-11273-1995", "articulo": "34"}],
     })
     args = ResponderConsultaNormativaArgs(
-        pregunta="¿a qué distancia de la zona urbana puedo aplicar?",
+        pregunta="¿a qué distancia de la planta urbana puedo aplicar por tierra?",
         jurisdiccion_id="Rosario", provincia="santa-fe",
     )
     resultado = responder_consulta_normativa_logica(
@@ -67,7 +77,7 @@ def test_localidad_sin_normativa_local_responde_con_la_provincial_y_lo_aclara(
         UMBRAL_SIMILITUD,
     )
     assert resultado.estado == "ok"
-    assert resultado.citas[0].norma == "ley-13740-2017"
+    assert resultado.citas[0].norma == "ley-11273-1995"
     assert resultado.datos["sin_normativa_municipal"] is True
     assert any("No se cuenta con la normativa municipal de Rosario" in a
                for a in resultado.advertencias)
@@ -76,8 +86,7 @@ def test_localidad_sin_normativa_local_responde_con_la_provincial_y_lo_aclara(
 def test_pregunta_sin_respaldo_por_debajo_del_umbral(conexion, modelo_embeddings):
     # Umbral altísimo: nada llega a superarlo, sin importar la pregunta.
     args = ResponderConsultaNormativaArgs(
-        pregunta="¿a qué distancia de una escuela puedo aplicar por tierra?",
-        jurisdiccion_id="san-carlos-centro",
+        pregunta=PREGUNTA, jurisdiccion_id="el-trebol",
     )
     fake = ClienteLLMFake()  # solo para reformular: no llega a generar una respuesta
     resultado = responder_consulta_normativa_logica(
@@ -94,26 +103,17 @@ def test_pregunta_sin_respaldo_por_debajo_del_umbral(conexion, modelo_embeddings
 
 
 def test_pregunta_con_respaldo_devuelve_cita_verificada(conexion, modelo_embeddings):
-    respuesta_llm = json.dumps({
-        "veredicto": "No",
-        "regla": "La distancia minima a una escuela para aplicacion terrestre es de 100 metros.",
-        "articulos_citados": [{"norma": "ordenanza-914-2018", "articulo": "8"}],
-    })
-    fake = ClienteLLMFake(respuestas=[REFORMULADA, respuesta_llm])
-
-    args = ResponderConsultaNormativaArgs(
-        pregunta="¿a qué distancia de una escuela puedo aplicar por tierra?",
-        jurisdiccion_id="san-carlos-centro",
-    )
+    fake = ClienteLLMFake(respuestas=[REFORMULADA, RESPUESTA_ART_4])
+    args = ResponderConsultaNormativaArgs(pregunta=PREGUNTA, jurisdiccion_id="el-trebol")
     resultado = responder_consulta_normativa_logica(
         args, conexion, modelo_embeddings, fake, UMBRAL_SIMILITUD
     )
 
     assert resultado.estado == "ok"
-    assert resultado.datos["veredicto"] == "No"
+    assert resultado.datos["veredicto"] == "Depende"
     assert len(resultado.citas) == 1
-    assert resultado.citas[0].norma == "ordenanza-914-2018"
-    assert resultado.citas[0].articulo == "8"
+    assert resultado.citas[0].norma == "ordenanza-841-2010"
+    assert resultado.citas[0].articulo == "4"
 
 
 def test_solo_cita_alucinada_queda_no_resuelto_con_advertencia(conexion, modelo_embeddings):
@@ -124,8 +124,7 @@ def test_solo_cita_alucinada_queda_no_resuelto_con_advertencia(conexion, modelo_
     fake = ClienteLLMFake(respuestas=[REFORMULADA, respuesta_llm])
 
     args = ResponderConsultaNormativaArgs(
-        pregunta="¿a qué distancia de una escuela puedo aplicar por tierra?",
-        jurisdiccion_id="san-carlos-centro",
+        pregunta=PREGUNTA, jurisdiccion_id="el-trebol",
     )
     resultado = responder_consulta_normativa_logica(
         args, conexion, modelo_embeddings, fake, UMBRAL_SIMILITUD
@@ -142,7 +141,7 @@ def test_solo_cita_alucinada_queda_no_resuelto_con_advertencia(conexion, modelo_
 def test_una_pregunta_fuera_de_tema_no_se_busca(conexion, modelo_embeddings):
     fake = ClienteLLMFake(respuestas=["FUERA"])
     args = ResponderConsultaNormativaArgs(
-        pregunta="¿quién ganó el mundial?", jurisdiccion_id="san-carlos-centro"
+        pregunta="¿quién ganó el mundial?", jurisdiccion_id="el-trebol"
     )
     resultado = responder_consulta_normativa_logica(
         args, conexion, modelo_embeddings, fake, UMBRAL_SIMILITUD
@@ -163,16 +162,9 @@ def test_modo_demo_muestra_la_respuesta_con_y_sin_reformular(conexion, modelo_em
             "articulos_citados": [{"norma": "norma-inventada-2099", "articulo": "1"}],
         }),
         REFORMULADA,
-        json.dumps({
-            "veredicto": "No",
-            "regla": "La distancia minima a una escuela para aplicacion terrestre es de 100 metros.",
-            "articulos_citados": [{"norma": "ordenanza-914-2018", "articulo": "8"}],
-        }),
+        RESPUESTA_ART_4,
     ])
-    args = ResponderConsultaNormativaArgs(
-        pregunta="¿a qué distancia de una escuela puedo aplicar por tierra?",
-        jurisdiccion_id="san-carlos-centro",
-    )
+    args = ResponderConsultaNormativaArgs(pregunta=PREGUNTA, jurisdiccion_id="el-trebol")
     resultado = responder_consulta_normativa_logica(
         args, conexion, modelo_embeddings, fake, UMBRAL_SIMILITUD, modo_demo_reformulacion=True
     )
@@ -185,4 +177,4 @@ def test_modo_demo_muestra_la_respuesta_con_y_sin_reformular(conexion, modelo_em
     original, reformulada = texto.split("*Pregunta reformulada (lo que se busca):*")
     assert "No pude completar la consulta" in original
     assert REFORMULADA in reformulada
-    assert "100 metros" in reformulada
+    assert "más de 8 km/h" in reformulada

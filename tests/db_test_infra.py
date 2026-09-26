@@ -80,10 +80,13 @@ def aplicar_migraciones(conn: psycopg.Connection) -> None:
 
 
 def cargar_fixtures_insumos(conn: psycopg.Connection, modelo_embeddings) -> None:
-    """Reemplaza `territorio.*` por las localidades sintéticas de
-    `tests/fixtures/insumos/` (San Carlos Centro, Colonia Vecina, la ley
-    provincial y la nacional). No toca `catalogo.*` ni `operacion.*`."""
+    """Reemplaza `territorio.*` por los insumos de `tests/fixtures/insumos/`: una copia
+    congelada de los reales (El Trébol, Sastre y San Jorge, la Ley 11.273 y su decreto),
+    así editar `data/insumos/` no rompe los tests. Antes eran localidades y normas
+    inventadas (San Carlos Centro, Colonia Vecina); se sacaron el 26/09/2026 (ver
+    DECISIONES.md). No toca `catalogo.*` ni `operacion.*`."""
     from fitosanitarios.insumos.loader_geo import cargar_localidades
+    from fitosanitarios.insumos.loader_meteorologia import cargar_centros, cargar_reglas_viento
     from fitosanitarios.insumos.loader_normativa import cargar_normativa
     from fitosanitarios.insumos.loader_reglas import cargar_reglas, indexar_reglas
 
@@ -99,3 +102,5 @@ def cargar_fixtures_insumos(conn: psycopg.Connection, modelo_embeddings) -> None
     cargar_normativa(conn, FIXTURES_INSUMOS, modelo_embeddings)
     cargar_reglas(conn, FIXTURES_INSUMOS)
     indexar_reglas(conn, modelo_embeddings)
+    cargar_centros(conn, FIXTURES_INSUMOS)
+    cargar_reglas_viento(conn, FIXTURES_INSUMOS)

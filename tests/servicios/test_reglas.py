@@ -4,41 +4,43 @@ from fitosanitarios.servicios.reglas import (
     excepciones_aplicables,
 )
 
+# Reglas reales de tests/fixtures/insumos/reglas.csv (copia de data/insumos).
+SASTRE = "sastre"
 
-def _regla_san_carlos_escuela() -> ReglaCandidata:
-    # Regla real de la fixture san-carlos-centro (reglas.csv)
+
+def _regla_escuela_sastre() -> ReglaCandidata:
+    """Ordenanza 1174/2019 de Sastre: terrestre, todas las bandas, 200 m de la escuela."""
     return ReglaCandidata(
         tipo_zona="escuela", tipo_aplicacion="terrestre", bandas=["todas"],
-        distancia_min_m=100, norma="ordenanza-914-2018", articulo="8",
-        jurisdiccion_id="san-carlos-centro",
+        distancia_min_m=200, norma="ordenanza-1174-2019", articulo=None,
+        jurisdiccion_id=SASTRE,
     )
 
 
-def test_lote_a_80m_de_escuela_con_regla_de_100m_no_cumple_con_cita():
-    # Caso citado literalmente en plandefases.md, Fase 5.
+def test_lote_a_150m_de_la_escuela_con_regla_de_200m_no_cumple_con_cita():
     chequeo = evaluar_distancia_zona(
-        zona_tipo="escuela", zona_nombre="Escuela N 12", distancia_real_m=80.0,
-        reglas=[_regla_san_carlos_escuela()], tipo_aplicacion="terrestre", banda="IV",
+        zona_tipo="escuela", zona_nombre="Escuela rural N 693", distancia_real_m=150.0,
+        reglas=[_regla_escuela_sastre()], tipo_aplicacion="terrestre", banda="IV",
     )
     assert chequeo is not None
     assert chequeo.cumple is False
     assert len(chequeo.citas) == 1
-    assert chequeo.citas[0].norma == "ordenanza-914-2018"
-    assert chequeo.citas[0].articulo == "8"
+    assert chequeo.citas[0].norma == "ordenanza-1174-2019"
+    assert chequeo.citas[0].articulo is None
 
 
-def test_lote_a_150m_de_escuela_con_regla_de_100m_cumple():
+def test_lote_a_250m_de_la_escuela_con_regla_de_200m_cumple():
     chequeo = evaluar_distancia_zona(
-        zona_tipo="escuela", zona_nombre="Escuela N 12", distancia_real_m=150.0,
-        reglas=[_regla_san_carlos_escuela()], tipo_aplicacion="terrestre", banda="IV",
+        zona_tipo="escuela", zona_nombre="Escuela rural N 693", distancia_real_m=250.0,
+        reglas=[_regla_escuela_sastre()], tipo_aplicacion="terrestre", banda="IV",
     )
     assert chequeo.cumple is True
 
 
 def test_distancia_exactamente_en_el_limite_cumple():
     chequeo = evaluar_distancia_zona(
-        zona_tipo="escuela", zona_nombre="X", distancia_real_m=100.0,
-        reglas=[_regla_san_carlos_escuela()], tipo_aplicacion="terrestre", banda="IV",
+        zona_tipo="escuela", zona_nombre="X", distancia_real_m=200.0,
+        reglas=[_regla_escuela_sastre()], tipo_aplicacion="terrestre", banda="IV",
     )
     assert chequeo.cumple is True  # >= , no estrictamente mayor
 
@@ -46,7 +48,7 @@ def test_distancia_exactamente_en_el_limite_cumple():
 def test_sin_regla_aplicable_devuelve_none():
     chequeo = evaluar_distancia_zona(
         zona_tipo="curso_agua", zona_nombre="Arroyo", distancia_real_m=10.0,
-        reglas=[_regla_san_carlos_escuela()], tipo_aplicacion="terrestre", banda="IV",
+        reglas=[_regla_escuela_sastre()], tipo_aplicacion="terrestre", banda="IV",
     )
     assert chequeo is None
 
@@ -54,16 +56,16 @@ def test_sin_regla_aplicable_devuelve_none():
 def test_regla_no_aplica_a_aplicacion_aerea_si_es_solo_terrestre():
     chequeo = evaluar_distancia_zona(
         zona_tipo="escuela", zona_nombre="X", distancia_real_m=80.0,
-        reglas=[_regla_san_carlos_escuela()], tipo_aplicacion="aerea", banda="IV",
+        reglas=[_regla_escuela_sastre()], tipo_aplicacion="aerea", banda="IV",
     )
     assert chequeo is None
 
 
 def test_regla_con_tipo_aplicacion_todas_aplica_a_terrestre_y_aerea():
+    # Ninguna norma cargada usa "todas" como tipo de aplicación: regla de prueba.
     regla_todas = ReglaCandidata(
         tipo_zona="curso_agua", tipo_aplicacion="todas", bandas=["todas"],
-        distancia_min_m=50, norma="ordenanza-914-2018", articulo="10",
-        jurisdiccion_id="san-carlos-centro",
+        distancia_min_m=50, norma="norma-de-prueba", articulo="1", jurisdiccion_id=None,
     )
     terrestre = evaluar_distancia_zona("curso_agua", "Arroyo", 30, [regla_todas], "terrestre", "IV")
     aerea = evaluar_distancia_zona("curso_agua", "Arroyo", 30, [regla_todas], "aerea", "IV")
@@ -72,52 +74,45 @@ def test_regla_con_tipo_aplicacion_todas_aplica_a_terrestre_y_aerea():
 
 
 def test_regla_con_bandas_especificas_no_aplica_a_otra_banda():
-    regla_bandas_altas = ReglaCandidata(
-        tipo_zona="escuela", tipo_aplicacion="terrestre", bandas=["Ia", "Ib", "II"],
-        distancia_min_m=200, norma="ordenanza-914-2018", articulo="11",
-        jurisdiccion_id="san-carlos-centro",
+    # Ley 11.273, art. 34: terrestre, clases A y B (Ia, Ib, II), 500 m de la zona urbana.
+    art_34 = ReglaCandidata(
+        tipo_zona="zona_urbana", tipo_aplicacion="terrestre", bandas=["Ia", "Ib", "II"],
+        distancia_min_m=500, norma="ley-11273-1995", articulo="34", jurisdiccion_id=None,
     )
-    chequeo_banda_iv = evaluar_distancia_zona(
-        "escuela", "X", 80, [regla_bandas_altas], "terrestre", "IV"
-    )
-    assert chequeo_banda_iv is None
-    chequeo_banda_ii = evaluar_distancia_zona(
-        "escuela", "X", 80, [regla_bandas_altas], "terrestre", "II"
-    )
-    assert chequeo_banda_ii is not None
+    assert evaluar_distancia_zona("zona_urbana", "X", 80, [art_34], "terrestre", "IV") is None
+    assert evaluar_distancia_zona("zona_urbana", "X", 80, [art_34], "terrestre", "II") is not None
 
 
 def test_varias_reglas_aplicables_gana_la_mas_restrictiva_citando_todas():
-    regla_municipal = ReglaCandidata(
-        tipo_zona="zona_urbana", tipo_aplicacion="todas", bandas=["todas"],
-        distancia_min_m=100, norma="ordenanza-914-2018", articulo="12",
-        jurisdiccion_id="san-carlos-centro",
+    # El Trébol, aérea banda II: la ordenanza dice 500 m para todas las bandas (art. 6) y la
+    # ley, 3000 m para la clase B (art. 33).
+    ordenanza_art_6 = ReglaCandidata(
+        tipo_zona="zona_urbana", tipo_aplicacion="aerea", bandas=["todas"],
+        distancia_min_m=500, norma="ordenanza-841-2010", articulo="6",
+        jurisdiccion_id="el-trebol",
     )
-    regla_provincial = ReglaCandidata(
-        tipo_zona="zona_urbana", tipo_aplicacion="todas", bandas=["todas"],
-        distancia_min_m=300, norma="ley-13740-2017", articulo="2",
-        jurisdiccion_id=None,
+    ley_art_33 = ReglaCandidata(
+        tipo_zona="zona_urbana", tipo_aplicacion="aerea", bandas=["II"],
+        distancia_min_m=3000, norma="ley-11273-1995", articulo="33", jurisdiccion_id=None,
     )
     chequeo = evaluar_distancia_zona(
-        "zona_urbana", "Casco urbano", 150,
-        [regla_municipal, regla_provincial], "terrestre", "IV",
+        "zona_urbana", "Limite Agronomico", 1000, [ordenanza_art_6, ley_art_33], "aerea", "II",
     )
-    assert chequeo.distancia_min_aplicable_m == 300  # gana la provincial, más restrictiva
-    assert chequeo.cumple is False  # 150 < 300
+    assert chequeo.distancia_min_aplicable_m == 3000  # gana la provincial, más restrictiva
+    assert chequeo.cumple is False  # 1000 < 3000
     assert len(chequeo.citas) == 2  # cita ambas, no solo la que ganó
-    normas_citadas = {c.norma for c in chequeo.citas}
-    assert normas_citadas == {"ordenanza-914-2018", "ley-13740-2017"}
+    assert {c.norma for c in chequeo.citas} == {"ordenanza-841-2010", "ley-11273-1995"}
 
 
 def test_observaciones_de_las_reglas_se_propagan_como_advertencias():
+    aviso = "Buffer adicional desde la escuela rural N 693 Bernardino Rivadavia (Estacion km 465)"
     regla_con_aviso = ReglaCandidata(
         tipo_zona="escuela", tipo_aplicacion="aerea", bandas=["todas"],
-        distancia_min_m=200, norma="ordenanza-914-2018", articulo="9",
-        jurisdiccion_id="san-carlos-centro",
-        observaciones="Aviso previo a la direccion de la escuela",
+        distancia_min_m=200, norma="ordenanza-1174-2019", articulo=None,
+        jurisdiccion_id=SASTRE, observaciones=aviso,
     )
     chequeo = evaluar_distancia_zona("escuela", "X", 250, [regla_con_aviso], "aerea", "IV")
-    assert chequeo.advertencias == ["Aviso previo a la direccion de la escuela"]
+    assert chequeo.advertencias == [aviso]
 
 
 # --- Prohibiciones (N) y reglas condicionales (S) ---

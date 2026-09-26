@@ -1,6 +1,6 @@
 """Tests de integración de evaluar_viabilidad_legal contra Postgres real
-(Docker), con el catálogo real de SENASA (Fase 2) y las localidades
-sintéticas de San Carlos Centro (Fase 3). Cubre los 3 resultados posibles
+(Docker), con el catálogo real de SENASA (Fase 2) y los insumos reales congelados
+en `tests/fixtures/insumos/` (Sastre). Cubre los 3 resultados posibles
 del dictamen: APTA, OBSERVADA y NO_EVALUABLE (ver plandefases.md, Fase 5).
 
 El dictamen ya no compara contra la ubicación del lote: la localidad se
@@ -21,7 +21,7 @@ from fitosanitarios.tools.evaluar_viabilidad_legal import (
 )
 
 TOLERANCIA_PCT = 10.0
-LOCALIDAD = "San Carlos Centro"
+LOCALIDAD = "Sastre"
 
 
 def test_dictamen_apta_producto_registrado_dosis_ok(conexion, modelo_embeddings):
@@ -47,8 +47,8 @@ def test_dictamen_informa_banda_y_distancias_minimas(conexion, modelo_embeddings
     condiciones = resultado.datos["dictamen"]["condiciones"]
     assert condiciones["banda"] == "II"
     distancias = {d["tipo_zona"]: d["distancia_min_m"] for d in condiciones["distancias_minimas"]}
-    assert distancias["escuela"] == 100
-    assert any(c["norma"] == "ordenanza-914-2018" for c in resultado.datos["dictamen"]["citas"])
+    assert distancias["escuela"] == 200
+    assert any(c["norma"] == "ordenanza-1174-2019" for c in resultado.datos["dictamen"]["citas"])
 
 
 def test_dictamen_observada_por_dosis_fuera_de_rango(conexion, modelo_embeddings):

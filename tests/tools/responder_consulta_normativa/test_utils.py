@@ -8,12 +8,16 @@ from fitosanitarios.tools.responder_consulta_normativa.utils import (
 )
 
 
-def _fragmento_escuela() -> FragmentoNormativa:
+def _fragmento_art_7() -> FragmentoNormativa:
+    """Ordenanza 841/2010 de El Trébol, art. 7 (texto real)."""
     return FragmentoNormativa(
-        articulo_id=1, numero="8",
-        texto="Prohibese la aplicacion terrestre a menos de 100 metros de escuelas.",
-        norma="ordenanza-914-2018", ambito="municipal",
-        jurisdiccion_id="san-carlos-centro", score=0.9,
+        articulo_id=1, numero="7",
+        texto=(
+            "Prohíbese la aplicación aérea de productos fitosanitarios clasificados como "
+            "Banda Amarilla desde el Límite 0 y hasta 3.000 metros del mismo."
+        ),
+        norma="ordenanza-841-2010", ambito="municipal",
+        jurisdiccion_id="el-trebol", score=0.9,
     )
 
 
@@ -41,18 +45,20 @@ def test_filtrar_por_umbral_todos_por_debajo_devuelve_vacio():
 def test_respuesta_con_cita_verificada():
     respuesta_llm = json.dumps({
         "veredicto": "No",
-        "regla": "La distancia minima a una escuela es de 100 metros para aplicacion terrestre.",
-        "articulos_citados": [{"norma": "ordenanza-914-2018", "articulo": "8"}],
+        "regla": "Con banda amarilla no se puede aplicar por avión a menos de 3000 metros.",
+        "articulos_citados": [{"norma": "ordenanza-841-2010", "articulo": "7"}],
     })
     fake = ClienteLLMFake(respuestas=[respuesta_llm])
 
-    resultado = responder_con_fragmentos("¿puedo aplicar a 80m?", [_fragmento_escuela()], fake)
+    resultado = responder_con_fragmentos(
+        "¿puedo aplicar con avión a 1000 m con banda amarilla?", [_fragmento_art_7()], fake
+    )
 
     assert resultado.veredicto == "No"
     assert len(resultado.citas) == 1
-    assert resultado.citas[0].norma == "ordenanza-914-2018"
-    assert resultado.citas[0].articulo == "8"
-    assert resultado.citas[0].jurisdiccion_id == "san-carlos-centro"
+    assert resultado.citas[0].norma == "ordenanza-841-2010"
+    assert resultado.citas[0].articulo == "7"
+    assert resultado.citas[0].jurisdiccion_id == "el-trebol"
     assert resultado.advertencias == []
 
 
@@ -67,7 +73,7 @@ def test_cita_alucinada_no_presente_en_fragmentos_se_descarta():
     })
     fake = ClienteLLMFake(respuestas=[respuesta_llm])
 
-    resultado = responder_con_fragmentos("¿puedo aplicar?", [_fragmento_escuela()], fake)
+    resultado = responder_con_fragmentos("¿puedo aplicar?", [_fragmento_art_7()], fake)
 
     assert resultado.citas == []
     assert len(resultado.advertencias) == 1
@@ -75,32 +81,32 @@ def test_cita_alucinada_no_presente_en_fragmentos_se_descarta():
 
 
 def test_cita_parcialmente_alucinada_solo_descarta_la_invalida():
-    otro_fragmento = FragmentoNormativa(
-        2, "10", "sobre cursos de agua", "ordenanza-914-2018", "municipal",
-        "san-carlos-centro", score=0.8,
+    art_4 = FragmentoNormativa(
+        2, "4", "Prohíbese las pulverizaciones ... por efecto de vientos de una intensidad "
+        "mayor a 8 km/hora ...", "ordenanza-841-2010", "municipal", "el-trebol", score=0.8,
     )
     respuesta_llm = json.dumps({
         "veredicto": "Depende",
         "regla": "Depende de la zona.",
         "articulos_citados": [
-            {"norma": "ordenanza-914-2018", "articulo": "8"},  # real
-            {"norma": "ordenanza-914-2018", "articulo": "99"},  # no existe
+            {"norma": "ordenanza-841-2010", "articulo": "7"},  # recuperado
+            {"norma": "ordenanza-841-2010", "articulo": "99"},  # no existe
         ],
     })
     fake = ClienteLLMFake(respuestas=[respuesta_llm])
 
     resultado = responder_con_fragmentos(
-        "¿puedo aplicar?", [_fragmento_escuela(), otro_fragmento], fake
+        "¿puedo aplicar?", [_fragmento_art_7(), art_4], fake
     )
 
     assert len(resultado.citas) == 1
-    assert resultado.citas[0].articulo == "8"
+    assert resultado.citas[0].articulo == "7"
     assert len(resultado.advertencias) == 1
 
 
 def test_respuesta_no_json_no_rompe():
     fake = ClienteLLMFake(respuestas=["esto no es JSON"])
-    resultado = responder_con_fragmentos("¿puedo aplicar?", [_fragmento_escuela()], fake)
+    resultado = responder_con_fragmentos("¿puedo aplicar?", [_fragmento_art_7()], fake)
     assert resultado.veredicto == "Depende"
     assert resultado.citas == []
     assert resultado.advertencias != []
@@ -112,7 +118,7 @@ def test_sin_articulos_citados_no_hay_citas():
         "articulos_citados": [],
     })
     fake = ClienteLLMFake(respuestas=[respuesta_llm])
-    resultado = responder_con_fragmentos("¿puedo aplicar?", [_fragmento_escuela()], fake)
+    resultado = responder_con_fragmentos("¿puedo aplicar?", [_fragmento_art_7()], fake)
     assert resultado.citas == []
     assert resultado.advertencias == []
 

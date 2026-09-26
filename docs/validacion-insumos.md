@@ -1,5 +1,7 @@
 # Validación de insumos — primera carga
 
+> **Registro histórico (26/09/2026).** Las fixtures sintéticas que usa este reporte (San Carlos Centro, Colonia Vecina, Ley 13740/2017, Ley 27302/2016 y sus ordenanzas, todas inventadas) se borraron. Desde esa fecha `tests/fixtures/insumos/` es una copia congelada de los insumos reales (El Trébol, Sastre, San Jorge, Ley 11.273 y su decreto), ver `DECISIONES.md`. Lo de abajo describe la primera corrida tal como fue.
+
 > Estructura de carpetas actualizada el 19/09/2026 (municipios dentro de la carpeta de su provincia, ver `docs/contrato-insumos.md`). Los resultados de carga de abajo son de la primera corrida y siguen valiendo: solo cambiaron las rutas.
 
 Reporte de la primera carga real del pipeline de insumos (Fase 3). **No hay insumos reales del equipo todavía** (capas SIG y normativa de las 10 localidades del caso de estudio, ver `plandefases.md` sección 6) — este reporte corre el pipeline completo contra las **fixtures sintéticas** de `tests/fixtures/insumos/`, que tienen la misma estructura y pasan las mismas validaciones que exigirán los datos reales. Cuando el equipo suba las localidades reales, se corre este mismo proceso sobre `data/insumos/` y se actualiza este documento con el resultado real.

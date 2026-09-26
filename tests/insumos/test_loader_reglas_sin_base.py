@@ -37,7 +37,7 @@ class CursorFalso:
             elif "'municipal'" in sql:
                 self._resultado = [("ordenanza-841-2010", 200)]
             else:
-                self._resultado = [("ley-27302-2016", 300)]
+                self._resultado = [("ley-1-2000", 300)]
         elif sql.startswith("SELECT id FROM territorio.articulo"):
             norma_id, numero = params
             self._resultado = [(norma_id * 1000 + int(numero),)] if int(numero) < 90 else []
@@ -177,7 +177,7 @@ def test_articulo_inexistente_falla_con_la_linea(insumos, extracciones):
 
 
 def test_una_regla_nacional_explicita_se_carga(insumos, extracciones):
-    _escribir(insumos, ",ARGENTINA,zona_urbana,todas,todas,10,N,,ley-27302-2016,1,")
+    _escribir(insumos, ",ARGENTINA,zona_urbana,todas,todas,10,N,,ley-1-2000,1,")
     conn = ConexionFalsa()
     assert cargar_reglas(conn, insumos) == 1
     (fila,) = [p for _, p in conn.cur.de_tipo("INSERT INTO territorio.regla_distancia")]

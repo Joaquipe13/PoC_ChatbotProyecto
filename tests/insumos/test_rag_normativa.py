@@ -52,14 +52,16 @@ def test_texto_de_una_prohibicion_sin_limite_y_de_una_excepcion():
 
 
 def test_el_retriever_trae_fragmentos_y_reglas_de_la_jurisdiccion(conexion, modelo_embeddings):
-    localidad = obtener_localidad_por_jurisdiccion_id(conexion, "san-carlos-centro")
-    embedding = modelo_embeddings.encode("¿a qué distancia de una escuela puedo aplicar?")
+    localidad = obtener_localidad_por_jurisdiccion_id(conexion, "el-trebol")
+    embedding = modelo_embeddings.encode("¿a qué distancia del pueblo puedo aplicar con avión?")
     filas = contexto_normativo_por_similitud(
         conexion, embedding.tolist(), localidad.id, localidad.provincia_id, top_k=20
     )
 
     assert {f["tipo"] for f in filas} == {"fragmento", "regla"}
-    assert "ordenanza-45-2019" not in {f["archivo"] for f in filas}  # es de Colonia Vecina
+    archivos = {f["archivo"] for f in filas}
+    assert "ordenanza-841-2010" in archivos
+    assert "ordenanza-1174-2019" not in archivos  # es de Sastre
     scores = [f["score"] for f in filas]
     assert scores == sorted(scores, reverse=True)
 

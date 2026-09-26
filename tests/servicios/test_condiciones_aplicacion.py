@@ -78,12 +78,13 @@ def test_sin_ninguna_banda_solo_aplican_reglas_para_todas_las_bandas():
 
 
 def test_sin_normativa_municipal_se_aclara_y_se_usa_la_provincial():
+    # Ley 11.273, art. 34: terrestre, clases A y B, 500 m de la planta urbana.
     provincial = ReglaCandidata(
-        tipo_zona="zona_urbana", tipo_aplicacion="todas", bandas=["todas"],
-        distancia_min_m=300, norma="ley-13740-2017", articulo="2", jurisdiccion_id=None,
+        tipo_zona="zona_urbana", tipo_aplicacion="terrestre", bandas=["Ia", "Ib", "II"],
+        distancia_min_m=500, norma="ley-11273-1995", articulo="34", jurisdiccion_id=None,
     )
     condiciones = calcular_condiciones(
-        "Rosario", "terrestre", {"Producto A": "IV"}, [provincial], con_normativa_municipal=False
+        "Rosario", "terrestre", {"Producto A": "II"}, [provincial], con_normativa_municipal=False
     )
     assert condiciones.sin_normativa_municipal is True
     assert condiciones.advertencias == [
@@ -91,8 +92,8 @@ def test_sin_normativa_municipal_se_aclara_y_se_usa_la_provincial():
         "normativa provincial"
     ]
     (distancia,) = condiciones.distancias_minimas
-    assert distancia.distancia_min_m == 300
-    assert distancia.norma_limitante.norma == "ley-13740-2017"
+    assert distancia.distancia_min_m == 500
+    assert distancia.norma_limitante.norma == "ley-11273-1995"
 
 
 def test_con_normativa_municipal_no_hay_aclaracion():

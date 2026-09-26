@@ -2,8 +2,8 @@
 
 Orden de presentación sugerido, con el mensaje exacto a mandar, el resultado
 esperado y qué señalar en cada caso. Todos los casos corren contra datos
-reales: catálogo SENASA real (Fase 2) y la normativa sintética de San Carlos
-Centro/Colonia Vecina (Fase 3, ver `docs/validacion-insumos.md`) — no hay
+reales: catálogo SENASA real (Fase 2) y la normativa real cargada de El Trébol,
+Sastre y San Jorge, más la Ley 11.273 de Santa Fe y su decreto — no hay
 fixtures ni LLM fake en la demo.
 
 **Plan B si el túnel de WhatsApp no está disponible**: correr
@@ -14,23 +14,37 @@ manda el mensaje (WhatsApp real vs. celda de la notebook).
 Requisitos antes de arrancar: `docker compose up -d db`, al menos una
 `GEMINI_API_KEY_*` real en `.env`.
 
-**Ojo (26/09/2026):** los casos 1, 2 y 8 usan San Carlos Centro, que es una
-localidad de las fixtures de los tests: en la base de desarrollo no está (las
-localidades con normativa cargada son El Trébol, Sastre y San Jorge). Hay que
-pasarlos a una de esas localidades y volver a ensayarlos antes de la defensa.
+**Cambio (26/09/2026):** los casos usaban San Carlos Centro y Colonia Vecina,
+localidades y normas inventadas para los tests que no estaban en la base de
+desarrollo. Se sacaron y los casos pasaron a El Trébol y Sastre; las salidas de
+abajo son las que dio el bot con Gemini real ese día.
 
 ## Los 6 casos obligatorios
 
 ### 1. Dictamen APTA
 
-> "Quiero validar la receta completa: Flyer 10 Ec en soja, 170 cm3/ha, terrestre, en San Carlos Centro, contra chinche de la alfalfa"
+> "Quiero validar la receta completa: Flyer 10 Ec en soja, 170 cm3/ha, terrestre, en El Trébol, contra chinche de la alfalfa"
 
-**Esperado:** `tipo=dictamen`, resultado `✅ APTA`, sin observaciones, más las
-*Condiciones de aplicación* de San Carlos Centro: banda II (amarilla) y la
-distancia mínima a cada tipo de zona con la norma que la fija (zona urbana
-300 m, Ley 13740/2017 art. 2; escuela 100 m, Ordenanza 914/2018 art. 8; curso
-de agua 50 m, art. 10). Cita el registro SENASA de Flyer 10 Ec (reg. 41881)
-y cierra ofreciendo más info (banda de cada producto) o agendar.
+**Esperado** (Gemini real, 26/09/2026):
+
+```
+*Dictamen* — El Trébol
+*Resultado:* ✅ APTA
+
+*Condiciones de aplicación* — El Trébol · terrestre · banda II (amarilla)
+- *Distancia mínima a zona urbana:* 500 m (Ley 11273/1995, art. 34)
+
+*Fuentes*
+- SENASA, Reg. 41881 (detalle API)
+
+¿Agendamos la aplicación?
+[BOTONES: Agendar | No, gracias]
+```
+
+Si se sigue con "sí, agendala para el lunes a las 9", la confirmación trae el
+pronóstico del tiempo de esa franja y, si el viento pronosticado supera los
+8 km/h, menciona la Ordenanza 841/2010, art. 4 (ver `DECISIONES.md`, "Pronóstico
+del tiempo al agendar").
 
 **Qué señalar:** el producto, el cultivo, la dosis y la localidad se sacaron de
 un solo mensaje en lenguaje natural; el núcleo (no el LLM) resolvió el producto
@@ -48,7 +62,7 @@ grafía no cubierta, el respaldo verificado y determinístico está en
 
 ### 2. Dictamen OBSERVADA (dosis fuera de rango)
 
-> "Quiero validar la receta completa: Flyer 10 Ec en soja, 500 cm3/ha, terrestre, en San Carlos Centro, contra chinche de la alfalfa"
+> "Quiero validar la receta completa: Flyer 10 Ec en soja, 500 cm3/ha, terrestre, en El Trébol, contra chinche de la alfalfa"
 
 **Esperado:** `tipo=dictamen`, resultado `❌ OBSERVADA` por la dosis (500 cm³/ha,
 muy por encima del rango registrado de 160-180). Muestra igual las condiciones
@@ -101,7 +115,7 @@ propósito general desde el 15/01/2026), no solo una limitación de producto.
 > "Quiero evaluar riesgo para una aplicación en Rosario, Santa Fe, Flyer 10 Ec, soja, terrestre, 2 L/ha, contra chinche de la alfalfa"
 
 **Esperado:** condiciones de aplicación con la distancia mínima a zona urbana
-de la **normativa provincial** (300 m, Ley 13740/2017 art. 2) y una aclaración
+de la **normativa provincial** (500 m, Ley 11273/1995 art. 34) y una aclaración
 explícita: "⚠️ No se cuenta con la normativa municipal de Rosario: la distancia
 se basa en la normativa provincial".
 
@@ -136,10 +150,20 @@ vez de un principio activo genérico.
 
 ### 8. Consulta normativa con cita verificada
 
-> "¿A qué distancia de una escuela puedo aplicar por tierra en San Carlos Centro?"
+> "¿Se puede fumigar con viento en El Trébol?"
 
-**Esperado:** `tipo=consulta_normativa`, veredicto corto + regla (100 m para
-aplicación terrestre) citando Ordenanza 914/2018, art. 8.
+**Esperado** (Gemini real, 26/09/2026, igual en 3 de 3 corridas):
+`tipo=consulta_normativa`, "*Depende.* Se prohíben las pulverizaciones cuando los
+vientos superen los 8 km/hora y puedan producir derivas hacia la planta urbana",
+citando la Ordenanza 841/2010, art. 4.
+
+No usar "¿hay que avisar antes de aplicar en El Trébol?": contestó bien una vez
+(art. 5) y después 0 de 4. La búsqueda trae primero artículos genéricos del
+decreto y el art. 5 queda afuera, según cómo reformule Gemini.
+
+Una pregunta de distancia ("¿a qué distancia de una escuela puedo aplicar en
+Sastre?") no va por acá: la responde `listar_limitaciones` con la lista de
+límites (200 m, Ordenanza 1174/2019).
 
 **Advertencia conocida:** la recuperación por similitud (`RAG_UMBRAL_SIMILITUD`)
 es sensible a la redacción exacta con la que el LLM orquestador arma el
@@ -147,7 +171,7 @@ argumento `pregunta` de la tool — no siempre es idéntica a como lo escribió
 el operario (ver `DECISIONES.md`, Fase 8). Si no devuelve cita en el primer
 intento, repetir la pregunta casi textual a la de arriba, o mostrar
 `tests/tools/responder_consulta_normativa/test_tool.py::test_pregunta_con_respaldo_devuelve_cita_verificada`
-como respaldo determinístico (misma pregunta, `jurisdiccion_id` explícito).
+como respaldo determinístico (la misma pregunta del viento, art. 4).
 
 ### 9. Extensiones (Fase 9)
 

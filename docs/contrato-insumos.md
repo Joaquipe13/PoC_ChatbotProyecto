@@ -9,9 +9,9 @@ data/insumos/
 ├── reglas.csv                        las reglas de distancia de todas las carpetas
 ├── <provincia>/                      p. ej. santa-fe
 │   ├── ley-NNNNN-AAAA.pdf            normativa provincial (una o más)
-│   └── <jurisdiccion_id>/            municipio de esa provincia, p. ej. san-carlos-centro
+│   └── <jurisdiccion_id>/            municipio de esa provincia, p. ej. el-trebol
 │       ├── localidad.geojson         límite + zonas protegidas, EPSG:4326
-│       └── ordenanza-914-2018.pdf    <tipo>-<numero>-<anio>.pdf
+│       └── ordenanza-841-2010.pdf    <tipo>-<numero>-<anio>.pdf
 └── normativa-general/
     └── nacional/
         └── ley-NNNNN-AAAA.pdf        solo para consultas: no aporta reglas al dictamen
@@ -28,7 +28,7 @@ data/insumos/
 **Cambio (22/09/2026, ver `DECISIONES.md`, "Localidades y normas sin fuente oficial: Sastre y San Jorge"):** `localidad.geojson` pasa a ser opcional, y una norma puede citarse desde un `.md` en vez de un PDF cuando no hay texto oficial disponible (un fallo judicial, o una norma citada solo por fuente secundaria).
 
 - `provincia` y `jurisdiccion_id` (nombres de carpeta): minúsculas, sin tildes, palabras separadas por guion. Son la clave que une geometría, normativa y reglas entre sí y con la base (`territorio.localidad.jurisdiccion_id`, `territorio.provincia.nombre`).
-- Normas: `<tipo>-<numero>-<anio>.pdf`, con `tipo` ∈ `ordenanza | decreto | resolucion | ley`. De ahí sale la cita ("Ordenanza 914/2018") y el ámbito (municipal/provincial/nacional) sale de la carpeta que lo contiene. Solo normas vigentes; si una fue modificada, va también la modificatoria o el texto ordenado completo.
+- Normas: `<tipo>-<numero>-<anio>.pdf`, con `tipo` ∈ `ordenanza | decreto | resolucion | ley`. De ahí sale la cita ("Ordenanza 841/2010") y el ámbito (municipal/provincial/nacional) sale de la carpeta que lo contiene. Solo normas vigentes; si una fue modificada, va también la modificatoria o el texto ordenado completo.
 - **Sin texto oficial disponible:** la misma convención de nombre, pero `.md` en vez de `.pdf`, y `tipo` puede ser también `fallo` (un fallo judicial; `numero` es un identificador, no necesariamente un número de expediente — p. ej. `fallo-sastre-2020.md`). El `.md` es el texto de referencia completo (puede incluir fuentes, salvedades de alcance, mapeos inferidos); se carga tal cual, sin OCR, y **no se chunkea en artículos** (no tiene encabezados "Artículo N" reales): sirve para que `reglas.csv` cite la norma, pero no aparece en `consultar_articulo` ni en `responder_consulta_normativa` (RAG por similitud). Usar `.md` es una salida de emergencia para normas sin fuente oficial, no un reemplazo del PDF cuando este existe.
 
 ## `localidad.geojson`
@@ -67,7 +67,7 @@ Resto de las columnas:
 - `tipo_aplicacion`: `terrestre | aerea | todas`.
 - `banda_toxicologica`: `todas` o una o más bandas separadas por `;` (`Ia;Ib;II`).
 - `condiciones`: el requisito legal de una fila `S` (ordenanza, terreno que impida equipos terrestres…). Vacío en las `N`.
-- `norma`: nombre de un PDF (o, sin fuente oficial, un `.md`) de la carpeta de esa jurisdicción, sin extensión (`ordenanza-914-2018`, `fallo-sastre-2020`). Una norma citada desde otra jurisdicción no se encuentra.
+- `norma`: nombre de un PDF (o, sin fuente oficial, un `.md`) de la carpeta de esa jurisdicción, sin extensión (`ordenanza-841-2010`, `fallo-sastre-2020`). Una norma citada desde otra jurisdicción no se encuentra.
 - `articulo`: número. Vacío si la regla no cita uno.
 - `observaciones`: aviso que el modelo no cubre (aviso previo, horarios, viento). El dictamen lo muestra como advertencia, no como bloqueo.
 

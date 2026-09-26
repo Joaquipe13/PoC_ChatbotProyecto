@@ -89,7 +89,7 @@ class Receta(BaseModel):
 class Cita(BaseModel):
     fuente: Literal["normativa", "senasa"]
     jurisdiccion_id: str | None = None
-    norma: str | None = None  # "Ordenanza 914/2018"
+    norma: str | None = None  # "Ordenanza 841/2010"
     articulo: str | None = None  # "8"
     registro_senasa: str | None = None
     documento: str | None = None  # "marbete", "detalle API", nombre del PDF

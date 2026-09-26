@@ -27,20 +27,20 @@ Una entrada por cada valor de `RespuestaAgente.tipo` (`src/fitosanitarios/domini
 
 **Campos que usa:** artifact `Dictamen` (`resultado`, `observaciones[].descripcion`+`citas`, productos con su estado, `citas` generales).
 
+Salida real con Gemini (26/09/2026, "Flyer 10 Ec en soja, 170 cm3/ha, terrestre, en El Trébol, contra chinche de la alfalfa"). Desde el 19/09 la distancia no se compara contra la ubicación del lote: se informa en *Condiciones de aplicación* (ver `DECISIONES.md`).
+
 ```
-*Dictamen* — Lote 4 · San Carlos Centro
-*Resultado:* ❌ OBSERVADA
+*Dictamen* — El Trébol
+*Resultado:* ✅ APTA
 
-*Observaciones*
-1. Distancia a escuela insuficiente: el lote está a 80 m y el mínimo es 100 m.
-2. Dosis de Glifosato Full 48 SL: 5 L/ha, por encima del rango registrado para soja (2–3 L/ha).
-
-*Productos*
-- Glifosato Full 48 SL · Reg. SENASA 12345 · Banda IV (verde) · autorizado para soja ✅
+*Condiciones de aplicación* — El Trébol · terrestre · banda II (amarilla)
+- *Distancia mínima a zona urbana:* 500 m (Ley 11273/1995, art. 34)
 
 *Fuentes*
-- Ordenanza 914/2018, art. 8 (San Carlos Centro)
-- SENASA, Reg. 12345 (marbete)
+- SENASA, Reg. 41881 (detalle API)
+
+¿Agendamos la aplicación?
+[BOTONES: Agendar | No, gracias]
 ```
 
 ## `consulta_producto`
@@ -66,11 +66,13 @@ Es lo que figura en el registro; qué aplicar lo define la receta del ingeniero 
 
 **Campos que usa:** artifact `ResultadoTool.datos` (veredicto corto generado por el LLM **solo** con los fragmentos recuperados) + `citas` verificadas en código.
 
+Salida real con Gemini (26/09/2026, "¿hay que avisar antes de aplicar en El Trébol?"):
+
 ```
-*No.* En San Carlos Centro la distancia mínima para aplicación terrestre a establecimientos educativos es de 100 m.
+*Si.* Toda persona que decida aplicar productos fitosanitarios debe comunicar dicha situación y adjuntar la receta agronómica a la autoridad competente antes de realizar la aplicación.
 
 *Fuentes*
-- Ordenanza 914/2018, art. 8 (San Carlos Centro)
+- Ordenanza 841/2010, art. 5 (el-trebol)
 ```
 
 ## `consulta_articulo`

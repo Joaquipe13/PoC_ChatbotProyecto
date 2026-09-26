@@ -1,4 +1,6 @@
-"""Test de integración de los 3 loaders de insumos contra Postgres real (Docker).
+"""Test de integración de los loaders de insumos contra Postgres real (Docker), con los
+insumos reales congelados en `tests/fixtures/insumos/` (El Trébol, Sastre, San Jorge,
+Ley 11.273 y su decreto).
 
 Se salta automáticamente si no hay una base de test disponible (ver
 `tests/db_test_infra.py`). Para correrlo:
@@ -6,173 +8,129 @@ Se salta automáticamente si no hay una base de test disponible (ver
     docker compose up -d db
     uv run pytest tests/insumos/test_loaders_integracion.py -q
 
-Usa el modelo de embeddings REAL (fixture compartida `modelo_embeddings` de
-tests/conftest.py), no uno fake: este archivo hace un DELETE completo de
-`territorio.*` y recarga desde las fixtures en la base de test (no la de
-desarrollo). Usar un modelo fake acá corrompería esos datos con embeddings
-dummy cada vez que corre la suite completa (ver DIFICULTADES.md).
+La base de test ya tiene esos insumos cargados (`_base_de_test` en tests/conftest.py,
+con el modelo de embeddings real), así que la mayoría de los tests solo inspecciona la
+carga. Antes cada test borraba `territorio.*` y recargaba: con las fixtures inventadas
+tardaba segundos; con las reales, un minuto por test. La regla de la normativa nacional
+(nunca se leen distancias de su PDF) la cubre `test_loader_reglas_sin_base.py`, sin base.
 """
 
 from pathlib import Path
 
-import pytest
-
-from fitosanitarios.config import get_settings
 from fitosanitarios.insumos.loader_geo import cargar_localidades
+from fitosanitarios.insumos.loader_meteorologia import cargar_centros, cargar_reglas_viento
 from fitosanitarios.insumos.loader_normativa import cargar_normativa
-from fitosanitarios.insumos.loader_reglas import cargar_reglas
-from tests.db_test_infra import cargar_fixtures_insumos, conectar_o_saltar
+from fitosanitarios.insumos.loader_reglas import cargar_reglas, indexar_reglas
 
 FIXTURES = Path(__file__).resolve().parent.parent / "fixtures" / "insumos"
+FILAS_REGLAS_CSV = 18  # tests/fixtures/insumos/reglas.csv
 
 
-@pytest.fixture
-def conexion(modelo_embeddings):
-    conn = conectar_o_saltar(get_settings().database_url)
-    with conn.cursor() as cur:
-        cur.execute("DELETE FROM territorio.regla_distancia")
-        cur.execute("DELETE FROM territorio.articulo")
-        cur.execute("DELETE FROM territorio.norma")
-        cur.execute("DELETE FROM territorio.zona_protegida")
-        cur.execute("DELETE FROM territorio.localidad")
-        cur.execute("DELETE FROM territorio.provincia")
-    conn.commit()
-    yield conn
-    # Deja la base en el estado canónico (FIXTURES cargadas), sea cual sea
-    # lo que haya cargado el test: otros archivos comparten esta misma base
-    # y no cargan sus propios datos (ver tests/conftest.py, `_base_de_test`,
-    # y DIFICULTADES.md, "el orden de los tests importa").
-    cargar_fixtures_insumos(conn, modelo_embeddings)
-    conn.close()
-
-
-def _cargar_todo(conn, modelo_embeddings):
-    cargar_localidades(conn, FIXTURES)
-    cargar_normativa(conn, FIXTURES, modelo_embeddings)
-    return cargar_reglas(conn, FIXTURES)
-
-
-def test_carga_completa_puebla_al_menos_2_localidades(conexion, modelo_embeddings):
-    _cargar_todo(conexion, modelo_embeddings)
+def _una(conexion, sql, params=()):
     with conexion.cursor() as cur:
-        cur.execute("SELECT jurisdiccion_id FROM territorio.localidad ORDER BY jurisdiccion_id")
-        jurisdicciones = [r[0] for r in cur.fetchall()]
-    assert set(jurisdicciones) == {"san-carlos-centro", "colonia-vecina"}
+        cur.execute(sql, params)
+        return cur.fetchall()
 
 
-def test_carga_completa_puebla_articulos_y_reglas_con_join(conexion, modelo_embeddings):
-    _cargar_todo(conexion, modelo_embeddings)
-    with conexion.cursor() as cur:
-        cur.execute(
-            """
-            SELECT l.jurisdiccion_id, rd.tipo_zona, rd.distancia_min_m, n.archivo, a.numero
-            FROM territorio.regla_distancia rd
-            JOIN territorio.norma n ON n.id = rd.norma_id
-            LEFT JOIN territorio.articulo a ON a.id = rd.articulo_id
-            LEFT JOIN territorio.localidad l ON l.id = n.localidad_id
-            WHERE l.jurisdiccion_id = 'san-carlos-centro' AND rd.tipo_zona = 'escuela'
-              AND rd.tipo_aplicacion = 'terrestre'
-            """
-        )
-        fila = cur.fetchone()
-    assert fila is not None
-    _, tipo_zona, distancia, archivo, articulo = fila
-    assert distancia == 100
-    assert archivo == "ordenanza-914-2018"
-    assert articulo == "8"
+def test_la_carga_puebla_las_tres_localidades(conexion):
+    filas = _una(conexion, "SELECT jurisdiccion_id FROM territorio.localidad")
+    jurisdicciones = {r[0] for r in filas}
+    assert jurisdicciones == {"el-trebol", "sastre", "san-jorge"}
 
 
-def test_filtro_por_jurisdiccion_excluye_articulos_de_otra_localidad(conexion, modelo_embeddings):
-    _cargar_todo(conexion, modelo_embeddings)
-    with conexion.cursor() as cur:
-        cur.execute(
-            "SELECT id FROM territorio.localidad WHERE jurisdiccion_id = 'san-carlos-centro'"
-        )
-        (localidad_id,) = cur.fetchone()
-        cur.execute(
-            """
-            SELECT a.numero FROM territorio.articulo a
-            JOIN territorio.norma n ON n.id = a.norma_id
-            WHERE n.localidad_id = %s
-            """,
-            (localidad_id,),
-        )
-        numeros = {r[0] for r in cur.fetchall()}
-    # Los artículos de san-carlos-centro son 8, 9, 10 (ordenanza-914-2018);
-    # el artículo 5 de colonia-vecina (ordenanza-45-2019) no debe aparecer acá.
-    assert numeros == {"8", "9", "10"}
+def test_solo_el_trebol_tiene_limite(conexion):
+    filas = dict(_una(
+        conexion, "SELECT jurisdiccion_id, limite IS NOT NULL FROM territorio.localidad"
+    ))
+    assert filas == {"el-trebol": True, "sastre": False, "san-jorge": False}
+
+
+def test_las_reglas_se_unen_con_su_norma_y_su_articulo(conexion):
+    filas = _una(conexion, """
+        SELECT rd.distancia_min_m, n.archivo, a.numero
+        FROM territorio.regla_distancia rd
+        JOIN territorio.norma n ON n.id = rd.norma_id
+        LEFT JOIN territorio.articulo a ON a.id = rd.articulo_id
+        JOIN territorio.localidad l ON l.id = n.localidad_id
+        WHERE l.jurisdiccion_id = 'el-trebol' AND rd.tipo_aplicacion = 'aerea'
+          AND rd.bandas = ARRAY['II']
+    """)
+    assert filas == [(3000, "ordenanza-841-2010", "7")]
+
+
+def test_los_articulos_de_una_localidad_son_solo_de_sus_normas(conexion):
+    normas = {r[0] for r in _una(conexion, """
+        SELECT DISTINCT n.archivo FROM territorio.articulo a
+        JOIN territorio.norma n ON n.id = a.norma_id
+        JOIN territorio.localidad l ON l.id = n.localidad_id
+        WHERE l.jurisdiccion_id = 'el-trebol'
+    """)}
+    assert normas == {"ordenanza-841-2010"}
+
+
+def test_una_norma_sin_pdf_no_tiene_articulos_pero_si_reglas(conexion):
+    """Las de Sastre son `.md` (fuente secundaria): no se inventan artículos."""
+    ((articulos,),) = _una(conexion, """
+        SELECT count(*) FROM territorio.articulo a JOIN territorio.norma n ON n.id = a.norma_id
+        WHERE n.archivo = 'ordenanza-1174-2019'
+    """)
+    ((reglas,),) = _una(conexion, """
+        SELECT count(*) FROM territorio.regla_distancia rd
+        JOIN territorio.norma n ON n.id = rd.norma_id WHERE n.archivo = 'ordenanza-1174-2019'
+    """)
+    assert articulos == 0
+    assert reglas > 0
+
+
+def test_las_reglas_provinciales_no_tienen_localidad(conexion):
+    filas = _una(conexion, """
+        SELECT rd.tipo_zona, rd.tipo_aplicacion, rd.distancia_min_m, n.localidad_id
+        FROM territorio.regla_distancia rd JOIN territorio.norma n ON n.id = rd.norma_id
+        WHERE n.ambito = 'provincial' AND NOT rd.permitido
+    """)
+    assert filas and all(localidad_id is None for *_, localidad_id in filas)
+    assert ("zona_urbana", "terrestre", 500) in {f[:3] for f in filas}  # Ley 11.273, art. 34
+
+
+def test_la_regla_condicional_se_carga_aparte_con_sus_condiciones(conexion):
+    filas = _una(conexion, """
+        SELECT rd.bandas, rd.distancia_min_m, rd.condiciones, a.numero
+        FROM territorio.regla_distancia rd
+        JOIN territorio.norma n ON n.id = rd.norma_id
+        LEFT JOIN territorio.articulo a ON a.id = rd.articulo_id
+        WHERE n.archivo = 'ley-055297-2017' AND rd.permitido AND rd.bandas = ARRAY['II']
+    """)
+    assert len(filas) == 1
+    bandas, distancia, condiciones, articulo = filas[0]
+    assert (bandas, distancia, articulo) == (["II"], 500, "51")
+    assert condiciones.startswith("Excepcion para clase B entre 500 y 3000 m")
 
 
 def test_carga_es_idempotente(conexion, modelo_embeddings):
-    _cargar_todo(conexion, modelo_embeddings)
-    with conexion.cursor() as cur:
-        cur.execute("SELECT count(*) FROM territorio.localidad")
-        localidades_1 = cur.fetchone()[0]
-        cur.execute("SELECT count(*) FROM territorio.regla_distancia")
-        reglas_1 = cur.fetchone()[0]
+    def contar():
+        ((localidades,),) = _una(conexion, "SELECT count(*) FROM territorio.localidad")
+        ((reglas,),) = _una(conexion, "SELECT count(*) FROM territorio.regla_distancia")
+        return localidades, reglas
 
-    _cargar_todo(conexion, modelo_embeddings)
-    with conexion.cursor() as cur:
-        cur.execute("SELECT count(*) FROM territorio.localidad")
-        localidades_2 = cur.fetchone()[0]
-        cur.execute("SELECT count(*) FROM territorio.regla_distancia")
-        reglas_2 = cur.fetchone()[0]
-
-    assert localidades_1 == localidades_2 == 2
-    assert reglas_1 == reglas_2 == 6  # 5 prohibiciones (N) + 1 condicional (S)
-
-
-def test_regla_provincial_sin_localidad_asociada(conexion, modelo_embeddings):
-    _cargar_todo(conexion, modelo_embeddings)
-    with conexion.cursor() as cur:
-        cur.execute(
-            """
-            SELECT rd.tipo_zona, rd.distancia_min_m FROM territorio.regla_distancia rd
-            JOIN territorio.norma n ON n.id = rd.norma_id
-            WHERE n.ambito = 'provincial' AND NOT rd.permitido
-            """
-        )
-        fila = cur.fetchone()
-    assert fila == ("zona_urbana", 300)
-
-
-def test_la_regla_condicional_se_carga_aparte_con_sus_condiciones(conexion, modelo_embeddings):
-    _cargar_todo(conexion, modelo_embeddings)
-    with conexion.cursor() as cur:
-        cur.execute(
-            """
-            SELECT rd.bandas, rd.distancia_min_m, rd.condiciones, a.numero
-            FROM territorio.regla_distancia rd
-            JOIN territorio.norma n ON n.id = rd.norma_id
-            LEFT JOIN territorio.articulo a ON a.id = rd.articulo_id
-            WHERE n.ambito = 'provincial' AND rd.permitido
-            """
-        )
-        fila = cur.fetchone()
-    assert fila == (["II"], 100, "con autorizacion del municipio", "2")
-
-
-def test_norma_nacional_sin_filas_en_reglas_csv_no_rompe_la_carga_ni_da_reglas(
-    conexion, modelo_embeddings
-):
-    # ley-27302-2016 (nacional) no tiene filas en reglas.csv: la normativa nacional es
-    # para consultas, así que ni siquiera se le leen distancias del PDF.
-    _cargar_todo(conexion, modelo_embeddings)
-    with conexion.cursor() as cur:
-        cur.execute("SELECT count(*) FROM territorio.norma WHERE ambito = 'nacional'")
-        assert cur.fetchone()[0] == 1
-        cur.execute(
-            "SELECT count(*) FROM territorio.regla_distancia rd "
-            "JOIN territorio.norma n ON n.id = rd.norma_id WHERE n.ambito = 'nacional'"
-        )
-        assert cur.fetchone()[0] == 0
+    antes = contar()
+    try:
+        cargar_localidades(conexion, FIXTURES)
+        cargar_normativa(conexion, FIXTURES, modelo_embeddings)
+        cargar_reglas(conexion, FIXTURES)
+        assert antes == contar() == (3, FILAS_REGLAS_CSV)
+    finally:
+        # Se deja la base como la deja `_base_de_test` para los demás archivos: recargar
+        # las reglas les borra el texto y el embedding (el RAG de normativa los usa), y
+        # recargar la normativa reemplaza las normas, de las que cuelgan las de viento.
+        indexar_reglas(conexion, modelo_embeddings)
+        cargar_centros(conexion, FIXTURES)
+        cargar_reglas_viento(conexion, FIXTURES)
 
 
 # --- Localidad sin `localidad.geojson` y norma sin PDF (22/09/2026, ver
-# DECISIONES.md, "Localidades y normas sin fuente oficial: Sastre y San
-# Jorge") -- data sintética propia en tmp_path, no toca FIXTURES: los conteos
-# de las otras pruebas de este archivo (2 localidades, 6 reglas) dependen de
-# esa carpeta compartida.
+# DECISIONES.md, "Localidades y normas sin fuente oficial: Sastre y San Jorge"): una
+# carpeta mínima en tmp_path, para probar el caso sin tocar los insumos compartidos. Se
+# borra al final.
 
 
 def test_localidad_sin_geojson_se_carga_con_norma_sin_pdf(conexion, modelo_embeddings, tmp_path):
@@ -189,34 +147,34 @@ def test_localidad_sin_geojson_se_carga_con_norma_sin_pdf(conexion, modelo_embed
         encoding="utf-8",
     )
 
-    cargar_localidades(conexion, tmp_path)
-    cargar_normativa(conexion, tmp_path, modelo_embeddings)
-    total = cargar_reglas(conexion, tmp_path)
+    try:
+        cargar_localidades(conexion, tmp_path)
+        cargar_normativa(conexion, tmp_path, modelo_embeddings)
+        assert cargar_reglas(conexion, tmp_path) == 1
 
-    assert total == 1
-    with conexion.cursor() as cur:
-        cur.execute(
+        assert _una(conexion,
             "SELECT limite, bbox_min_lon FROM territorio.localidad WHERE jurisdiccion_id = %s",
             ("testville",),
-        )
-        limite, bbox_min_lon = cur.fetchone()
-        assert limite is None and bbox_min_lon is None
-
-        cur.execute(
+        ) == [(None, None)]
+        assert _una(conexion,
             "SELECT tipo FROM territorio.norma WHERE archivo = 'fallo-testville-2020'"
-        )
-        assert cur.fetchone() == ("fallo",)
-
-        cur.execute(
+        ) == [("fallo",)]
+        assert _una(conexion,
             "SELECT count(*) FROM territorio.articulo a "
             "JOIN territorio.norma n ON n.id = a.norma_id "
             "WHERE n.archivo = 'fallo-testville-2020'"
-        )
-        assert cur.fetchone()[0] == 0  # sin encabezados reales: no se inventan artículos
-
-        cur.execute(
+        ) == [(0,)]  # sin encabezados reales: no se inventan artículos
+        assert _una(conexion,
             "SELECT rd.distancia_min_m FROM territorio.regla_distancia rd "
             "JOIN territorio.norma n ON n.id = rd.norma_id "
             "WHERE n.archivo = 'fallo-testville-2020'"
-        )
-        assert cur.fetchone() == (500,)
+        ) == [(500,)]
+    finally:
+        with conexion.cursor() as cur:
+            cur.execute(
+                "DELETE FROM territorio.norma WHERE localidad_id IN "
+                "(SELECT id FROM territorio.localidad WHERE jurisdiccion_id = 'testville')"
+            )
+            cur.execute("DELETE FROM territorio.localidad WHERE jurisdiccion_id = 'testville'")
+            cur.execute("DELETE FROM territorio.provincia WHERE nombre = 'testprov'")
+        conexion.commit()

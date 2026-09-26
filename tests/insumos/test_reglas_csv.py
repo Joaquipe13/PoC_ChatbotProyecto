@@ -23,13 +23,17 @@ def test_las_fixtures_se_leen_sin_errores_y_con_su_alcance():
     filas, errores = leer_reglas_csv(FIXTURES / "reglas.csv")
     assert errores == []
     assert {f.alcance for f in filas} == {
-        ("municipal", "santa-fe", "san-carlos-centro"),
-        ("municipal", "santa-fe", "colonia-vecina"),
+        ("municipal", "santa-fe", "el-trebol"),
+        ("municipal", "santa-fe", "sastre"),
+        ("municipal", "santa-fe", "san-jorge"),
         ("provincial", "santa-fe"),
     }
-    (condicional,) = [f for f in filas if f.permitido]
-    assert condicional.condiciones == "con autorizacion del municipio"
-    assert condicional.bandas == ["II"] and condicional.distancia_min_m == 100
+    # La excepción del decreto para banda II por avión (Ley 055297/2017, art. 51).
+    (condicional,) = [
+        f for f in filas if f.permitido and f.norma == "ley-055297-2017" and f.bandas == ["II"]
+    ]
+    assert condicional.condiciones.startswith("Excepcion para clase B entre 500 y 3000 m")
+    assert condicional.distancia_min_m == 500
 
 
 def test_provincial_lleva_la_provincia_en_jurisdiccion_y_provincia_vacia():

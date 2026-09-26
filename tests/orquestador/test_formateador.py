@@ -113,30 +113,31 @@ def test_dictamen_observada_con_citas():
     resultado = ResultadoTool(
         estado="observado",
         datos={
-            "jurisdiccion_id": "san-carlos-centro",
+            "jurisdiccion_id": "el-trebol",
             "dictamen": {
                 "resultado": "OBSERVADA",
                 "observaciones": [
-                    {"descripcion": "Distancia a escuela insuficiente: 80 m, mínimo 100 m."},
+                    {"descripcion": "Aplicación aérea con banda II a menos de 3000 m de la "
+                                    "zona urbana."},
                 ],
                 "chequeos_no_realizados": [],
                 "citas": [
-                    {"fuente": "normativa", "norma": "ordenanza-914-2018", "articulo": "8",
-                     "jurisdiccion_id": "san-carlos-centro"},
+                    {"fuente": "normativa", "norma": "ordenanza-841-2010", "articulo": "7",
+                     "jurisdiccion_id": "el-trebol"},
                 ],
             },
         },
-        citas=[Cita(fuente="normativa", norma="ordenanza-914-2018", articulo="8",
-                    jurisdiccion_id="san-carlos-centro")],
+        citas=[Cita(fuente="normativa", norma="ordenanza-841-2010", articulo="7",
+                    jurisdiccion_id="el-trebol")],
     )
     texto = _un_mensaje(respuesta, [resultado])
     assert texto == (
-        "*Dictamen* — san-carlos-centro\n"
+        "*Dictamen* — el-trebol\n"
         "*Resultado:* ❌ OBSERVADA\n\n"
         "*Observaciones*\n"
-        "1. Distancia a escuela insuficiente: 80 m, mínimo 100 m.\n\n"
+        "1. Aplicación aérea con banda II a menos de 3000 m de la zona urbana.\n\n"
         "*Fuentes*\n"
-        "- Ordenanza 914/2018, art. 8 (san-carlos-centro)"
+        "- Ordenanza 841/2010, art. 7 (el-trebol)"
     )
 
 
@@ -145,7 +146,7 @@ def test_dictamen_apta_sin_observaciones():
     resultado = ResultadoTool(
         estado="ok",
         datos={
-            "jurisdiccion_id": "san-carlos-centro",
+            "jurisdiccion_id": "el-trebol",
             "dictamen": {"resultado": "APTA", "observaciones": [],
                          "chequeos_no_realizados": [], "citas": []},
         },
@@ -521,15 +522,15 @@ def test_consulta_normativa():
     respuesta = RespuestaAgente(tipo="consulta_normativa")
     resultado = ResultadoTool(
         estado="ok",
-        datos={"veredicto": "No", "regla": "La distancia mínima es de 100 metros."},
-        citas=[Cita(fuente="normativa", norma="ordenanza-914-2018", articulo="8",
-                    jurisdiccion_id="san-carlos-centro")],
+        datos={"veredicto": "Si", "regla": "Hay que comunicarlo y adjuntar la receta agronómica."},
+        citas=[Cita(fuente="normativa", norma="ordenanza-841-2010", articulo="5",
+                    jurisdiccion_id="el-trebol")],
     )
     texto = _un_mensaje(respuesta, [resultado])
     assert texto == (
-        "*No.* La distancia mínima es de 100 metros.\n\n"
+        "*Si.* Hay que comunicarlo y adjuntar la receta agronómica.\n\n"
         "*Fuentes*\n"
-        "- Ordenanza 914/2018, art. 8 (san-carlos-centro)"
+        "- Ordenanza 841/2010, art. 5 (el-trebol)"
     )
 
 
@@ -689,8 +690,8 @@ def test_dictamen_sin_normativa_municipal_lo_aclara_junto_a_la_distancia_provinc
         "localidad": "Rosario", "tipo_aplicacion": "terrestre", "banda": "IV",
         "banda_color": "verde", "sin_normativa_municipal": True,
         "distancias_minimas": [{
-            "tipo_zona": "zona_urbana", "distancia_min_m": 300.0,
-            "norma_limitante": {"fuente": "normativa", "norma": "ley-13740-2017", "articulo": "2"},
+            "tipo_zona": "zona_urbana", "distancia_min_m": 500.0,
+            "norma_limitante": {"fuente": "normativa", "norma": "ley-11273-1995", "articulo": "34"},
         }],
         "advertencias": [
             "No se cuenta con la normativa municipal de Rosario: la distancia se basa en la "
@@ -702,15 +703,15 @@ def test_dictamen_sin_normativa_municipal_lo_aclara_junto_a_la_distancia_provinc
         datos={"dictamen": {"resultado": "APTA", "condiciones": condiciones}},
     )
     texto = _un_mensaje(RespuestaAgente(tipo="dictamen"), [resultado])
-    assert "- *Distancia mínima a zona urbana:* 300 m (Ley 13740/2017, art. 2)" in texto
+    assert "- *Distancia mínima a zona urbana:* 500 m (Ley 11273/1995, art. 34)" in texto
     assert "⚠️ No se cuenta con la normativa municipal de Rosario" in texto
 
 
 def test_consulta_normativa_sin_normativa_municipal_lo_aclara():
     resultado = ResultadoTool(
         estado="ok",
-        datos={"veredicto": "No", "regla": "La distancia mínima es de 300 metros."},
-        citas=[Cita(fuente="normativa", norma="ley-13740-2017", articulo="2")],
+        datos={"veredicto": "No", "regla": "La distancia mínima es de 500 metros."},
+        citas=[Cita(fuente="normativa", norma="ley-11273-1995", articulo="34")],
         advertencias=[
             "No se cuenta con la normativa municipal de Rosario: la respuesta se basa en la "
             "normativa provincial"
@@ -718,11 +719,11 @@ def test_consulta_normativa_sin_normativa_municipal_lo_aclara():
     )
     texto = _un_mensaje(RespuestaAgente(tipo="consulta_normativa"), [resultado])
     assert texto == (
-        "*No.* La distancia mínima es de 300 metros.\n\n"
+        "*No.* La distancia mínima es de 500 metros.\n\n"
         "⚠️ No se cuenta con la normativa municipal de Rosario: la respuesta se basa en la "
         "normativa provincial\n\n"
         "*Fuentes*\n"
-        "- Ley 13740/2017, art. 2"
+        "- Ley 11273/1995, art. 34"
     )
 
 

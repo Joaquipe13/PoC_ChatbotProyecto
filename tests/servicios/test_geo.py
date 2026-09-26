@@ -1,6 +1,8 @@
-"""Tests de servicios/geo.py usando la geometría real de la fixture de San
-Carlos Centro (tests/fixtures/insumos/santa-fe/san-carlos-centro/), la
-misma localidad y escuela de los ejemplos de referencia de la skill."""
+"""Tests de servicios/geo.py con geometría de prueba armada a mano: un cuadrado como
+límite, una escuela como punto, una zona urbana como polígono y un arroyo como línea.
+Las localidades reales cargadas no tienen escuelas ni cursos de agua con geometría, y
+estos tests prueban el cálculo, no los datos. Desde el 19/09/2026 el dictamen no usa
+este módulo (ver DECISIONES.md)."""
 
 from fitosanitarios.servicios.geo import (
     LocalidadCandidata,
@@ -9,8 +11,8 @@ from fitosanitarios.servicios.geo import (
     resolver_jurisdiccion,
 )
 
-# Límite real de la fixture san-carlos-centro (ver tests/fixtures/insumos/.../localidad.geojson)
-LIMITE_SAN_CARLOS = {
+# Límite de prueba: un cuadrado de unos 2 km de lado.
+LIMITE_DE_PRUEBA = {
     "type": "Polygon",
     "coordinates": [[
         [-60.660, -32.930], [-60.640, -32.930],
@@ -19,7 +21,7 @@ LIMITE_SAN_CARLOS = {
     ]],
 }
 
-# Escuela N 12 real de la fixture: [-60.6505, -32.9295]
+# Escuela de prueba, dentro del límite.
 ESCUELA_LON, ESCUELA_LAT = -60.6505, -32.9295
 
 # Puntos calculados con pyproj.Geod (WGS84) exactamente al norte de la escuela,
@@ -29,16 +31,16 @@ PUNTO_A_100M = (-32.9285983127258, -60.6505)
 PUNTO_A_150M = (-32.92814746903985, -60.6505)
 
 
-def _localidad_san_carlos() -> LocalidadCandidata:
+def _localidad_de_prueba() -> LocalidadCandidata:
     return LocalidadCandidata(
-        id=1, jurisdiccion_id="san-carlos-centro", nombre="San Carlos Centro",
-        provincia_id=1, limite=LIMITE_SAN_CARLOS,
+        id=1, jurisdiccion_id="localidad-de-prueba", nombre="Localidad de prueba",
+        provincia_id=1, limite=LIMITE_DE_PRUEBA,
     )
 
 
 def _escuela() -> ZonaCandidata:
     return ZonaCandidata(
-        id=1, tipo="escuela", nombre="Escuela N 12", jurisdiccion_id="san-carlos-centro",
+        id=1, tipo="escuela", nombre="Escuela de prueba", jurisdiccion_id="localidad-de-prueba",
         geometria={"type": "Point", "coordinates": [ESCUELA_LON, ESCUELA_LAT]},
     )
 
@@ -48,14 +50,14 @@ def _escuela() -> ZonaCandidata:
 
 def test_punto_dentro_del_limite_resuelve_la_localidad():
     lat, lon = PUNTO_A_80M
-    resultado = resolver_jurisdiccion(lat, lon, [_localidad_san_carlos()])
+    resultado = resolver_jurisdiccion(lat, lon, [_localidad_de_prueba()])
     assert resultado is not None
-    assert resultado.jurisdiccion_id == "san-carlos-centro"
+    assert resultado.jurisdiccion_id == "localidad-de-prueba"
 
 
 def test_punto_fuera_de_todas_las_localidades_devuelve_none():
-    # Muy lejos de San Carlos Centro (varios grados de distancia)
-    resultado = resolver_jurisdiccion(-30.0, -55.0, [_localidad_san_carlos()])
+    # Muy lejos del límite de prueba (varios grados de distancia)
+    resultado = resolver_jurisdiccion(-30.0, -55.0, [_localidad_de_prueba()])
     assert resultado is None
 
 
@@ -67,7 +69,7 @@ def test_punto_sin_localidades_candidatas_devuelve_none():
 def test_punto_sobre_el_borde_del_limite_resuelve_la_localidad():
     # Exactamente sobre el vértice del polígono (caso borde: ni claramente
     # dentro ni claramente afuera).
-    resultado = resolver_jurisdiccion(-32.930, -60.660, [_localidad_san_carlos()])
+    resultado = resolver_jurisdiccion(-32.930, -60.660, [_localidad_de_prueba()])
     assert resultado is not None
 
 
@@ -101,9 +103,9 @@ def test_sin_zonas_candidatas_devuelve_lista_vacia():
 
 
 def test_zona_como_poligono_distancia_correcta():
-    # Zona urbana real de la fixture (polígono, no punto)
+    # Zona urbana de prueba (polígono, no punto)
     zona_urbana = ZonaCandidata(
-        id=2, tipo="zona_urbana", nombre="Casco urbano", jurisdiccion_id="san-carlos-centro",
+        id=2, tipo="zona_urbana", nombre="Casco urbano", jurisdiccion_id="localidad-de-prueba",
         geometria={
             "type": "Polygon",
             "coordinates": [[
@@ -119,9 +121,9 @@ def test_zona_como_poligono_distancia_correcta():
 
 
 def test_zona_como_linestring():
-    # Arroyo real de la fixture (LineString, no punto ni polígono)
+    # Arroyo de prueba (LineString, no punto ni polígono)
     curso_agua = ZonaCandidata(
-        id=3, tipo="curso_agua", nombre="Arroyo del Medio", jurisdiccion_id="san-carlos-centro",
+        id=3, tipo="curso_agua", nombre="Arroyo de prueba", jurisdiccion_id="localidad-de-prueba",
         geometria={
             "type": "LineString",
             "coordinates": [[-60.660, -32.920], [-60.640, -32.918]],
@@ -135,9 +137,9 @@ def test_zona_como_linestring():
 def test_varias_zonas_devuelve_una_distancia_por_cada_una():
     lat, lon = PUNTO_A_80M
     otra_escuela = ZonaCandidata(
-        id=4, tipo="escuela", nombre="Otra escuela", jurisdiccion_id="colonia-vecina",
+        id=4, tipo="escuela", nombre="Otra escuela", jurisdiccion_id="vecina-de-prueba",
         geometria={"type": "Point", "coordinates": [-60.620, -32.920]},
     )
     resultados = calcular_distancias(lat, lon, [_escuela(), otra_escuela])
     assert len(resultados) == 2
-    assert {r.jurisdiccion_id for r in resultados} == {"san-carlos-centro", "colonia-vecina"}
+    assert {r.jurisdiccion_id for r in resultados} == {"localidad-de-prueba", "vecina-de-prueba"}
