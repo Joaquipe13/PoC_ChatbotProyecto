@@ -19,6 +19,7 @@ import re
 
 from fitosanitarios.dominio.modelos import RespuestaAgente, ResultadoTool
 from fitosanitarios.dominio.motivos import DESCRIPCION_MOTIVO, MotivoNoResuelto
+from fitosanitarios.servicios.demo_reformulacion import CLAVE_DEMO
 from fitosanitarios.servicios.formato import primer_dato
 from fitosanitarios.tools.agendar_aplicacion.mensajes import plantilla_agendar_aplicacion
 from fitosanitarios.tools.consultar_agenda.mensajes import plantilla_agenda
@@ -270,7 +271,13 @@ def formatear_respuesta(respuesta: RespuestaAgente, resultados: list[ResultadoTo
     """Punto de entrada del formateador: `RespuestaAgente.tipo` + los
     `ResultadoTool` de las tools ejecutadas en el turno -> lista de mensajes
     de WhatsApp (más de uno solo si supera el límite de caracteres)."""
-    varias = _texto_de_varias_consultas(respuesta, resultados)
+    # Modo prueba de la reformulación: la tool ya armó la comparación con estas plantillas.
+    demo = next(
+        (r.datos[CLAVE_DEMO] for r in resultados if r.datos and CLAVE_DEMO in r.datos), None
+    )
+    if demo is not None:
+        return partir_por_seccion(demo)
+    varias =_texto_de_varias_consultas(respuesta, resultados)
     if varias is not None:
         return partir_por_seccion(varias)
     tipo = _tipo_efectivo(respuesta.tipo, resultados)

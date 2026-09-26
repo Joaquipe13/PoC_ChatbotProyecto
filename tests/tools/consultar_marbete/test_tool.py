@@ -120,3 +120,41 @@ def test_si_la_reformulacion_falla_se_busca_con_la_pregunta_tal_cual():
     assert consulta_de_busqueda(
         "¿qué carencia tiene?", LLMCaido(), PROMPT_REFORMULACION
     ) == "¿qué carencia tiene?"
+
+
+def test_modo_demo_muestra_la_respuesta_con_y_sin_reformular(retriever):
+    """Con la pregunta tal cual el LLM no encuentra con qué responder; con la reformulada, sí."""
+    llm = ClienteLLMFake(respuestas=[
+        json.dumps({"respuesta": "El marbete no lo dice.", "paginas_citadas": []}),
+        REFORMULADA,
+        json.dumps({"respuesta": "La carencia en cítricos es de 7 días.",
+                    "paginas_citadas": [7]}),
+    ])
+    resultado = consultar_marbete_logica(
+        ConsultarMarbeteArgs(producto="vertimec", pregunta="¿qué carencia tiene en cítricos?"),
+        None, ModeloFalso(), llm, 0.42, modo_demo_reformulacion=True,
+    )
+    assert resultado.estado == "ok"
+    texto = "\n\n".join(
+        formatear_respuesta(RespuestaAgente(tipo="consulta_marbete"), [resultado])
+    )
+    original, reformulada = texto.split("*Pregunta reformulada (lo que se busca):*")
+    assert "*Pregunta original:* ¿qué carencia tiene en cítricos?" in original
+    assert "No pude completar la consulta" in original
+    assert "7 días" not in original
+    assert REFORMULADA in reformulada
+    assert "La carencia en cítricos es de 7 días." in reformulada
+    assert "marbete, pág. 7" in reformulada
+
+
+def test_modo_demo_con_una_pregunta_fuera_de_tema(retriever):
+    llm = ClienteLLMFake(respuestas=[
+        json.dumps({"respuesta": "x", "paginas_citadas": []}), "FUERA",
+    ])
+    resultado = consultar_marbete_logica(
+        ConsultarMarbeteArgs(producto="vertimec", pregunta="¿qué hora es?"),
+        None, ModeloFalso(), llm, 0.42, modo_demo_reformulacion=True,
+    )
+    assert resultado.estado == "no_resuelto"
+    texto = "\n\n".join(formatear_respuesta(RespuestaAgente(tipo="no_resuelto"), [resultado]))
+    assert "FUERA" in texto

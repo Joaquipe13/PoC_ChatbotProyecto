@@ -10,6 +10,7 @@ from fitosanitarios.datos.retrievers.territorio import (
 )
 from fitosanitarios.dominio.modelos import CampoFaltante, ResultadoTool
 from fitosanitarios.dominio.motivos import MotivoNoResuelto
+from fitosanitarios.servicios.demo_reformulacion import comparar_con_y_sin_reformular
 from fitosanitarios.servicios.reformulacion import consulta_de_busqueda
 from fitosanitarios.servicios.ubicacion import resolver_ubicacion_o_cortar
 from fitosanitarios.tools.responder_consulta_normativa import mensajes
@@ -38,6 +39,7 @@ def responder_consulta_normativa_logica(
     modelo_embeddings,
     cliente_llm,
     umbral_similitud: float,
+    modo_demo_reformulacion: bool = False,
 ) -> ResultadoTool:
     if args.jurisdiccion_id is None:
         jurisdicciones = listar_jurisdicciones_cargadas(conn)
@@ -64,8 +66,27 @@ def responder_consulta_normativa_logica(
         else [mensajes.aclaracion_sin_normativa_municipal(ubicacion.nombre)]
     )
 
+    def responder(consulta: str | None) -> ResultadoTool:
+        return _responder_con_la_normativa(
+            args.pregunta, consulta, ubicacion, aclaracion, conn, modelo_embeddings,
+            cliente_llm, umbral_similitud,
+        )
+
+    if modo_demo_reformulacion:
+        return comparar_con_y_sin_reformular(
+            args.pregunta, cliente_llm, PROMPT_REFORMULACION, responder,
+            "responder_consulta_normativa",
+        )
     # Reformulación: la pregunta más los términos que usaría la norma.
-    consulta = consulta_de_busqueda(args.pregunta, cliente_llm, PROMPT_REFORMULACION)
+    return responder(consulta_de_busqueda(args.pregunta, cliente_llm, PROMPT_REFORMULACION))
+
+
+def _responder_con_la_normativa(
+    pregunta: str, consulta: str | None, ubicacion, aclaracion: list[str], conn,
+    modelo_embeddings, cliente_llm, umbral_similitud: float,
+) -> ResultadoTool:
+    """Busca en la normativa con `consulta` y responde `pregunta`. `consulta` es `None` si
+    la pregunta quedó fuera de tema al reformularla."""
     if consulta is None:
         return ResultadoTool(
             estado="no_resuelto", motivo=MotivoNoResuelto.NORMATIVA_SIN_RESPALDO,
@@ -93,7 +114,7 @@ def responder_consulta_normativa_logica(
             advertencias=aclaracion,
         )
 
-    respuesta = responder_con_fragmentos(args.pregunta, relevantes, cliente_llm)
+    respuesta = responder_con_fragmentos(pregunta, relevantes, cliente_llm)
     if not respuesta.citas:
         # El LLM no pudo anclar ninguna cita verificable a los fragmentos
         # recuperados: no se muestra un veredicto sin fuente citable.
@@ -139,7 +160,8 @@ def responder_consulta_normativa(
     cliente_llm = crear_cliente_llm(settings)
     resultado = con_conexion_y_modelo(
         lambda conn, modelo: responder_consulta_normativa_logica(
-            args, conn, modelo, cliente_llm, settings.rag_umbral_similitud
+            args, conn, modelo, cliente_llm, settings.rag_umbral_similitud,
+            settings.modo_demo_reformulacion,
         )
     )
     return mensajes.resumen_para_llm(resultado.estado), resultado

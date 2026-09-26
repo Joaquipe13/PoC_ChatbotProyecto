@@ -149,3 +149,40 @@ def test_una_pregunta_fuera_de_tema_no_se_busca(conexion, modelo_embeddings):
     )
     assert resultado.estado == "no_resuelto"
     assert len(fake.llamadas) == 1  # solo la reformulación: no se generó ninguna respuesta
+
+
+def test_modo_demo_muestra_la_respuesta_con_y_sin_reformular(conexion, modelo_embeddings):
+    """Con la pregunta tal cual el LLM cita una norma que no se recuperó (se descarta y no
+    hay respuesta); con la reformulada cita el artículo recuperado."""
+    from fitosanitarios.dominio.modelos import RespuestaAgente
+    from fitosanitarios.orquestador.formateador import formatear_respuesta
+
+    fake = ClienteLLMFake(respuestas=[
+        json.dumps({
+            "veredicto": "Si", "regla": "Se puede sin restricciones.",
+            "articulos_citados": [{"norma": "norma-inventada-2099", "articulo": "1"}],
+        }),
+        REFORMULADA,
+        json.dumps({
+            "veredicto": "No",
+            "regla": "La distancia minima a una escuela para aplicacion terrestre es de 100 metros.",
+            "articulos_citados": [{"norma": "ordenanza-914-2018", "articulo": "8"}],
+        }),
+    ])
+    args = ResponderConsultaNormativaArgs(
+        pregunta="¿a qué distancia de una escuela puedo aplicar por tierra?",
+        jurisdiccion_id="san-carlos-centro",
+    )
+    resultado = responder_consulta_normativa_logica(
+        args, conexion, modelo_embeddings, fake, UMBRAL_SIMILITUD, modo_demo_reformulacion=True
+    )
+
+    assert resultado.estado == "ok"
+    assert len(fake.llamadas) == 3
+    texto = "\n\n".join(
+        formatear_respuesta(RespuestaAgente(tipo="consulta_normativa"), [resultado])
+    )
+    original, reformulada = texto.split("*Pregunta reformulada (lo que se busca):*")
+    assert "No pude completar la consulta" in original
+    assert REFORMULADA in reformulada
+    assert "100 metros" in reformulada

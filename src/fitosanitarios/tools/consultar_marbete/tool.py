@@ -20,6 +20,7 @@ from fitosanitarios.datos.retrievers.catalogo import (
 from fitosanitarios.dominio.modelos import CampoFaltante, Cita, ResultadoTool
 from fitosanitarios.dominio.motivos import MotivoNoResuelto
 from fitosanitarios.servicios.busqueda_hibrida import seleccionar
+from fitosanitarios.servicios.demo_reformulacion import comparar_con_y_sin_reformular
 from fitosanitarios.servicios.matching import Candidato, hay_empate_ambiguo, rankear_candidatos
 from fitosanitarios.servicios.reformulacion import consulta_de_busqueda
 from fitosanitarios.tools.consultar_marbete import mensajes
@@ -52,7 +53,8 @@ def _parsear_json(respuesta: str) -> dict | None:
 
 
 def consultar_marbete_logica(
-    args: ConsultarMarbeteArgs, conn, modelo_embeddings, cliente_llm, umbral_similitud: float
+    args: ConsultarMarbeteArgs, conn, modelo_embeddings, cliente_llm, umbral_similitud: float,
+    modo_demo_reformulacion: bool = False,
 ) -> ResultadoTool:
     candidatos = buscar_productos_por_nombre(conn, args.producto, modelo_embeddings)
     if not candidatos:
@@ -71,11 +73,29 @@ def consultar_marbete_logica(
         )
     producto = candidatos[0]
 
+    def responder(consulta: str | None) -> ResultadoTool:
+        return _responder_con_el_marbete(
+            args.pregunta, consulta, producto, conn, modelo_embeddings, cliente_llm,
+            umbral_similitud,
+        )
+
+    if modo_demo_reformulacion:
+        return comparar_con_y_sin_reformular(
+            args.pregunta, cliente_llm, PROMPT_REFORMULACION, responder, "consultar_marbete"
+        )
+    # Reformulación: la pregunta más los términos que usaría el marbete.
+    return responder(consulta_de_busqueda(args.pregunta, cliente_llm, PROMPT_REFORMULACION))
+
+
+def _responder_con_el_marbete(
+    pregunta: str, consulta: str | None, producto, conn, modelo_embeddings, cliente_llm,
+    umbral_similitud: float,
+) -> ResultadoTool:
+    """Busca en el marbete con `consulta` y responde `pregunta`. `consulta` es `None` si la
+    pregunta quedó fuera de tema al reformularla."""
     sin_respaldo = ResultadoTool(
         estado="no_resuelto", motivo=MotivoNoResuelto.MARBETE_SIN_RESPALDO
     )
-    # Reformulación: la pregunta más los términos que usaría el marbete.
-    consulta = consulta_de_busqueda(args.pregunta, cliente_llm, PROMPT_REFORMULACION)
     if consulta is None:
         return sin_respaldo
 
@@ -98,7 +118,7 @@ def consultar_marbete_logica(
     )
     respuesta_llm = cliente_llm.generar(
         PLANTILLA_PROMPT_USUARIO.format(
-            producto=producto.marca, pregunta=args.pregunta, contexto=contexto
+            producto=producto.marca, pregunta=pregunta, contexto=contexto
         ),
         system=PROMPT_SISTEMA_MARBETE,
     )
@@ -159,7 +179,8 @@ def consultar_marbete(producto: str, pregunta: str) -> tuple[str, ResultadoTool]
     cliente_llm = crear_cliente_llm(settings)
     resultado = con_conexion_y_modelo(
         lambda conn, modelo: consultar_marbete_logica(
-            args, conn, modelo, cliente_llm, settings.rag_umbral_similitud
+            args, conn, modelo, cliente_llm, settings.rag_umbral_similitud,
+            settings.modo_demo_reformulacion,
         )
     )
     return mensajes.resumen_para_llm(resultado), resultado

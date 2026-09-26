@@ -51,6 +51,10 @@ class Settings(BaseSettings):
     rag_umbral_similitud: float = 0.35
     radio_busqueda_zonas_m: float = 2000.0
 
+    # Presentación: las tools con RAG muestran la respuesta con y sin reformular la
+    # pregunta (ver `servicios/demo_reformulacion.py`).
+    modo_demo_reformulacion: bool = False
+
     # Tests y desarrollo
     use_fixtures: bool = True
 
