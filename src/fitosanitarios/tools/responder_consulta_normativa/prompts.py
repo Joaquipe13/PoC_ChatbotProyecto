@@ -7,7 +7,8 @@ DESCRIPCION = """\
 Responde una pregunta de contenido sobre la normativa de aplicación en una localidad
 cargada, citando norma y artículo: leyes, ordenanzas y fallos judiciales ("¿hay que
 avisar antes de aplicar?", "¿se puede aplicar de noche?", "¿qué dice el fallo de
-Sastre?"). No para la lista de distancias o límites (`listar_limitaciones`), ni para el
+Sastre?"). No para la lista de distancias o límites, ni para compararlos entre tipos
+de aplicación o bandas (`listar_limitaciones`), ni para el
 texto de un artículo por su número (`consultar_articulo`), ni para el dictamen de una
 receta (`evaluar_viabilidad_legal`).
 
