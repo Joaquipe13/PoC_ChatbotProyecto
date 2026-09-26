@@ -20,6 +20,7 @@ from typing import Protocol
 from pydantic import BaseModel, Field, ValidationError
 
 from fitosanitarios.dominio.modelos import CampoFaltante, Receta, RecetaItem
+from fitosanitarios.llm.client import ImagenRechazada
 from fitosanitarios.servicios.receta import faltantes_de_receta, normalizar_tipo_aplicacion
 from fitosanitarios.tools.leer_receta.prompts import PROMPT_SISTEMA_EXTRACCION
 
@@ -131,7 +132,12 @@ def extraer_receta_de_imagen(
             if datos is not None:
                 return _validar_o_no_legible(datos)
 
-    respuesta = cliente_llm.generar_con_imagen(imagen, "", system=PROMPT_SISTEMA_EXTRACCION)
+    try:
+        respuesta = cliente_llm.generar_con_imagen(imagen, "", system=PROMPT_SISTEMA_EXTRACCION)
+    except ImagenRechazada:
+        # Un archivo que Gemini no puede abrir es, para el operario, una foto que no se lee.
+        logger.warning("El LLM rechazó la imagen, se trata como no legible", exc_info=True)
+        return RecetaExtraidaLLM(legible=False)
     if cache is not None:
         cache[clave] = respuesta
 

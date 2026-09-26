@@ -19,6 +19,11 @@ class ServicioLLMNoDisponible(Exception):
     """Se agotaron todas las keys/reintentos configurados para el proveedor de LLM."""
 
 
+class ImagenRechazada(Exception):
+    """El proveedor no pudo procesar la imagen (archivo dañado o que no es una imagen).
+    Gemini responde `400 INVALID_ARGUMENT: Unable to process input image`."""
+
+
 class ClienteLLM(Protocol):
     def generar(self, prompt: str, *, system: str | None = None) -> str: ...
 
@@ -36,6 +41,10 @@ class ClienteLLMMultimodal(Protocol):
 def _es_error_cuota(exc: BaseException) -> bool:
     texto = str(exc).upper()
     return "429" in texto or "RESOURCE_EXHAUSTED" in texto or "RATE LIMIT" in texto
+
+
+def _es_imagen_rechazada(exc: BaseException) -> bool:
+    return "UNABLE TO PROCESS INPUT IMAGE" in str(exc).upper()
 
 
 def _texto_de_respuesta(respuesta) -> str:
@@ -102,6 +111,9 @@ class ClienteGemini:
             try:
                 return self._generar_con_key(api_key, prompt, system, imagen, mime_type)
             except Exception as exc:
+                if imagen is not None and _es_imagen_rechazada(exc):
+                    # La imagen es la misma con cualquier key: no tiene sentido rotar.
+                    raise ImagenRechazada(str(exc)) from exc
                 if not _es_error_cuota(exc):
                     raise
                 ultimo_error = exc

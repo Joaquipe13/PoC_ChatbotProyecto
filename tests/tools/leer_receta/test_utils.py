@@ -250,3 +250,13 @@ def test_conversion_normaliza_el_tipo_de_aplicacion():
     extraccion.tipo_aplicacion = "Aérea"
     receta, _ = convertir_a_receta_y_faltantes(extraccion)
     assert receta.tipo_aplicacion == "aerea"
+
+
+def test_imagen_que_el_llm_no_puede_abrir_es_no_legible():
+    from fitosanitarios.llm.client import ImagenRechazada
+
+    class ClienteQueRechaza:
+        def generar_con_imagen(self, imagen, prompt, *, system=None, **_kwargs):
+            raise ImagenRechazada("400 INVALID_ARGUMENT: Unable to process input image")
+
+    assert extraer_receta_de_imagen(b"fake", ClienteQueRechaza()).legible is False

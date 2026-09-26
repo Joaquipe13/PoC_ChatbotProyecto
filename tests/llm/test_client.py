@@ -100,6 +100,29 @@ def test_cliente_gemini_generar_con_imagen_pasa_los_bytes(monkeypatch):
     assert recibido["mime_type"] == "image/jpeg"
 
 
+def test_cliente_gemini_imagen_rechazada_no_rota_las_keys(monkeypatch):
+    """Error real de Gemini con un archivo que no es una imagen: es de la imagen, no de la
+    key, así que se corta en la primera."""
+    from fitosanitarios.llm.client import ImagenRechazada
+
+    cliente = ClienteGemini(api_keys=["k1", "k2"], model="gemini-flash-latest")
+    llamadas: list[str] = []
+
+    def falsa_generacion(self, api_key, prompt, system, imagen, mime_type="image/jpeg"):
+        llamadas.append(api_key)
+        raise RuntimeError(
+            "400 INVALID_ARGUMENT. {'error': {'code': 400, 'message': 'Unable to process "
+            "input image. Please retry or report in https://developers.generativeai.google/"
+            "guide/troubleshooting', 'status': 'INVALID_ARGUMENT'}}"
+        )
+
+    monkeypatch.setattr(ClienteGemini, "_generar_con_key", falsa_generacion)
+
+    with pytest.raises(ImagenRechazada):
+        cliente.generar_con_imagen(b"fake", "")
+    assert llamadas == ["k1"]
+
+
 # --- _texto_de_respuesta (regresión, ver DIFICULTADES.md) ---
 
 
