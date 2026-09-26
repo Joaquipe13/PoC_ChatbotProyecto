@@ -4,7 +4,8 @@ POC de un agente conversacional por WhatsApp que lee recetas agronómicas de fit
 
 - Plan de trabajo: [`plandefases.md`](plandefases.md) — leerlo antes de tocar código, identificar la fase en curso y trabajar solo en esa fase.
 - Arquitectura, contratos y reglas de negocio: skill `agente-fitosanitarios` (`.claude/skills/agente-fitosanitarios/SKILL.md`).
-- Decisiones tomadas y por qué: [`DECISIONES.md`](DECISIONES.md).
+- Decisiones tomadas y por qué: [`DECISIONES.md`](DECISIONES.md). Resumen para arrancar: [`DECISIONES_PRINCIPALES.md`](DECISIONES_PRINCIPALES.md).
+- Guion del video de presentación: [`docs/guion_presentacion.md`](docs/guion_presentacion.md).
 - Problemas encontrados y cómo se resolvieron: [`DIFICULTADES.md`](DIFICULTADES.md).
 
 ## Levantar el entorno
