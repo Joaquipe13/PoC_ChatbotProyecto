@@ -7,8 +7,9 @@ DESCRIPCION = """\
 Responde qué dice el marbete (la etiqueta aprobada por SENASA) de un producto: tiempo de
 carencia, precauciones, compatibilidad o mezclas, reingreso al lote, primeros auxilios,
 modo de aplicación ("¿qué carencia tiene Flyer en soja?", "¿se puede mezclar con
-glifosato?"). No para si está registrado o autorizado para un cultivo
-(`validar_producto_registro`), ni para listar productos (`consultar_productos`).
+glifosato?"). No para si está registrado o autorizado para un cultivo, ni para su
+banda toxicológica (`validar_producto_registro`), ni para listar productos
+(`consultar_productos`).
 
 Args:
     producto: el nombre comercial tal como lo dijo.

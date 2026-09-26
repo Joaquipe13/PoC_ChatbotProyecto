@@ -45,3 +45,21 @@ def test_producto_no_encontrado(conexion, modelo_embeddings):
     from fitosanitarios.dominio.motivos import MotivoNoResuelto
 
     assert resultado.motivo == MotivoNoResuelto.PRODUCTO_NO_ENCONTRADO
+
+
+def test_sin_cultivo_informa_registro_y_banda(conexion, modelo_embeddings):
+    """"¿Qué banda tiene el Flyer?": sin cultivo no se chequea autorización, pero la banda
+    se informa (antes el cultivo era obligatorio y Gemini mandaba la pregunta al marbete)."""
+    args = ValidarProductoRegistroArgs(producto_nombre="Flyer 10 Ec")
+    resultado = validar_producto_registro_logica(args, conexion, modelo_embeddings, TOLERANCIA_PCT)
+    assert resultado.estado == "ok"
+    assert resultado.datos["banda_toxicologica"] == "II"
+    assert resultado.datos["cultivo_autorizado"] is None
+    assert resultado.advertencias == []
+
+
+def test_sin_cultivo_informa_la_banda_aunque_no_tenga_usos(conexion, modelo_embeddings):
+    args = ValidarProductoRegistroArgs(producto_nombre="Glynomyl Dd")
+    resultado = validar_producto_registro_logica(args, conexion, modelo_embeddings, TOLERANCIA_PCT)
+    assert resultado.estado == "ok"
+    assert "banda_toxicologica" in resultado.datos

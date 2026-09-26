@@ -67,7 +67,7 @@ def resolver_y_validar_producto(
     conn,
     modelo_embeddings,
     producto_nombre: str,
-    cultivo: str,
+    cultivo: str | None,
     adversidad: str | None,
     dosis_valor: float | None,
     dosis_unidad: str | None,
@@ -86,6 +86,21 @@ def resolver_y_validar_producto(
     citas = [
         Cita(fuente="senasa", registro_senasa=producto.numero_inscripcion, documento="detalle API")
     ]
+
+    if cultivo is None:
+        # Solo el producto ("¿qué banda tiene el Tordon?"): registro y banda, sin chequear
+        # ningún cultivo. La banda se sabe aunque el producto no tenga usos registrados.
+        return ResolucionProducto(
+            numero_inscripcion=producto.numero_inscripcion,
+            marca=producto.marca,
+            banda_toxicologica=producto.banda_toxicologica,
+            chequeo_producto=ChequeoProducto(
+                producto_nombre=producto.marca, registrado=True, activo=True,
+                cultivo_autorizado=None, banda_toxicologica=producto.banda_toxicologica,
+                citas=citas,
+            ),
+            usos_registrados=producto.usos_registrados,
+        )
 
     if not producto.usos_registrados:
         return ResolucionProducto(

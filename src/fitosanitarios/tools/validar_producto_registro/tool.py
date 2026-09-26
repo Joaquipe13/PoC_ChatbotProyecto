@@ -12,7 +12,7 @@ from fitosanitarios.tools.validar_producto_registro.prompts import DESCRIPCION
 
 class ValidarProductoRegistroArgs(BaseModel):
     producto_nombre: str
-    cultivo: str
+    cultivo: str | None = None  # sin cultivo: solo registro y banda
     adversidad: str | None = None
     dosis_valor: float | None = None
     dosis_unidad: str | None = None
@@ -55,7 +55,7 @@ def validar_producto_registro_logica(
     if cp.cultivo_autorizado is False:
         advertencias.append(mensajes.advertencia_sin_uso_registrado(resolucion.marca, args.cultivo))
 
-    estado = "ok" if cp.cultivo_autorizado else "observado"
+    estado = "ok" if cp.cultivo_autorizado or args.cultivo is None else "observado"
     return ResultadoTool(estado=estado, datos=datos, citas=cp.citas, advertencias=advertencias)
 
 
@@ -68,7 +68,7 @@ def validar_producto_registro_logica(
 )
 def validar_producto_registro(
     producto_nombre: str,
-    cultivo: str,
+    cultivo: str | None = None,
     adversidad: str | None = None,
     dosis_valor: float | None = None,
     dosis_unidad: str | None = None,

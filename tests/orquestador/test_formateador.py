@@ -435,6 +435,20 @@ def test_consulta_producto_puntual():
     assert "*Fuentes*" not in texto
 
 
+def test_consulta_producto_sin_cultivo_muestra_la_banda_con_su_color():
+    """"¿Qué banda tiene el Flyer?": sin cultivo no hay autorización que mostrar."""
+    resultado = ResultadoTool(
+        estado="ok",
+        datos={
+            "producto": "Flyer 10 Ec", "numero_inscripcion": "41881",
+            "banda_toxicologica": "II", "cultivo": None, "cultivo_autorizado": None,
+            "usos_del_cultivo": [],
+        },
+    )
+    texto = _un_mensaje(RespuestaAgente(tipo="consulta_producto"), [resultado])
+    assert texto == "*Flyer 10 Ec* · Reg. SENASA 41881 · Banda II (amarilla)"
+
+
 def test_consulta_producto_puntual_sin_dosis_registrada():
     respuesta = RespuestaAgente(tipo="consulta_producto")
     resultado = ResultadoTool(
