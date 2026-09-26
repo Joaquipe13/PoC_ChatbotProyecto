@@ -5,6 +5,7 @@ from fpdf import FPDF
 from fitosanitarios.senasa.loader_marbetes import (
     cargar_marbetes,
     fragmentos_de_paginas,
+    leer_paginas,
     marbetes_por_registro,
 )
 
@@ -14,6 +15,26 @@ def test_los_fragmentos_guardan_su_pagina():
     fragmentos = fragmentos_de_paginas(paginas)
     assert {p for p, _, _ in fragmentos} == {2, 3}
     assert [o for p, o, _ in fragmentos if p == 3][:2] == [0, 1]  # la 3 se partió en varios
+
+
+def test_el_texto_leido_no_trae_caracteres_nul(monkeypatch, tmp_path):
+    """Hay marbetes reales con NUL en el texto, y Postgres no los acepta: cortaba la carga."""
+
+    class _Pagina:
+        def extract_text(self):
+            return "Carencia:\x00 7 d\x00ías"
+
+    class _Pdf:
+        pages = [_Pagina()]
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            return False
+
+    monkeypatch.setattr("fitosanitarios.senasa.loader_marbetes.pdfplumber.open", lambda _: _Pdf())
+    assert leer_paginas(tmp_path / "x.pdf") == ["Carencia: 7 días"]
 
 
 def test_los_pdf_se_agrupan_por_numero_de_inscripcion(tmp_path):

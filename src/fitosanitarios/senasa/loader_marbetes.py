@@ -47,9 +47,11 @@ def marbetes_por_registro(carpeta: Path) -> dict[str, list[Path]]:
 
 
 def leer_paginas(ruta: Path) -> list[str]:
-    """El texto de cada página (vacío si la página no tiene capa de texto)."""
+    """El texto de cada página (vacío si la página no tiene capa de texto). Sin caracteres
+    NUL: algunos PDF los traen en el texto y Postgres no los acepta en un campo de texto
+    (cortaba la carga entera)."""
     with pdfplumber.open(ruta) as pdf:
-        return [(pagina.extract_text() or "") for pagina in pdf.pages]
+        return [(pagina.extract_text() or "").replace("\x00", "") for pagina in pdf.pages]
 
 
 def fragmentos_de_paginas(paginas: list[str]) -> list[tuple[int, int, str]]:
