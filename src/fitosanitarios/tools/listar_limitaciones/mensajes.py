@@ -33,6 +33,23 @@ def aviso_banda_no_entendida(texto: str) -> str:
     return f"No entendí la banda '{texto}': muestro todas"
 
 
+_AVISO_EQUIPO = {
+    "drone": (
+        "Las normas cargadas no mencionan los drones: muestro las reglas de aplicación "
+        "aérea, que es como se los suele encuadrar. Confirmalo con la autoridad de "
+        "aplicación antes de aplicar"
+    ),
+    "mochila": (
+        "Las normas cargadas no tienen reglas propias para la mochila (aplicación "
+        "manual): muestro las de aplicación terrestre"
+    ),
+}
+
+
+def aviso_equipo_sin_norma(equipo: str) -> str:
+    return _AVISO_EQUIPO[equipo]
+
+
 def aviso_producto_no_encontrado(nombre: str) -> str:
     return f"No encontré '{nombre}' en el registro de SENASA: muestro todas las bandas"
 

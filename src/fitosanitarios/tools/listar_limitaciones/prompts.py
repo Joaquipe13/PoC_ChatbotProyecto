@@ -18,7 +18,8 @@ respuesta separa aérea y terrestre) y "¿qué diferencia hay entre banda amaril
 Args:
     localidad: la de la consulta o la de la receta en curso.
     provincia: solo si la tool la pidió.
-    tipo_aplicacion: "terrestre" o "aerea", si lo dijo.
+    tipo_aplicacion: el tipo o el equipo tal como lo dijo ("aérea", "terrestre", "avión",
+        "mosquito", "drone", "mochila"), si lo dijo. No lo traduzcas: la tool lo interpreta.
     banda: Ia, Ib, II, III, IV o su color (roja, amarilla, azul, verde), si la dijo;
         una o varias ("amarilla y verde").
     tipo_zona: "zona urbana", "escuela" o "curso de agua", si la dijo.

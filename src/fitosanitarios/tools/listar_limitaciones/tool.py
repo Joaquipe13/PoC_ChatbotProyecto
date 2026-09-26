@@ -24,6 +24,7 @@ from fitosanitarios.servicios.ubicacion import resolver_ubicacion_o_cortar
 from fitosanitarios.tools.listar_limitaciones import mensajes
 from fitosanitarios.tools.listar_limitaciones.prompts import DESCRIPCION
 from fitosanitarios.tools.listar_limitaciones.utils import (
+    equipo_sin_norma,
     filtrar_reglas,
     normalizar_bandas,
     normalizar_tipo_aplicacion,
@@ -107,6 +108,9 @@ def listar_limitaciones_logica(
     tipo_aplicacion = normalizar_tipo_aplicacion(args.tipo_aplicacion)
     if args.tipo_aplicacion and args.tipo_aplicacion.strip() and tipo_aplicacion is None:
         advertencias.append(mensajes.aviso_tipo_aplicacion_no_entendido(args.tipo_aplicacion.strip()))
+    equipo = equipo_sin_norma(args.tipo_aplicacion)
+    if equipo is not None and tipo_aplicacion is not None:
+        advertencias.append(mensajes.aviso_equipo_sin_norma(equipo))
     bandas = normalizar_bandas(args.banda)
     if bandas == []:
         advertencias.append(mensajes.aviso_banda_no_entendida(args.banda.strip()))

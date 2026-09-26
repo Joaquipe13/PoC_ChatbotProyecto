@@ -190,3 +190,23 @@ def test_producto_que_no_esta_en_el_registro_muestra_todas_y_lo_avisa(base, monk
     assert r.estado == "ok"
     assert r.datos["filtros"]["bandas"] is None
     assert any("Inventadol" in a for a in r.advertencias)
+
+
+# --- equipos que las normas no nombran: se avisa la suposición ---
+
+
+def test_drone_muestra_las_reglas_aereas_y_avisa_que_la_norma_no_lo_nombra(base):
+    r = _listar(tipo_aplicacion="con el drone")
+    assert r.datos["filtros"]["tipo_aplicacion"] == "aerea"
+    assert any("drones" in a for a in r.advertencias)
+
+
+def test_mochila_muestra_las_reglas_terrestres_y_lo_avisa(base):
+    r = _listar(tipo_aplicacion="mochila")
+    assert r.datos["filtros"]["tipo_aplicacion"] == "terrestre"
+    assert any("mochila" in a for a in r.advertencias)
+
+
+def test_los_equipos_que_la_norma_contempla_no_llevan_aviso(base):
+    for equipo in ("avión", "la mosquito", "terrestre"):
+        assert _listar(tipo_aplicacion=equipo).advertencias == []

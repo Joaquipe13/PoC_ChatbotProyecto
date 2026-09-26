@@ -18,6 +18,22 @@ from fitosanitarios.servicios.reglas import (
 )
 
 BANDAS = ["Ia", "Ib", "II", "III", "IV"]
+
+# Equipos que las normas cargadas no nombran: la ley y el decreto de Santa Fe hablan de
+# aplicación aérea (aeronaves) y terrestre ("equipos mecánicos de arrastre o
+# autopropulsados"). Se muestran con el tipo que corresponde y se avisa que es una
+# suposición.
+_EQUIPOS_SIN_NORMA = {"dron": "drone", "mochila": "mochila"}
+
+
+def equipo_sin_norma(texto: str | None) -> str | None:
+    """"con el drone", "la mochila" -> "drone", "mochila"; `None` para los equipos que las
+    normas sí contemplan (avión, mosquito, pulverizadora)."""
+    for palabra in _plano(texto or "").split():
+        for prefijo, equipo in _EQUIPOS_SIN_NORMA.items():
+            if palabra.startswith(prefijo):
+                return equipo
+    return None
 _COLOR = {
     "roja": ["Ia", "Ib"], "rojo": ["Ia", "Ib"], "amarilla": ["II"], "amarillo": ["II"],
     "azul": ["III"], "verde": ["IV"],
