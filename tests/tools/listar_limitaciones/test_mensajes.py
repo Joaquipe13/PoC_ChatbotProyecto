@@ -99,3 +99,31 @@ def test_listado_general_no_transcribe_observaciones_ni_condiciones():
     texto = plantilla_limitaciones(None, [resultado])
     assert "nota larga" not in texto and "condiciones largas" not in texto
     assert "se puede desde 500 m con condiciones (Ley 055297/2017, art. 51)" in texto
+
+
+def test_con_producto_dice_con_que_banda_se_filtro():
+    resultado = ResultadoTool(
+        estado="ok",
+        datos={
+            "localidad": "El Trébol", "filtros": {"bandas": ["III"]},
+            "prohibiciones": [_regla(500, "aerea", ["III", "IV"])], "condicionales": [],
+            "producto": {"marca": "Tordon D 30", "numero_inscripcion": "30735",
+                         "banda": "III", "variantes": []},
+        },
+    )
+    texto = plantilla_limitaciones(None, [resultado])
+    assert texto.startswith("*Limitaciones en El Trébol*\n\nPara *Tordon D 30*: banda III (azul)")
+
+
+def test_con_producto_a_una_distancia_tambien_dice_la_banda():
+    resultado = ResultadoTool(
+        estado="ok",
+        datos={
+            "localidad": "El Trébol", "filtros": {"bandas": ["IV"]}, "distancia_m": 300.0,
+            "prohibiciones": [], "condicionales": [], "restricciones": [],
+            "producto": {"marca": "Roundup", "numero_inscripcion": None, "banda": "IV",
+                         "variantes": ["Roundup Fg", "Roundup Wg"]},
+        },
+    )
+    texto = plantilla_limitaciones(None, [resultado])
+    assert "Para *Roundup*: banda IV (verde), la de todas sus variantes registradas" in texto

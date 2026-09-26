@@ -2,6 +2,7 @@
 operario (la plantilla del tipo de respuesta `limitaciones`)."""
 
 from fitosanitarios.dominio.modelos import Cita, RespuestaAgente, ResultadoTool
+from fitosanitarios.servicios.condiciones_aplicacion import COLOR_BANDA
 from fitosanitarios.servicios.formato import (
     NOMBRE_ZONA,
     cita_norma,
@@ -30,6 +31,22 @@ def aviso_tipo_aplicacion_no_entendido(texto: str) -> str:
 
 def aviso_banda_no_entendida(texto: str) -> str:
     return f"No entendí la banda '{texto}': muestro todas"
+
+
+def aviso_producto_no_encontrado(nombre: str) -> str:
+    return f"No encontré '{nombre}' en el registro de SENASA: muestro todas las bandas"
+
+
+def aviso_producto_sin_banda(marca: str) -> str:
+    return f"{marca} no tiene banda registrada en SENASA: muestro todas las bandas"
+
+
+def pregunta_producto_ambiguo(nombre: str) -> str:
+    return f"Hay varios productos parecidos a '{nombre}', de distinta banda. ¿Cuál es?"
+
+
+def motivo_producto_ambiguo(nombre: str) -> str:
+    return f"'{nombre}' coincide con varios productos de distinta banda"
 
 
 def resumen_para_llm(resultado: ResultadoTool) -> str:
@@ -148,6 +165,19 @@ def _linea_aplicacion(restricciones: list[dict], aplicacion: str, bandas: list[s
     return f"- *{_APLICACION_CORTA[aplicacion]}:* {' · '.join(partes)}"
 
 
+def _linea_producto(producto: dict | None) -> str:
+    """Con qué banda se filtró, cuando salió del producto: "Para *Roundup Max*: banda IV
+    (verde)"."""
+    if not producto:
+        return ""
+    banda = producto["banda"]
+    color = COLOR_BANDA.get(banda)
+    banda_txt = f"banda {banda} ({color})" if color else f"banda {banda}"
+    if producto.get("variantes"):
+        return f"Para *{producto['marca']}*: {banda_txt}, la de todas sus variantes registradas"
+    return f"Para *{producto['marca']}*: {banda_txt}"
+
+
 def _plantilla_a_una_distancia(datos: dict, aclaracion: str, fuentes: str) -> str:
     """Qué tipo de aplicación y qué bandas se pueden a esa distancia, sin transcribir
     la norma: las normas quedan en *Fuentes* (pedido del usuario, 23/09/2026)."""
@@ -162,11 +192,12 @@ def _plantilla_a_una_distancia(datos: dict, aclaracion: str, fuentes: str) -> st
         zonas.insert(0, filtros["tipo_zona"])
 
     distancia = num(datos["distancia_m"])
+    producto = _linea_producto(datos.get("producto"))
     if not restricciones:
         titulo = f"*A {distancia} m en {datos['localidad']}*"
-        return unir_secciones(titulo, aclaracion, _SIN_PROHIBICION, fuentes)
+        return unir_secciones(titulo, producto, aclaracion, _SIN_PROHIBICION, fuentes)
 
-    secciones = []
+    secciones = [producto]
     for zona in zonas:
         de_la_zona = [x for x in restricciones if x["prohibicion"]["tipo_zona"] == zona]
         nombre = _ZONA_CON_ARTICULO.get(zona) or NOMBRE_ZONA.get(zona, zona.replace("_", " "))
@@ -184,7 +215,10 @@ def plantilla_limitaciones(respuesta: RespuestaAgente, resultados: list[Resultad
     if datos.get("distancia_m") is not None:
         return _plantilla_a_una_distancia(datos, aclaracion, fuentes)
 
-    secciones = [f"*Limitaciones en {datos.get('localidad', '')}*", aclaracion]
+    secciones = [
+        f"*Limitaciones en {datos.get('localidad', '')}*",
+        _linea_producto(datos.get("producto")), aclaracion,
+    ]
     prohibiciones = datos.get("prohibiciones", [])
     for aplicacion in _ORDEN_APLICACION:
         reglas = [r for r in prohibiciones if r["tipo_aplicacion"] == aplicacion]

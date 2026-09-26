@@ -123,3 +123,70 @@ def test_sin_localidad_corta_con_la_pregunta_de_la_localidad(base, monkeypatch):
     pedir = ResultadoTool(estado="faltan_datos")
     monkeypatch.setattr(modulo, "resolver_ubicacion_o_cortar", lambda c, t, p=None: (None, pedir))
     assert listar_limitaciones_logica(ListarLimitacionesArgs(), None) is pedir
+
+
+# --- con un producto: la banda sale del registro ---
+
+
+def _producto(id_, marca, banda, registro="30000"):
+    from fitosanitarios.datos.retrievers.catalogo import CandidatoProducto
+
+    return CandidatoProducto(
+        id=id_, numero_inscripcion=registro, marca=marca, banda_toxicologica=banda,
+        estado_producto="Activo", score=0.9,
+    )
+
+
+def _con_catalogo(monkeypatch, productos):
+    monkeypatch.setattr(modulo, "buscar_productos_por_nombre", lambda c, n, m: productos)
+
+
+def test_con_un_producto_filtra_por_su_banda_y_lo_cita(base, monkeypatch):
+    """"Tengo Tordon D 30, ¿a cuánto del pueblo lo puedo tirar?": antes se ignoraba el
+    producto y se listaban todas las bandas."""
+    _con_catalogo(monkeypatch, [_producto(1, "Tordon D 30", "III", "30735")])
+    r = _listar(producto="Tordon D 30")
+    assert r.estado == "ok"
+    assert r.datos["filtros"]["bandas"] == ["III"]
+    assert r.datos["producto"]["marca"] == "Tordon D 30"
+    bandas = [b for p in r.datos["prohibiciones"] for b in p["bandas"]]
+    assert "Ia" not in bandas and "II" not in bandas
+    assert r.citas[0].registro_senasa == "30735"
+
+
+def test_la_banda_que_dijo_el_operario_manda_sobre_el_producto(base, monkeypatch):
+    def no_se_busca(*_):
+        raise AssertionError("con la banda dicha no hace falta buscar el producto")
+
+    monkeypatch.setattr(modulo, "buscar_productos_por_nombre", no_se_busca)
+    r = _listar(producto="Tordon D 30", banda="verde")
+    assert r.datos["filtros"]["bandas"] == ["IV"]
+    assert r.datos["producto"] is None
+
+
+def test_producto_con_variantes_de_distinta_banda_pregunta_cual(base, monkeypatch):
+    _con_catalogo(monkeypatch, [
+        _producto(1, "Roundup Fg", "III"), _producto(2, "Roundup Wg", "IV"),
+    ])
+    r = _listar(producto="Roundup")
+    assert r.estado == "faltan_datos"
+    assert r.faltantes[0].campo == "producto"
+    assert set(r.faltantes[0].opciones) == {"Roundup Fg", "Roundup Wg"}
+
+
+def test_producto_con_variantes_de_la_misma_banda_no_pregunta(base, monkeypatch):
+    _con_catalogo(monkeypatch, [
+        _producto(1, "Roundup Fg", "IV"), _producto(2, "Roundup Wg", "IV"),
+    ])
+    r = _listar(producto="Roundup")
+    assert r.estado == "ok"
+    assert r.datos["filtros"]["bandas"] == ["IV"]
+    assert r.datos["producto"]["variantes"]
+
+
+def test_producto_que_no_esta_en_el_registro_muestra_todas_y_lo_avisa(base, monkeypatch):
+    _con_catalogo(monkeypatch, [])
+    r = _listar(producto="Inventadol")
+    assert r.estado == "ok"
+    assert r.datos["filtros"]["bandas"] is None
+    assert any("Inventadol" in a for a in r.advertencias)

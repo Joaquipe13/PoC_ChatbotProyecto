@@ -6,14 +6,19 @@ y, si se da una distancia, qué opciones hay a esa distancia ("¿puedo aplicar a
 Sale de las reglas cargadas (`reglas.csv`), no de una búsqueda por similitud: la
 lista es completa y cada línea cita norma y artículo. Las prohibiciones (`N`) son
 las que bloquean el dictamen; las condicionales (`S`) solo se muestran acá.
+
+Si el operario nombra un producto y no la banda ("tengo Roundup, ¿a cuánto del pueblo lo
+puedo tirar?"), la banda sale del registro de SENASA y se filtra con ella.
 """
 
 from langchain_core.tools import tool
 from pydantic import BaseModel
 
+from fitosanitarios.datos.retrievers.catalogo import buscar_productos_por_nombre
 from fitosanitarios.datos.retrievers.territorio import reglas_candidatas
-from fitosanitarios.dominio.modelos import Cita, ResultadoTool
+from fitosanitarios.dominio.modelos import CampoFaltante, Cita, ResultadoTool
 from fitosanitarios.dominio.motivos import MotivoNoResuelto
+from fitosanitarios.servicios.matching import Candidato, hay_empate_ambiguo, rankear_candidatos
 from fitosanitarios.servicios.reglas import ReglaCandidata
 from fitosanitarios.servicios.ubicacion import resolver_ubicacion_o_cortar
 from fitosanitarios.tools.listar_limitaciones import mensajes
@@ -34,6 +39,7 @@ class ListarLimitacionesArgs(BaseModel):
     banda: str | None = None
     tipo_zona: str | None = None
     distancia_m: float | None = None
+    producto: str | None = None  # para tomar su banda si no la dijo
 
 
 def regla_a_dict(r: ReglaCandidata) -> dict:
@@ -51,7 +57,45 @@ def _cita(r: ReglaCandidata) -> Cita:
     )
 
 
-def listar_limitaciones_logica(args: ListarLimitacionesArgs, conn) -> ResultadoTool:
+def _producto_con_banda(
+    conn, modelo_embeddings, nombre: str
+) -> tuple[dict | None, ResultadoTool | None]:
+    """El producto del registro y su banda: (producto, None); (None, None) si no está; y
+    (None, repregunta) si el nombre coincide con varios de distinta banda. Si todas las
+    variantes tienen la misma banda ("Roundup": Fg, Wg, Max...) no hace falta preguntar."""
+    candidatos = buscar_productos_por_nombre(conn, nombre, modelo_embeddings)
+    if not candidatos:
+        return None, None
+    ranking = rankear_candidatos(
+        nombre, [Candidato(id=c.id, nombre=c.marca) for c in candidatos], top_k=5
+    )
+    if hay_empate_ambiguo(ranking):
+        empatados = {r.candidato.id for r in ranking}
+        bandas = {c.banda_toxicologica for c in candidatos if c.id in empatados}
+        if len(bandas) == 1 and None not in bandas:
+            variantes = [r.candidato.nombre for r in ranking]
+            return {
+                "marca": nombre, "numero_inscripcion": None, "banda": bandas.pop(),
+                "variantes": variantes,
+            }, None
+        return None, ResultadoTool(
+            estado="faltan_datos",
+            faltantes=[CampoFaltante(
+                campo="producto", motivo=mensajes.motivo_producto_ambiguo(nombre),
+                pregunta_sugerida=mensajes.pregunta_producto_ambiguo(nombre),
+                tipo_entrada="lista", opciones=[r.candidato.nombre for r in ranking],
+            )],
+        )
+    elegido = candidatos[0]
+    return {
+        "marca": elegido.marca, "numero_inscripcion": elegido.numero_inscripcion,
+        "banda": elegido.banda_toxicologica, "variantes": [],
+    }, None
+
+
+def listar_limitaciones_logica(
+    args: ListarLimitacionesArgs, conn, modelo_embeddings=None
+) -> ResultadoTool:
     ubicacion, corte = resolver_ubicacion_o_cortar(conn, args.localidad, args.provincia)
     if corte is not None:
         return corte
@@ -68,6 +112,26 @@ def listar_limitaciones_logica(args: ListarLimitacionesArgs, conn) -> ResultadoT
         advertencias.append(mensajes.aviso_banda_no_entendida(args.banda.strip()))
         bandas = None
     tipo_zona = normalizar_tipo_zona(args.tipo_zona)
+
+    # La banda que dijo el operario manda; si no la dijo, la del producto que nombró.
+    producto = None
+    citas_producto: list[Cita] = []
+    if args.producto and args.producto.strip() and bandas is None:
+        producto, corte = _producto_con_banda(conn, modelo_embeddings, args.producto.strip())
+        if corte is not None:
+            return corte
+        if producto is None:
+            advertencias.append(mensajes.aviso_producto_no_encontrado(args.producto.strip()))
+        elif producto["banda"] is None:
+            advertencias.append(mensajes.aviso_producto_sin_banda(producto["marca"]))
+            producto = None
+        else:
+            bandas = [producto["banda"]]
+            if producto["numero_inscripcion"]:
+                citas_producto = [Cita(
+                    fuente="senasa", registro_senasa=producto["numero_inscripcion"],
+                    documento="detalle API",
+                )]
 
     def filtrar(reglas):
         return filtrar_reglas(reglas, tipo_zona, tipo_aplicacion, bandas)
@@ -88,6 +152,7 @@ def listar_limitaciones_logica(args: ListarLimitacionesArgs, conn) -> ResultadoT
         "distancia_m": args.distancia_m,
         "prohibiciones": [regla_a_dict(r) for r in prohibiciones],
         "condicionales": [regla_a_dict(r) for r in condicionales],
+        "producto": producto,
     }
     reglas_citadas = prohibiciones + condicionales
     if args.distancia_m is not None:
@@ -106,7 +171,7 @@ def listar_limitaciones_logica(args: ListarLimitacionesArgs, conn) -> ResultadoT
         ]
 
     return ResultadoTool(
-        estado="ok", datos=datos, citas=[_cita(r) for r in reglas_citadas],
+        estado="ok", datos=datos, citas=citas_producto + [_cita(r) for r in reglas_citadas],
         advertencias=advertencias,
     )
 
@@ -125,12 +190,18 @@ def listar_limitaciones(
     banda: str | None = None,
     tipo_zona: str | None = None,
     distancia_m: float | None = None,
+    producto: str | None = None,
 ) -> tuple[str, ResultadoTool]:
-    from fitosanitarios.servicios.recursos import con_conexion
+    from fitosanitarios.servicios.recursos import con_conexion, con_conexion_y_modelo
 
     args = ListarLimitacionesArgs(
         localidad=localidad, provincia=provincia, tipo_aplicacion=tipo_aplicacion,
-        banda=banda, tipo_zona=tipo_zona, distancia_m=distancia_m,
+        banda=banda, tipo_zona=tipo_zona, distancia_m=distancia_m, producto=producto,
     )
-    resultado = con_conexion(lambda conn: listar_limitaciones_logica(args, conn))
+    if producto:  # el matching del producto usa embeddings
+        resultado = con_conexion_y_modelo(
+            lambda conn, modelo: listar_limitaciones_logica(args, conn, modelo)
+        )
+    else:
+        resultado = con_conexion(lambda conn: listar_limitaciones_logica(args, conn))
     return mensajes.resumen_para_llm(resultado), resultado
