@@ -140,7 +140,7 @@ def test_modo_demo_muestra_la_respuesta_con_y_sin_reformular(retriever):
     )
     original, reformulada = texto.split("*Pregunta reformulada (lo que se busca):*")
     assert "*Pregunta original:* ¿qué carencia tiene en cítricos?" in original
-    assert "No pude completar la consulta" in original
+    assert "No cuento con esa información" in original
     assert "7 días" not in original
     assert REFORMULADA in reformulada
     assert "La carencia en cítricos es de 7 días." in reformulada

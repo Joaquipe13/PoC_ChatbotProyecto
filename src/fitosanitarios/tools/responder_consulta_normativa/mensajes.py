@@ -19,6 +19,12 @@ REGLA_RESPUESTA_ININTERPRETABLE = "No se pudo interpretar la respuesta del asist
 ADVERTENCIA_LLM_SIN_JSON = "respuesta del LLM no era JSON válido"
 
 
+def es_aclaracion_sin_normativa_municipal(texto: str) -> bool:
+    """La aclaración de que se respondió con la normativa provincial: se le muestra al
+    operario. Las otras advertencias de la tool (citas descartadas) son internas."""
+    return texto.startswith(_PREFIJO_SIN_NORMATIVA_MUNICIPAL)
+
+
 def aclaracion_sin_normativa_municipal(localidad: str) -> str:
     return (
         f"{_PREFIJO_SIN_NORMATIVA_MUNICIPAL} la normativa municipal de {localidad}: la "
@@ -49,6 +55,6 @@ def plantilla_consulta_normativa(
     cuerpo = f"*{veredicto}.* {regla}"
     aclaracion = "\n".join(
         f"⚠️ {a}" for r in resultados for a in r.advertencias
-        if a.startswith(_PREFIJO_SIN_NORMATIVA_MUNICIPAL)
+        if es_aclaracion_sin_normativa_municipal(a)
     )
     return unir_secciones(cuerpo, aclaracion, seccion_fuentes(todas_las_citas(resultados)))

@@ -33,6 +33,7 @@ from fitosanitarios.tools.listar_limitaciones.mensajes import plantilla_limitaci
 from fitosanitarios.tools.registrar_evento.mensajes import plantilla_evento_registrado
 from fitosanitarios.tools.resolver_vehiculo.mensajes import plantilla_consulta_vehiculo
 from fitosanitarios.tools.responder_consulta_normativa.mensajes import (
+    es_aclaracion_sin_normativa_municipal,
     plantilla_consulta_normativa,
 )
 from fitosanitarios.tools.validar_producto_registro.mensajes import plantilla_producto
@@ -107,11 +108,43 @@ def _plantilla_fuera_de_dominio(respuesta: RespuestaAgente, resultados: list[Res
 # --- no_resuelto ---
 
 
+# Los RAG (normativa y marbetes) no encontraron con qué responder: no es un error ni un
+# dato mal dado, el bot no tiene esa información. Se dice así, sin avisos internos (citas
+# descartadas) ni "revisá el dato" (pedido del usuario, 26/09/2026).
+_SIN_INFORMACION = {
+    MotivoNoResuelto.NORMATIVA_SIN_RESPALDO: (
+        "No encontré en la normativa cargada nada que responda tu pregunta, así que no "
+        "te doy una respuesta sin una norma que la respalde."
+    ),
+    MotivoNoResuelto.MARBETE_SIN_RESPALDO: (
+        "No encontré en el marbete del producto nada que responda tu pregunta (o el "
+        "marbete que tengo cargado es un escaneo sin texto)."
+    ),
+}
+_QUE_HACER_SIN_INFORMACION = {
+    MotivoNoResuelto.NORMATIVA_SIN_RESPALDO: (
+        "consultalo al área de ambiente del municipio o a tu ingeniero agrónomo."
+    ),
+    MotivoNoResuelto.MARBETE_SIN_RESPALDO: (
+        "leé la etiqueta del envase o consultalo con tu ingeniero agrónomo."
+    ),
+}
+
+
+def _plantilla_sin_informacion(motivo: MotivoNoResuelto, advertencias: list[str]) -> str:
+    lineas = ["ℹ️ *No cuento con esa información*", _SIN_INFORMACION[motivo]]
+    lineas += [f"⚠️ {a}" for a in advertencias if es_aclaracion_sin_normativa_municipal(a)]
+    lineas.append(f"*Qué podés hacer:* {_QUE_HACER_SIN_INFORMACION[motivo]}")
+    return "\n".join(lineas)
+
+
 def _plantilla_no_resuelto(respuesta: RespuestaAgente, resultados: list[ResultadoTool]) -> str:
     motivo: MotivoNoResuelto | None = next((r.motivo for r in resultados if r.motivo), None)
+    advertencias = [a for r in resultados for a in r.advertencias]
+    if motivo in _SIN_INFORMACION:
+        return _plantilla_sin_informacion(motivo, advertencias)
     porque = DESCRIPCION_MOTIVO.get(motivo, "no se pudo determinar el motivo exacto.")
 
-    advertencias = [a for r in resultados for a in r.advertencias]
     lineas = ["⚠️ *No pude completar la consulta*", f"*Por qué:* {porque}"]
     if advertencias:
         lineas.append(f"*Detalle:* {advertencias[0]}")
@@ -343,7 +376,12 @@ def _tipo_efectivo(tipo: str, resultados: list[ResultadoTool]) -> str:
     datos = primer_dato(resultados)
     if datos:
         return _tipo_segun_los_datos(tipo, datos)
-    if tipo not in ("dictamen", "detalle_bandas", "consulta_articulo", "limitaciones"):
+    # Sin datos no hay qué mostrar con estas plantillas: sin esto, una consulta normativa
+    # sin respaldo salía como "*Depende.* " y nada más.
+    if tipo not in (
+        "dictamen", "detalle_bandas", "consulta_articulo", "limitaciones",
+        "consulta_normativa", "consulta_marbete",
+    ):
         return tipo
     for r in resultados:
         if r.estado == "faltan_datos":

@@ -175,6 +175,6 @@ def test_modo_demo_muestra_la_respuesta_con_y_sin_reformular(conexion, modelo_em
         formatear_respuesta(RespuestaAgente(tipo="consulta_normativa"), [resultado])
     )
     original, reformulada = texto.split("*Pregunta reformulada (lo que se busca):*")
-    assert "No pude completar la consulta" in original
+    assert "No cuento con esa información" in original
     assert REFORMULADA in reformulada
     assert "más de 8 km/h" in reformulada

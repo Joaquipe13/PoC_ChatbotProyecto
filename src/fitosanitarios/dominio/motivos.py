@@ -49,7 +49,8 @@ DESCRIPCION_MOTIVO: dict[MotivoNoResuelto, str] = {
         "contra las del registro."
     ),
     MotivoNoResuelto.NORMATIVA_SIN_RESPALDO: (
-        "Ningún fragmento de normativa recuperado superó RAG_UMBRAL_SIMILITUD."
+        "La normativa cargada no dice nada que responda la pregunta (o lo que se "
+        "encontró no alcanza para citar una norma)."
     ),
     MotivoNoResuelto.IMAGEN_ILEGIBLE: (
         "La extracción de la receta desde la imagen no alcanzó la confianza "

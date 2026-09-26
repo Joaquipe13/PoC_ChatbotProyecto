@@ -1161,3 +1161,54 @@ def test_los_datos_de_un_riesgo_no_se_confunden_con_un_listado_de_productos():
     })
     texto = _un_mensaje(RespuestaAgente(tipo="detalle_bandas"), [riesgo])
     assert texto.startswith("*Banda de cada producto*")
+
+
+# --- el RAG no encontró con qué responder: el bot no cuenta con esa información ---
+
+
+def test_normativa_sin_respaldo_dice_que_no_cuenta_con_la_informacion():
+    """Antes decía "No pude completar la consulta", "Ningún fragmento de normativa recuperado
+    superó RAG_UMBRAL_SIMILITUD" (falso si se recuperaron fragmentos y el LLM no pudo citar
+    ninguno) y "revisá el dato", como si el operario se hubiera equivocado."""
+    resultado = ResultadoTool(
+        estado="no_resuelto", motivo=MotivoNoResuelto.NORMATIVA_SIN_RESPALDO,
+        advertencias=[
+            "El asistente citó ley-1-2000 art. 1, que no está entre los fragmentos "
+            "recuperados; se descartó esa cita."
+        ],
+    )
+    texto = _un_mensaje(RespuestaAgente(tipo="consulta_normativa"), [resultado])
+    assert texto == (
+        "ℹ️ *No cuento con esa información*\n"
+        "No encontré en la normativa cargada nada que responda tu pregunta, así que no "
+        "te doy una respuesta sin una norma que la respalde.\n"
+        "*Qué podés hacer:* consultalo al área de ambiente del municipio o a tu ingeniero "
+        "agrónomo."
+    )
+    assert "RAG_UMBRAL" not in texto and "se descartó" not in texto
+
+
+def test_normativa_sin_respaldo_mantiene_la_aclaracion_de_normativa_provincial():
+    resultado = ResultadoTool(
+        estado="no_resuelto", motivo=MotivoNoResuelto.NORMATIVA_SIN_RESPALDO,
+        advertencias=[
+            "No se cuenta con la normativa municipal de Rosario: la respuesta se basa en la "
+            "normativa provincial"
+        ],
+    )
+    texto = _un_mensaje(RespuestaAgente(tipo="no_resuelto"), [resultado])
+    assert texto.startswith("ℹ️ *No cuento con esa información*")
+    assert "⚠️ No se cuenta con la normativa municipal de Rosario" in texto
+
+
+def test_marbete_sin_respaldo_dice_que_no_cuenta_con_la_informacion():
+    resultado = ResultadoTool(
+        estado="no_resuelto", motivo=MotivoNoResuelto.MARBETE_SIN_RESPALDO,
+        advertencias=["Se descartó una cita a la página 99, que no estaba entre lo recuperado"],
+    )
+    texto = _un_mensaje(RespuestaAgente(tipo="no_resuelto"), [resultado])
+    assert texto.startswith("ℹ️ *No cuento con esa información*\nNo encontré en el marbete")
+    assert "página 99" not in texto
+    assert texto.endswith(
+        "*Qué podés hacer:* leé la etiqueta del envase o consultalo con tu ingeniero agrónomo."
+    )
