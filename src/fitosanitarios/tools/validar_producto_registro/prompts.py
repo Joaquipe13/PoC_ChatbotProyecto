@@ -3,9 +3,11 @@ argumentos."""
 
 DESCRIPCION = """\
 Valida si UN producto está registrado en SENASA y autorizado para un cultivo ("¿el
-glifo full está habilitado para soja?"), o dice su banda toxicológica (color) y su
-registro ("¿qué banda tiene el Tordon D 30?", "¿el Roundup es banda verde?"). Para un
-listado: `consultar_productos`.
+glifo full está habilitado para soja?"), su dosis registrada para ese cultivo ("¿cuál
+es la dosis de Flyer para soja?", o "¿cuál es la dosis correcta?" después de un aviso de
+dosis: con el producto y el cultivo de la conversación), o su banda toxicológica (color)
+y su registro ("¿qué banda tiene el Tordon D 30?"). Para un listado:
+`consultar_productos`.
 
 Args:
     producto_nombre: nombre comercial tal como lo escribió.

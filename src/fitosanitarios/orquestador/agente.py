@@ -16,9 +16,10 @@ import logging
 from contextlib import contextmanager
 
 from langchain.agents import create_agent
-from langchain.agents.middleware import ToolCallLimitMiddleware
+from langchain.agents.middleware import AgentMiddleware, ToolCallLimitMiddleware
 from langchain.agents.structured_output import ToolStrategy
 from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_core.messages import AIMessage, HumanMessage
 from langgraph.checkpoint.postgres import PostgresSaver
 
 from fitosanitarios.config import Settings
@@ -104,6 +105,36 @@ def construir_tools(imagen_base64: str | None = None) -> list:
     ]
 
 
+def es_primera_llamada_del_turno(mensajes: list) -> bool:
+    """Todavía no hubo respuesta del modelo después del último mensaje del usuario."""
+    for m in reversed(mensajes):
+        if isinstance(m, HumanMessage):
+            return True
+        if isinstance(m, AIMessage):
+            return False
+    return True
+
+
+class LeerLaFotoPrimero(AgentMiddleware):
+    """Si el mensaje trae una foto, lo primero del turno es leerla (`leer_receta`).
+
+    Antes lo decidía el modelo y a veces no la leía: contestaba "mandame la foto" aunque
+    la foto hubiera llegado, y a la segunda vez cortaba por límite de repreguntas (plan de
+    pruebas, 26/09/2026; ver también DIFICULTADES.md, "repregunta por la foto"). En la
+    primera llamada del turno quedan solo la tool de lectura y `tool_choice` con su
+    nombre; se saca la salida estructurada porque, con ella, `create_agent` fuerza
+    `tool_choice="any"` e ignora este. `leer_receta` corta el turno (`return_direct`)."""
+
+    def wrap_model_call(self, request, handler):
+        if es_primera_llamada_del_turno(request.messages):
+            lectura = [t for t in request.tools if getattr(t, "name", None) == "leer_receta"]
+            if lectura:
+                request = request.override(
+                    tools=lectura, tool_choice="leer_receta", response_format=None
+                )
+        return handler(request)
+
+
 def crear_agente(model: BaseChatModel, checkpointer=None, imagen_base64: str | None = None):
     """`checkpointer=None` es válido (sin memoria entre invocaciones, útil
     para tests); en producción pasar un `PostgresSaver` (ver
@@ -115,7 +146,8 @@ def crear_agente(model: BaseChatModel, checkpointer=None, imagen_base64: str | N
         tools=construir_tools(imagen_base64),
         system_prompt=PROMPT_SISTEMA,
         response_format=ToolStrategy(RespuestaAgente),
-        middleware=[ToolCallLimitMiddleware(run_limit=LIMITE_TOOLS_POR_TURNO)],
+        middleware=[ToolCallLimitMiddleware(run_limit=LIMITE_TOOLS_POR_TURNO)]
+        + ([LeerLaFotoPrimero()] if imagen_base64 is not None else []),
         checkpointer=checkpointer,
     )
 

@@ -1231,3 +1231,36 @@ def test_marbete_sin_respaldo_dice_que_no_cuenta_con_la_informacion():
     assert texto.endswith(
         "*Qué podés hacer:* leé la etiqueta del envase o consultalo con tu ingeniero agrónomo."
     )
+
+
+def test_foto_ilegible_dice_que_no_pudo_leer_una_receta_sin_texto_tecnico():
+    """Plan de pruebas (26/09/2026): una factura en vez de la receta daba "la extracción no
+    alcanzó la confianza mínima en campos clave… revisá el dato"."""
+    resultado = ResultadoTool(estado="no_resuelto", motivo=MotivoNoResuelto.IMAGEN_ILEGIBLE)
+    texto = _un_mensaje(RespuestaAgente(tipo="no_resuelto"), [resultado])
+    assert texto.startswith("📷 *No pude leer una receta en esa foto*")
+    assert "mandame una foto nítida de la receta completa" in texto
+    assert "confianza" not in texto and "revisá el dato" not in texto
+
+
+def test_repregunta_sin_dato_concreto_no_dice_que_falta_algo():
+    """"Me equivoqué de foto, después te la mando" terminaba en "Necesito un dato más para
+    continuar, pero no pude identificar cuál"."""
+    texto = _un_mensaje(RespuestaAgente(tipo="repregunta"), [])
+    assert texto.startswith("Dale. Cuando quieras, mandame la foto de la receta")
+    assert "no pude identificar" not in texto
+
+
+def test_no_resuelto_sin_ninguna_tool_responde_neutro():
+    """El botón "No, gracias" salía como "no se pudo determinar el motivo exacto"."""
+    texto = _un_mensaje(RespuestaAgente(tipo="no_resuelto"), [])
+    assert texto.startswith("Dale. Cuando quieras")
+
+
+def test_aviso_de_choque_sin_lote():
+    from fitosanitarios.tools.agendar_aplicacion.mensajes import advertencia_choque
+
+    sin_lote = advertencia_choque("soja", None, "09:00")
+    assert sin_lote == "Ya tenías soja (sin lote) agendada a las 09:00"
+    con_lote = advertencia_choque("soja", "4", "09:00")
+    assert con_lote == "Ya tenías soja (lote 4) agendada a las 09:00"

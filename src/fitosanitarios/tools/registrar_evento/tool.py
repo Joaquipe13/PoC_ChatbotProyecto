@@ -19,6 +19,7 @@ from pydantic import BaseModel
 from fitosanitarios.dominio.modelos import CampoFaltante, ResultadoTool
 from fitosanitarios.servicios.conversacion import thread_id_de_config
 from fitosanitarios.servicios.eventos import finalizar_evento, iniciar_evento
+from fitosanitarios.servicios.fechas import momento_legible
 from fitosanitarios.servicios.resolucion_vehiculo import (
     faltante_vehiculo_no_identificado,
 )
@@ -41,8 +42,8 @@ def registrar_evento_logica(
         resultado = finalizar_evento(conn, thread_id)
         if resultado.motivo_no_resuelto is not None:
             return ResultadoTool(estado="no_resuelto", motivo=resultado.motivo_no_resuelto)
-        fecha_inicio = resultado.fecha_inicio.isoformat() if resultado.fecha_inicio else None
-        fecha_fin = resultado.fecha_fin.isoformat() if resultado.fecha_fin else None
+        fecha_inicio = momento_legible(resultado.fecha_inicio) if resultado.fecha_inicio else None
+        fecha_fin = momento_legible(resultado.fecha_fin) if resultado.fecha_fin else None
         datos = {"lote": resultado.lote, "fecha_inicio": fecha_inicio, "fecha_fin": fecha_fin}
         return ResultadoTool(estado="ok", datos=datos)
 
@@ -77,12 +78,11 @@ def registrar_evento_logica(
             ],
         )
     if resultado.ya_en_curso:
+        inicio = momento_legible(resultado.fecha_inicio)
         return ResultadoTool(
             estado="observado",
-            datos={"lote": resultado.lote, "fecha_inicio": resultado.fecha_inicio.isoformat()},
-            advertencias=[
-                mensajes.advertencia_ya_en_curso(resultado.fecha_inicio.isoformat(), resultado.lote)
-            ],
+            datos={"lote": resultado.lote, "fecha_inicio": inicio},
+            advertencias=[mensajes.advertencia_ya_en_curso(inicio, resultado.lote)],
         )
 
     return ResultadoTool(
@@ -90,7 +90,7 @@ def registrar_evento_logica(
         datos={
             "vehiculo": resultado.vehiculo.nombre,
             "lote": resultado.lote,
-            "fecha_inicio": resultado.fecha_inicio.isoformat(),
+            "fecha_inicio": momento_legible(resultado.fecha_inicio),
         },
     )
 

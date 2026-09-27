@@ -70,16 +70,22 @@ def _plantilla_consulta_producto(
 # --- repregunta ---
 
 
+_SIN_DATO_CONCRETO = (
+    "Dale. Cuando quieras, mandame la foto de la receta o escribime tu consulta (un "
+    "producto, una localidad o una norma)."
+)
+
+
 def _plantilla_repregunta(respuesta: RespuestaAgente, resultados: list[ResultadoTool]) -> str:
     # Si una tool de este turno ya dijo qué falta (y con qué opciones), eso manda: el LLM
     # reescribía las opciones por su cuenta y llegó a inventar una norma que no existe.
     de_tools = next((r.faltantes for r in resultados if r.faltantes), [])
     faltantes = de_tools or respuesta.faltantes
     if not faltantes:
-        return (
-            "Necesito un dato más para continuar, pero no pude identificar cuál. "
-            "¿Podés repetir el mensaje?"
-        )
+        # El modelo eligió repreguntar sin decir qué: pasa también con un mensaje que no
+        # pide nada ("me equivoqué de foto, después te la mando"). Antes decía "Necesito un
+        # dato más, pero no pude identificar cuál", que no tenía sentido en ese caso.
+        return _SIN_DATO_CONCRETO
     # Estructura fija: la pregunta y, si corresponde, sus opciones. Sin encabezado
     # ni nombre de campo: la pregunta tiene que entenderse sola.
     varias = len(faltantes) > 1
@@ -131,6 +137,15 @@ _QUE_HACER_SIN_INFORMACION = {
 }
 
 
+# Una foto que no es una receta, o que no se lee: antes decía "la extracción no alcanzó la
+# confianza mínima en campos clave… revisá el dato" (plan de pruebas, 26/09/2026).
+_IMAGEN_ILEGIBLE = (
+    "📷 *No pude leer una receta en esa foto*\n"
+    "Puede que no sea una receta, o que esté borrosa o cortada.\n"
+    "*Qué podés hacer:* mandame una foto nítida de la receta completa, con buena luz."
+)
+
+
 def _plantilla_sin_informacion(motivo: MotivoNoResuelto, advertencias: list[str]) -> str:
     lineas = ["ℹ️ *No cuento con esa información*", _SIN_INFORMACION[motivo]]
     lineas += [f"⚠️ {a}" for a in advertencias if es_aclaracion_sin_normativa_municipal(a)]
@@ -143,6 +158,8 @@ def _plantilla_no_resuelto(respuesta: RespuestaAgente, resultados: list[Resultad
     advertencias = [a for r in resultados for a in r.advertencias]
     if motivo in _SIN_INFORMACION:
         return _plantilla_sin_informacion(motivo, advertencias)
+    if motivo == MotivoNoResuelto.IMAGEN_ILEGIBLE:
+        return _IMAGEN_ILEGIBLE
     porque = DESCRIPCION_MOTIVO.get(motivo, "no se pudo determinar el motivo exacto.")
 
     lineas = ["⚠️ *No pude completar la consulta*", f"*Por qué:* {porque}"]
@@ -359,6 +376,10 @@ _TIPOS_DE_CONSULTA = (
 )
 
 
+# Tipos que se arman sin resultados de tools (el resto, sin ellos, queda vacío).
+_TIPOS_SIN_DATOS_DE_TOOLS = ("repregunta", "fuera_de_dominio", "no_resuelto", "ayuda", "error")
+
+
 def _tipo_efectivo(tipo: str, resultados: list[ResultadoTool]) -> str:
     """El tipo que se usa para elegir la plantilla. Si hay datos, manda su forma
     (`_tipo_segun_los_datos`). Si la tool no llegó a evaluar nada (faltó un dato, p. ej.
@@ -372,6 +393,15 @@ def _tipo_efectivo(tipo: str, resultados: list[ResultadoTool]) -> str:
     if tipo in _TIPOS_DE_CONSULTA and any(
         r.estado == "faltan_datos" and r.faltantes and not r.datos for r in resultados
     ):
+        return "repregunta"
+    # El modelo eligió un tipo que muestra datos de una tool sin haber llamado a ninguna
+    # (plan de pruebas, 26/09/2026: el botón "No, gracias" después de un dictamen salía
+    # como `dictamen` y el mensaje quedaba vacío): va la respuesta neutra de la repregunta.
+    if not resultados and tipo not in _TIPOS_SIN_DATOS_DE_TOOLS:
+        return "repregunta"
+    # Lo mismo con un "no resuelto" sin ninguna tool: no hay motivo que mostrar (el botón
+    # "No, gracias" salía como "no se pudo determinar el motivo exacto").
+    if not resultados and tipo == "no_resuelto":
         return "repregunta"
     datos = primer_dato(resultados)
     if datos:

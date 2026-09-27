@@ -1,4 +1,4 @@
-from datetime import date, time
+from datetime import UTC, date, time
 
 import pytest
 
@@ -104,3 +104,13 @@ def test_resolver_dias_el_domingo_la_semana_es_la_que_empieza():
 
 def test_resolver_dias_no_entendido():
     assert resolver_dias("cualquier cosa", MIERCOLES) is None
+
+
+def test_momento_legible_en_hora_de_argentina():
+    """Los eventos se guardan en UTC: se mostraban como "2026-09-27T02:31:15+00:00"."""
+    from datetime import datetime
+
+    from fitosanitarios.servicios.fechas import momento_legible
+
+    utc = datetime(2026, 9, 27, 2, 31, 15, tzinfo=UTC)
+    assert momento_legible(utc) == "sábado 26/09/2026, 23:31"

@@ -7,13 +7,18 @@ DESCRIPCION = """\
 Responde qué dice el marbete (la etiqueta aprobada por SENASA) de un producto: tiempo de
 carencia, precauciones, compatibilidad o mezclas, reingreso al lote, primeros auxilios,
 modo de aplicación ("¿qué carencia tiene Flyer en soja?", "¿se puede mezclar con
-glifosato?"). No para si está registrado o autorizado para un cultivo, ni para su
-banda toxicológica (`validar_producto_registro`), ni para listar productos
-(`consultar_productos`).
+glifosato?", "¿qué hago con los bidones vacíos?"). También para seguir hablando de un
+producto ya nombrado en la conversación ("¿y qué hago con los bidones?" después de
+preguntar por Vertimec): pasá ese producto. No para si está registrado o autorizado para
+un cultivo, ni para su
+dosis registrada ni su banda toxicológica (`validar_producto_registro`), ni para
+listar productos (`consultar_productos`).
 
 Args:
     producto: el nombre comercial tal como lo dijo.
-    pregunta: tal como la escribió el operario."""
+    pregunta: la del operario; si depende de algo dicho antes en la conversación (el
+        cultivo, la plaga), agregalo ("¿y la carencia?" sobre Vertimec en cítricos ->
+        "¿qué carencia tiene en cítricos?")."""
 
 # Reformulación de la pregunta antes de buscar (el paso "contextualizar la pregunta" del
 # notebook de RAG de la cursada): el operario pregunta "¿cuándo puedo volver a entrar al

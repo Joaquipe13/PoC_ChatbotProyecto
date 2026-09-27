@@ -8,7 +8,7 @@ confiabilidad). Todo recibe `hoy` como parámetro para poder testearse.
 
 import re
 import unicodedata
-from datetime import date, time, timedelta
+from datetime import date, datetime, time, timedelta, timezone
 
 DIAS_SEMANA = ["lunes", "martes", "miercoles", "jueves", "viernes", "sabado", "domingo"]
 _NOMBRE_DIA = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
@@ -146,3 +146,15 @@ def fecha_legible(fecha: date) -> str:
 
 def hora_legible(hora: time) -> str:
     return hora.strftime("%H:%M")
+
+
+# Argentina no tiene horario de verano: UTC-3 todo el año.
+HORA_ARGENTINA = timezone(timedelta(hours=-3))
+
+
+def momento_legible(momento: datetime) -> str:
+    """"sábado 26/09/2026, 23:31", en hora de Argentina. La base guarda los eventos en
+    UTC y se mostraban así ("2026-09-27T02:31:15+00:00": otro día y otra hora)."""
+    if momento.tzinfo is not None:
+        momento = momento.astimezone(HORA_ARGENTINA)
+    return f"{fecha_legible(momento.date())}, {momento.strftime('%H:%M')}"

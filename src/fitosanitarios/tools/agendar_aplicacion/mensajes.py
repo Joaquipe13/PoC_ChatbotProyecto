@@ -26,7 +26,7 @@ def motivo_hora_no_entendida(texto: str) -> str:
 
 def advertencia_choque(cultivo: str | None, lote: str | None, hora: str) -> str:
     return (
-        f"Ya tenías {cultivo or 'una tarea'} (lote {lote or 'sin lote'}) "
+        f"Ya tenías {cultivo or 'una tarea'} ({f'lote {lote}' if lote else 'sin lote'}) "
         f"agendada a las {hora}"
     )
 
