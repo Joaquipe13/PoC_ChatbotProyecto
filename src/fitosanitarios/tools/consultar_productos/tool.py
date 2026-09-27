@@ -69,7 +69,12 @@ def consultar_productos_logica(
     citas = [Cita(fuente="senasa", documento="vademécum")] if productos else []
     return ResultadoTool(
         estado="ok",
-        datos={"productos": productos, "total": len(productos)},
+        # `mostrados`: cuántos entran en el mensaje ("10 de 20"); así el número del
+        # encabezado también sale de la tool.
+        datos={
+            "productos": productos, "total": len(productos),
+            "mostrados": min(len(productos), mensajes.MAXIMO_LISTADO),
+        },
         citas=citas,
     )
 

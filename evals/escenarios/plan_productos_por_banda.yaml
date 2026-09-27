@@ -1,0 +1,16 @@
+id: plan_productos_por_banda
+conjunto: plan
+persona: >
+  Esteban, asesor. Busca productos de baja toxicidad.
+objetivo: >
+  Conseguir un listado de productos registrados para soja que sean banda verde.
+datos:
+  cultivo: soja
+comportamiento: >
+  Pregunta por productos banda verde para soja. Revisa que los que le muestran sean banda
+  verde. Termina cuando tiene el listado.
+expectativas_duras:
+  - {tipo: alguna_tool, valor: consultar_productos}
+  - {tipo: texto_no_contiene, valor: "Banda III ·"}
+  - {tipo: texto_no_contiene, valor: "Banda II ·"}
+tools_esperadas: [consultar_productos]

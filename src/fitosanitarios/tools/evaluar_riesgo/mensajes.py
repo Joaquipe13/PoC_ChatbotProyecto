@@ -7,6 +7,7 @@ from fitosanitarios.dominio.modelos import RespuestaAgente, ResultadoTool
 from fitosanitarios.servicios.formato import (
     COLOR_BANDA,
     SEGUIMIENTO_COMPLETO,
+    SEGUIMIENTO_SOLO_INFO,
     bloque_condiciones,
     bloque_no_verificado,
     citas_no_mostradas_inline,
@@ -46,14 +47,26 @@ def resumen_para_llm(estado: str) -> str:
 
 
 def plantilla_riesgo(respuesta: RespuestaAgente, resultados: list[ResultadoTool]) -> str:
-    """`evaluar_riesgo` suelto: solo condiciones de aplicación, sin veredicto."""
+    """`evaluar_riesgo` suelto: condiciones de aplicación, sin veredicto. Si la dosis
+    está fuera del rango registrado lo dice primero y no ofrece agendar (como un
+    dictamen OBSERVADA)."""
     datos = primer_dato(resultados) or {}
     condiciones = datos.get("condiciones")
+    observaciones = datos.get("observaciones") or []
     no_realizados = [c for r in resultados for c in r.chequeos_no_realizados]
     citas = citas_no_mostradas_inline(todas_las_citas(resultados), condiciones)
+    bloque_observaciones = "\n".join(
+        ["⚠️ *Observaciones*"] + [f"{i}. {o}" for i, o in enumerate(observaciones, start=1)]
+    ) if observaciones else ""
+    if not condiciones:
+        seguimiento = ""
+    elif observaciones:
+        seguimiento = SEGUIMIENTO_SOLO_INFO
+    else:
+        seguimiento = SEGUIMIENTO_COMPLETO
     return unir_secciones(
-        bloque_condiciones(condiciones), bloque_no_verificado(no_realizados),
-        seccion_fuentes(citas), SEGUIMIENTO_COMPLETO if condiciones else "",
+        bloque_observaciones, bloque_condiciones(condiciones), bloque_no_verificado(no_realizados),
+        seccion_fuentes(citas), seguimiento,
     )
 
 

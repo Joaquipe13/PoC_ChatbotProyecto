@@ -99,3 +99,19 @@ def test_riesgo_localidad_sin_normativa_local_se_basa_en_la_provincial_y_lo_acla
     distancias = {d["tipo_zona"]: d["distancia_min_m"] for d in condiciones["distancias_minimas"]}
     # Solo la Ley 11.273, art. 34 (banda II, terrestre): Rosario no tiene ordenanza cargada.
     assert distancias == {"zona_urbana": 500}
+
+
+def test_riesgo_con_dosis_fuera_de_rango_la_observa(conexion, modelo_embeddings):
+    """Flyer 10 Ec en soja contra chinche de la alfalfa: registrada 160-180 cm3/ha."""
+    resultado = evaluar_riesgo_logica(
+        _args(dosis_valor=500), conexion, modelo_embeddings, TOLERANCIA_PCT
+    )
+    assert resultado.estado == "observado"
+    (observacion,) = resultado.datos["observaciones"]
+    assert "por encima del rango registrado" in observacion
+
+
+def test_riesgo_con_dosis_dentro_de_rango_no_observa(conexion, modelo_embeddings):
+    resultado = evaluar_riesgo_logica(_args(), conexion, modelo_embeddings, TOLERANCIA_PCT)
+    assert resultado.estado == "ok"
+    assert resultado.datos["observaciones"] == []

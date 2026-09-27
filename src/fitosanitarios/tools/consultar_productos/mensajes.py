@@ -10,7 +10,7 @@ SIN_PRODUCTOS = "No encontré productos registrados con esos filtros."
 _AVISO_REGISTRO = (
     "Es lo que figura en el registro; qué aplicar lo define la receta del ingeniero agrónomo."
 )
-_MAXIMO_LISTADO = 10
+MAXIMO_LISTADO = 10
 
 
 def motivo_cultivo_no_encontrado(cultivo: str) -> str:
@@ -36,7 +36,7 @@ def plantilla_listado(respuesta: RespuestaAgente, resultados: list[ResultadoTool
     total = datos.get("total", len(productos))
     if not productos:
         return SIN_PRODUCTOS
-    mostrados = productos[:_MAXIMO_LISTADO]
+    mostrados = productos[:MAXIMO_LISTADO]
     lineas = [f"*Productos registrados* ({len(mostrados)} de {total})"]
     for i, p in enumerate(mostrados, start=1):
         dosis = p.get("dosis") or {}

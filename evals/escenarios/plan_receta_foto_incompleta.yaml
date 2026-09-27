@@ -1,0 +1,23 @@
+id: plan_receta_foto_incompleta
+conjunto: plan
+persona: >
+  Julia, ingeniera agrónoma joven. Escribe claro y completo. Tiene la receta a mano y sabe
+  todos los datos, pero la foto que saca salió incompleta.
+objetivo: >
+  Que el asistente cargue la receta aunque la foto no muestre todo, completando lo que
+  falte cuando se lo pida.
+datos:
+  imagen: tests/fixtures/recetas/07_multiples_faltantes.jpg
+  lote: "7"
+  superficie: 40 ha
+  tipo_de_aplicacion: terrestre
+  plaga: malezas de hoja ancha
+  localidad: Sastre
+comportamiento: >
+  Manda la foto. Cuando el asistente le pide datos que faltan, los da, de a uno o todos
+  juntos. Si le muestra la receta completa para confirmar, confirma. Termina cuando la
+  receta quedó completa y confirmada (o evaluada), o si el asistente se traba.
+expectativas_duras:
+  - {tipo: alguna_tool, valor: leer_receta}
+  - {tipo: alguna_tool, valor: completar_receta}
+tools_esperadas: [leer_receta, completar_receta]

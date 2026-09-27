@@ -1,0 +1,20 @@
+id: plan_receta_foto_apta
+conjunto: plan
+persona: >
+  Marcos, encargado de un campo cerca de El Trébol. Escribe corto desde el celular, en
+  voseo, sin tildes. No sabe de normas ni de bandas.
+objetivo: >
+  Mandar la foto de la receta que le dejó el ingeniero, confirmar lo que el asistente leyó
+  y saber si puede hacer la aplicación.
+datos:
+  imagen: data/recetas_ejemplo/01_apta_terrestre.jpg
+  localidad: El Trébol   # la dice solo si se la preguntan
+comportamiento: >
+  Empieza mandando la foto con un texto corto ("te paso la receta"). Si le preguntan un dato
+  que no está en la foto y lo sabe (la localidad), lo contesta. Si le muestran los datos
+  leídos y están bien, confirma. Termina cuando le dicen si puede aplicar.
+expectativas_duras:
+  - {tipo: alguna_tool, valor: leer_receta}
+  - {tipo: alguna_tool, valor: evaluar_viabilidad_legal}
+  - {tipo: algun_turno_tipo, valor: dictamen}
+tools_esperadas: [leer_receta, evaluar_viabilidad_legal]

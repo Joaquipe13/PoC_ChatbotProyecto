@@ -1,0 +1,17 @@
+id: plan_equipos_sin_norma
+conjunto: plan
+persona: >
+  Tomás, productor chico. Tiene un drone y una mochila.
+objetivo: >
+  Saber si puede aplicar con drone en El Trébol, y a qué distancia de las casas puede usar la
+  mochila en El Trébol.
+datos:
+  localidad: El Trébol
+comportamiento: >
+  Pregunta primero por el drone y después por la mochila. Termina cuando tiene respuesta para
+  los dos.
+expectativas_duras:
+  - {tipo: alguna_tool, valor: listar_limitaciones}
+  - {tipo: texto_contiene, valor: drones}
+  - {tipo: texto_contiene, valor: mochila}
+tools_esperadas: [listar_limitaciones]

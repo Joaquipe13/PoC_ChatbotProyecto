@@ -1,0 +1,25 @@
+id: plan_dictamen_dosis_observada
+conjunto: plan
+persona: >
+  Nicolás, operario nuevo, escribe con errores de ortografía. Anotó mal la dosis.
+objetivo: >
+  Saber si puede aplicar Flyer 10 Ec en soja a 500 cm3/ha, por tierra, en El Trébol, contra
+  chinche de la alfalfa.
+datos:
+  producto: Flyer 10 Ec
+  dosis: 500 cm3/ha
+  cultivo: soja
+  plaga: chinche de la alfalfa
+  tipo_de_aplicacion: terrestre
+  localidad: El Trébol
+comportamiento: >
+  Pregunta con todos los datos juntos. Si el asistente le marca un problema, pregunta cuál es
+  la dosis correcta una vez. Termina cuando entiende qué está mal.
+# Una receta dada por texto va a `evaluar_riesgo` (la foto confirmada, a
+# `evaluar_viabilidad_legal`): se exige lo que ve el operario, no la tool.
+expectativas_duras:
+  - {tipo: algun_turno_tipo, valor: dictamen}
+  - {tipo: texto_contiene, valor: por encima del rango registrado}
+  - {tipo: texto_no_contiene, valor: Agendamos}
+  - {tipo: ninguna_tool, valor: agendar_aplicacion}
+tools_esperadas: [evaluar_riesgo]

@@ -212,3 +212,11 @@ def test_expectativas_duras_del_escenario():
         escenario=escenario,
     )
     assert "expectativa_dura_incumplida" not in nombres(bien)
+
+
+def test_expectativa_texto_contiene():
+    escenario = {"expectativas_duras": [{"tipo": "texto_contiene", "valor": "3000 m"}]}
+    falta = analizar(turno(1, tipo="limitaciones", texto="a menos de 500 m"), escenario=escenario)
+    assert "expectativa_dura_incumplida" in nombres(falta)
+    esta = analizar(turno(1, tipo="limitaciones", texto="Zona urbana: 3000 M"), escenario=escenario)
+    assert "expectativa_dura_incumplida" not in nombres(esta)

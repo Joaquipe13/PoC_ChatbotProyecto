@@ -30,7 +30,7 @@ TOOLS_POR_TIPO = {
     "consulta_articulo": {"consultar_articulo"},
     "limitaciones": {"listar_limitaciones"},
     "consulta_producto": {"validar_producto_registro", "consultar_productos"},
-    "confirmacion_receta": {"leer_receta"},
+    "confirmacion_receta": {"leer_receta", "completar_receta"},
     "agenda": {"consultar_agenda"},
     "agendar_aplicacion": {"agendar_aplicacion"},
     "evento_registrado": {"registrar_evento"},
@@ -394,6 +394,8 @@ def expectativas_duras(turnos: list[dict], escenario: dict) -> list[dict]:
             falla = f"se llamó a la tool '{valor}' y no debía"
         elif tipo == "texto_no_contiene" and valor.lower() in texto.lower():
             falla = f"el texto contiene '{valor}' y no debía"
+        elif tipo == "texto_contiene" and valor.lower() not in texto.lower():
+            falla = f"ningún mensaje del bot contiene '{valor}'"
         else:
             continue
         salida.append(violacion("expectativa_dura_incumplida", "alto",

@@ -15,6 +15,7 @@ from pydantic import BaseModel
 from fitosanitarios.datos.retrievers.territorio import reglas_candidatas
 from fitosanitarios.dominio.modelos import ResultadoTool
 from fitosanitarios.servicios.condiciones_aplicacion import calcular_condiciones
+from fitosanitarios.servicios.dictamen import observacion_de_dosis
 from fitosanitarios.servicios.ubicacion import resolver_ubicacion_o_cortar
 from fitosanitarios.servicios.validacion_producto import resolver_y_validar_producto
 from fitosanitarios.tools.evaluar_riesgo import mensajes
@@ -42,6 +43,7 @@ def evaluar_riesgo_logica(
     reglas = reglas_candidatas(conn, ubicacion.localidad_id, ubicacion.provincia_id)
 
     chequeos_no_realizados = []
+    observaciones: list[str] = []
     productos_info = []
     banda_por_producto: dict[str, str | None] = {}
 
@@ -62,6 +64,11 @@ def evaluar_riesgo_logica(
             "banda_toxicologica": resolucion.banda_toxicologica,
         })
 
+        # Dosis fuera del rango registrado: antes se descartaba y la respuesta ofrecía
+        # agendar (hallazgo del plan de pruebas, 26/09/2026).
+        chd = resolucion.chequeo_dosis
+        if chd is not None and chd.comparable and not chd.cumple:
+            observaciones.append(f"{resolucion.marca}: {observacion_de_dosis(chd)}")
         if resolucion.chequeo_dosis is not None and not resolucion.chequeo_dosis.comparable:
             if resolucion.chequeo_dosis.requiere_volumen_caldo:
                 chequeos_no_realizados.append(
@@ -86,11 +93,12 @@ def evaluar_riesgo_logica(
     advertencias.extend(condiciones.advertencias)
 
     return ResultadoTool(
-        estado="ok",
+        estado="observado" if observaciones else "ok",
         datos={
             "jurisdiccion_id": ubicacion.jurisdiccion_id,
             "productos": productos_info,
             "condiciones": condiciones.model_dump(mode="json"),
+            "observaciones": observaciones,
         },
         citas=citas, advertencias=advertencias,
         chequeos_no_realizados=chequeos_no_realizados,

@@ -1,0 +1,17 @@
+id: plan_eventos_y_agenda
+conjunto: plan
+persona: >
+  Beto, maquinista. Avisa por WhatsApp cuando empieza y cuando termina.
+objetivo: >
+  Avisar que empezó a aplicar con la mosquito en el lote 4, avisar que terminó y después ver
+  qué tiene agendado esta semana.
+datos:
+  vehiculo: la mosquito
+  lote: "4"
+comportamiento: >
+  Escribe que empezó a aplicar con la mosquito en el lote 4, después que terminó, y después
+  pregunta qué tiene para esta semana. Termina cuando ve la agenda.
+expectativas_duras:
+  - {tipo: alguna_tool, valor: registrar_evento}
+  - {tipo: alguna_tool, valor: consultar_agenda}
+tools_esperadas: [registrar_evento, consultar_agenda]

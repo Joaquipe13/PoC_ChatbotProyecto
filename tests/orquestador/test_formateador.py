@@ -225,6 +225,25 @@ def test_evaluar_riesgo_suelto_muestra_condiciones_sin_veredicto():
     assert texto.endswith("[Agendar] [No, gracias]")
 
 
+def test_evaluar_riesgo_con_dosis_fuera_de_rango_lo_dice_y_no_ofrece_agendar():
+    """Hallazgo del plan de pruebas (26/09/2026): "¿puedo aplicar Flyer a 500 cm3/ha?" iba a
+    `evaluar_riesgo`, que descartaba la dosis fuera de rango y ofrecía agendar."""
+    resultado = ResultadoTool(
+        estado="observado",
+        datos={
+            "jurisdiccion_id": "el-trebol", "condiciones": _CONDICIONES_EL_TREBOL,
+            "observaciones": [
+                "Flyer 10 Ec: Dosis 500.0 cm3/ha: por encima del rango registrado "
+                "(160.0-180.0 cm3/ha), 178% de desvío."
+            ],
+        },
+    )
+    texto = _un_mensaje(RespuestaAgente(tipo="dictamen"), [resultado])
+    assert texto.startswith("⚠️ *Observaciones*\n1. Flyer 10 Ec: Dosis 500.0 cm3/ha: por encima")
+    assert "Agendar" not in texto
+    assert texto.endswith("[Sí] [No]")
+
+
 def test_detalle_bandas_lista_la_banda_de_cada_producto():
     resultado = ResultadoTool(
         estado="ok",

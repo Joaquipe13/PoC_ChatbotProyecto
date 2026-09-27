@@ -37,6 +37,11 @@ def _valores(horas: list[HoraPronostico], campo: str) -> list[float]:
     return [v for h in horas if (v := getattr(h, campo)) is not None]
 
 
+def _redondo(valores: list[float], funcion) -> int | None:
+    """Entero: es lo que se muestra, y así lo que queda guardado coincide con el mensaje."""
+    return round(funcion(valores)) if valores else None
+
+
 def resumen_pronostico(
     horas: list[HoraPronostico], reglas_viento: list[dict]
 ) -> dict | None:
@@ -56,14 +61,14 @@ def resumen_pronostico(
         "hasta": horas[-1].hora.strftime("%H:%M"),
         "viene_de": punto_cardinal(direccion) if direccion is not None else None,
         "empuja_hacia": punto_cardinal(direccion + 180) if direccion is not None else None,
-        "viento_min_kmh": min(viento) if viento else None,
-        "viento_max_kmh": viento_max,
-        "rafagas_max_kmh": max(rafagas) if rafagas else None,
+        "viento_min_kmh": _redondo(viento, min),
+        "viento_max_kmh": _redondo(viento, max),
+        "rafagas_max_kmh": _redondo(rafagas, max),
         "lluvia_mm": round(sum(lluvia), 1) if lluvia else None,
         "lluvia_probabilidad_max": max(probabilidad) if probabilidad else None,
-        "temperatura_min": min(temperatura) if temperatura else None,
-        "temperatura_max": max(temperatura) if temperatura else None,
-        "humedad_min": min(humedad) if humedad else None,
+        "temperatura_min": _redondo(temperatura, min),
+        "temperatura_max": _redondo(temperatura, max),
+        "humedad_min": _redondo(humedad, min),
         # Solo las normas cuyo umbral supera el viento pronosticado: se mencionan como
         # referencia, sin decidir nada.
         "normas": [

@@ -22,6 +22,17 @@ from fitosanitarios.dominio.modelos import Cita, CondicionesAplicacion, Dictamen
 from fitosanitarios.servicios.dosis import ChequeoDosis
 
 
+def observacion_de_dosis(chd: ChequeoDosis) -> str:
+    """La dosis declarada fuera del rango registrado. La usan el dictamen y
+    `evaluar_riesgo`, que también compara la dosis."""
+    direccion = "por encima" if chd.porcentaje_desvio > 0 else "por debajo"
+    return (
+        f"Dosis {chd.valor_declarado} {chd.unidad_declarada}: {direccion} del rango "
+        f"registrado ({chd.valor_min_registrado}-{chd.valor_max_registrado} "
+        f"{chd.unidad_declarada}), {abs(chd.porcentaje_desvio):.0f}% de desvío."
+    )
+
+
 @dataclass
 class ChequeoProducto:
     """Resultado de validar un producto contra el registro."""
@@ -85,17 +96,7 @@ def armar_dictamen(
                     f"{chd.motivo_no_comparable or 'no comparable con el registro'}"
                 )
         elif not chd.cumple:
-            direccion = "por encima" if chd.porcentaje_desvio > 0 else "por debajo"
-            observaciones.append(
-                Observacion(
-                    descripcion=(
-                        f"Dosis {chd.valor_declarado} {chd.unidad_declarada}: {direccion} del "
-                        f"rango registrado ({chd.valor_min_registrado}-"
-                        f"{chd.valor_max_registrado} {chd.unidad_declarada}), "
-                        f"{abs(chd.porcentaje_desvio):.0f}% de desvío."
-                    )
-                )
-            )
+            observaciones.append(Observacion(descripcion=observacion_de_dosis(chd)))
 
     if condiciones is not None:
         for distancia in condiciones.distancias_minimas:
