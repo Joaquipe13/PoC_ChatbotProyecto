@@ -1,43 +1,93 @@
 # Especificación de plantillas
 
-Una entrada por cada valor de `RespuestaAgente.tipo` (`src/fitosanitarios/dominio/modelos.py`). El formateador determinista (Fase 7, `src/fitosanitarios/orquestador/formateador.py`) arma el texto de cada plantilla a partir de los **artifacts de las tools ejecutadas en el turno**, nunca del texto libre del LLM (ver skill, "Contratos": `RespuestaAgente.tipo` + artifacts → formateador). **Dónde está cada plantilla:** la de cada tipo de respuesta que produce una sola tool vive en `src/fitosanitarios/tools/<tool>/mensajes.py` (`plantilla_<tipo>`); `formateador.py` las reúne en `_PLANTILLAS` y tiene las comunes (`repregunta`, `fuera_de_dominio`, `no_resuelto`, `ayuda`, `error`); lo que se repite entre plantillas (citas, números, *Fuentes*) está en `servicios/formato.py`. `dictamen` y `consulta_producto` los producen dos tools cada uno y se reparten según la forma del resultado. Ver DECISIONES.md, "Estructura de `tools/`". Formato WhatsApp general: `*negrita*`, listas con `-`/`1.`, sin tablas ni encabezados markdown, ≤ 4096 caracteres por mensaje, coma decimal con unidad separada, fechas `dd/mm/aaaa`, sección `*Fuentes*` al final si hay citas.
+Una entrada por cada valor de `RespuestaAgente.tipo` (`src/fitosanitarios/dominio/modelos.py`, 17 en total). El formateador determinista (`src/fitosanitarios/orquestador/formateador.py`) arma el texto de cada plantilla a partir de los **artifacts de las tools ejecutadas en el turno**, nunca del texto libre del LLM (ver skill, "Contratos": `RespuestaAgente.tipo` + artifacts → formateador).
 
-> **Nota sobre el conteo de plantillas:** el contrato `RespuestaAgente` (skill, sección "Contratos") define **9** valores posibles de `tipo`, incluido `ayuda`. La sección 3.4 del prompt de planificación y la Fase 7 de `plandefases.md` mencionan "8 plantillas" enumerando los mismos 8 casos que abajo tienen ejemplo en la skill, sin `ayuda`. Se toma esto como una omisión menor de esas dos enumeraciones (probablemente porque `ayuda` es el caso trivial), no como una exclusión deliberada: acá se especifican las 9. Si en la Fase 7 se decide que `ayuda` no hace falta como tipo aparte (podría fusionarse con `fuera_de_dominio` o resolverse sin pasar por el formateador), es una decisión a tomar y documentar en esa fase, no en esta.
+**Dónde está cada plantilla:** la de cada tipo de respuesta que produce una sola tool vive en `src/fitosanitarios/tools/<tool>/mensajes.py` (`plantilla_<tipo>`); `formateador.py` las reúne en `_PLANTILLAS` y tiene las comunes (`repregunta`, `fuera_de_dominio`, `no_resuelto`, `ayuda`, `error`); lo que se repite entre plantillas (citas, números, *Fuentes*, seguimientos) está en `servicios/formato.py`. `dictamen` y `consulta_producto` los producen dos tools cada uno y se reparten según la forma del resultado. Ver DECISIONES.md, "Estructura de `tools/`".
+
+**Formato WhatsApp general:** `*negrita*`, listas con `-`/`1.`, sin tablas ni encabezados markdown, ≤ 4096 caracteres por mensaje (si se pasa, se parte por sección), coma decimal con unidad separada ("1,8 mm", "500 cm3/ha", sin ".0"), fechas `dd/mm/aaaa` y horas en la hora local del operario, sección `*Fuentes*` al final si hay citas que no se mostraron en la misma línea. Los botones se escriben `[BOTONES: A | B]` y las listas `[LISTA: A | B]` en los ejemplos: el canal los manda como botones o lista interactiva de WhatsApp.
+
+Los ejemplos son **salidas reales** del bot contra la base de desarrollo (la mayoría de las conversaciones del plan de pruebas del 26 y 27/09/2026, `docs/plan_pruebas.md`).
 
 ## `confirmacion_receta`
 
-**Cuándo:** después de `leer_receta`, antes de evaluar. Siempre pide Confirmar/Corregir.
+**Cuándo:** después de `leer_receta` o `completar_receta`, antes de evaluar.
 
-**Campos que usa:** artifact de `leer_receta` (`Receta` con `confianza_por_campo`); campos con confianza baja se marcan con ⚠️ en vez de mostrarse como dato firme.
+**Campos que usa:** artifact de la tool (`Receta` con `confianza_por_campo`); los campos con confianza baja se marcan con ⚠️.
+
+Si falta un dato obligatorio (cultivo, localidad, tipo de aplicación, producto, dosis, lote o superficie; `servicios/receta.py`), no ofrece confirmar: pregunta lo que falta y muestra lo que pudo leer. El operario lo da y `completar_receta` lo aplica sobre la receta leída.
 
 ```
-*Leí la receta N° 0042*. Confirmá los datos:
-- *Cultivo:* soja
-- *Lote:* 4
-- *Adversidad:* malezas de hoja ancha
-- *Producto:* Glifosato 48 % — 2 L/ha
-- *Superficie:* 35 ha
-- *Tipo de aplicación:* no figura ⚠️
-[Confirmar] [Corregir]
+*Leí la receta N.° 0042*. Falta la siguiente información obligatoria:
+
+1. *Localidad:* ¿En qué localidad se aplica?
+2. *Tipo de aplicación:* ¿Es aplicación terrestre o aérea?
+3. *Lote:* ¿Cuál es el número o nombre del lote?
+4. *Superficie:* ¿Cuántas hectáreas tiene el lote?
+
+*Lo que pude leer:*
+- *Cultivo:* Algodon
+- *Producto:* Acefato 75% — 0,5 kg/ha (Acefato)
+```
+
+Con todos los datos:
+
+```
+*Leí la receta N.° 0042*. Confirmá los datos:
+- *Cultivo:* Algodon
+- *Lote:* 7
+- *Localidad:* Sastre
+- *Superficie:* 40 ha
+- *Producto:* Acefato 75% — 0,5 kg/ha (Acefato)
+- *Tipo de aplicación:* terrestre
+[BOTONES: Confirmar | Corregir]
 ```
 
 ## `dictamen`
 
-**Cuándo:** resultado de `evaluar_viabilidad_legal`.
+**Cuándo:** resultado de `evaluar_viabilidad_legal` (dictamen con veredicto) o de `evaluar_riesgo` suelto (condiciones de aplicación, sin veredicto).
 
-**Campos que usa:** artifact `Dictamen` (`resultado`, `observaciones[].descripcion`+`citas`, productos con su estado, `citas` generales).
+**Campos que usa:** artifact `Dictamen` (`resultado`, `observaciones`, `condiciones`, citas) o, en el suelto, `condiciones` y `observaciones` de `evaluar_riesgo`. Desde el 19/09 la distancia no se compara contra la ubicación del lote: se informa en *Condiciones de aplicación* (ver `DECISIONES.md`).
 
-Salida real con Gemini (26/09/2026, "Flyer 10 Ec en soja, 170 cm3/ha, terrestre, en El Trébol, contra chinche de la alfalfa"). Desde el 19/09 la distancia no se compara contra la ubicación del lote: se informa en *Condiciones de aplicación* (ver `DECISIONES.md`).
+Dictamen de una receta confirmada:
 
 ```
-*Dictamen* — El Trébol
+*Dictamen* — Sastre
 *Resultado:* ✅ APTA
+
+*Condiciones de aplicación* — Sastre · terrestre · banda III (azul)
+- *Distancia mínima a zona urbana:* 1000 m (Fallo Sastre/2020)
+- *Distancia mínima a escuelas:* 200 m (Ordenanza 1174/2019)
+
+*Fuentes*
+- SENASA, Reg. 36302 (detalle API)
+
+¿Agendamos la aplicación?
+[BOTONES: Agendar | No, gracias]
+```
+
+Consulta suelta ("¿puedo usar Flyer 10 Ec en soja a 500 cm3/ha por tierra en El Trébol?"): la dosis fuera de rango va primero y **no se ofrece agendar**, como en un dictamen OBSERVADA. Con un solo producto tampoco se ofrece "la banda de cada producto", que ya está en el encabezado; con varios, sí (`[BOTONES: Sí | No]`).
+
+```
+⚠️ *Observaciones*
+1. Flyer 10 Ec: Dosis 500 cm3/ha: por encima del rango registrado (160-180 cm3/ha), 178% de desvío.
 
 *Condiciones de aplicación* — El Trébol · terrestre · banda II (amarilla)
 - *Distancia mínima a zona urbana:* 500 m (Ley 11273/1995, art. 34)
+```
 
-*Fuentes*
-- SENASA, Reg. 41881 (detalle API)
+## `detalle_bandas`
+
+**Cuándo:** el operario pide la banda de cada producto después de un dictamen o una evaluación con varios productos. Sale de `evaluar_riesgo` del turno.
+
+```
+*Banda de cada producto*
+- Flyer 10 Ec · Reg. SENASA 41881: II (amarilla)
+- Tordon D 30 · Reg. SENASA 30735: III (azul)
+La aplicación se rige por la más peligrosa: II (amarilla).
+
+*Condiciones de aplicación* — Sastre · terrestre · banda II (amarilla)
+- *Distancia mínima a zona urbana:* 1000 m (Fallo Sastre/2020)
+- *Distancia mínima a escuelas:* 200 m (Ordenanza 1174/2019)
 
 ¿Agendamos la aplicación?
 [BOTONES: Agendar | No, gracias]
@@ -45,146 +95,273 @@ Salida real con Gemini (26/09/2026, "Flyer 10 Ec en soja, 170 cm3/ha, terrestre,
 
 ## `consulta_producto`
 
-**Cuándo:** resultado de `validar_producto_registro` (consulta puntual) o `consultar_productos` (listado).
+**Cuándo:** resultado de `validar_producto_registro` (un producto) o `consultar_productos` (listado).
 
-**Campos que usa:** artifact `ResultadoTool.datos` (lista de candidatos/productos con registro, banda, dosis).
+Un producto, su banda (sin cultivo):
 
 ```
-*Productos registrados para yuyo colorado en soja* (3 de 23)
-1. Marca A · Reg. SENASA 12345 · Banda III (azul) · 1,5–2 L/ha
-2. Marca B · Reg. SENASA 23456 · Banda IV (verde) · 2–3 L/ha
-3. Marca C · Reg. SENASA 34567 · Banda IV (verde) · 0,8–1 L/ha
+*Tordon D 30* · Reg. SENASA 30735 · Banda III (azul)
+```
+
+Un producto para un cultivo ("¿cuál sería la dosis correcta?" después de un aviso de dosis):
+
+```
+*Flyer 10 Ec* · Reg. SENASA 41881 · Banda II · ✅ autorizado para soja
+Dosis registrada para soja: 160-180 cm3/ha (Chinche De La Alfalfa)
+```
+
+Un nombre que coincide con varios productos (va como `repregunta`, con la lista de la tool):
+
+```
+Hay varios productos parecidos a 'Roundup'. ¿Cuál es?
+[LISTA: Roundup Fg | Roundup Wg | Roundup Max | Roundup Fg W | Roundup Ready]
+```
+
+Listado (una línea por uso registrado: el mismo producto aparece una vez por plaga):
+
+```
+*Productos registrados* (10 de 20)
+1. *Aceite Quimeco Plus* · Reg. SENASA 37227 · Banda IV · Yuyo Colorado · 250 cm3 por ha
+2. *Agrolufen 5 Ec* · Reg. SENASA 38947 · Banda IV · Falsa Medidora · 200-300 cm3/ha
+3. *Agrolufen 5 Ec* · Reg. SENASA 38947 · Banda IV · Oruga De Las Leguminosas · 200-300 cm3/ha
+...
 Es lo que figura en el registro; qué aplicar lo define la receta del ingeniero agrónomo.
+```
+
+## `consulta_marbete`
+
+**Cuándo:** resultado de `consultar_marbete`. El LLM responde solo con los fragmentos recuperados del marbete; cada página citada se verifica en código.
+
+```
+*Vertimec* · Reg. SENASA 30116
+Los bidones vacíos deben someterse a triple lavado o lavado a presión, inutilizarse perforándolos sin dañar la etiqueta y enviarse a centros de acopio habilitados según la ley 27.279, estando prohibido reutilizarlos, enterrarlos o quemarlos.
 
 *Fuentes*
-- SENASA, vademécum (datos al 11/09/2026)
+- SENASA, Reg. 30116 (marbete, pág. 10)
 ```
+
+Sin respaldo en el marbete: ver `no_resuelto`, "No cuento con esa información".
 
 ## `consulta_normativa`
 
 **Cuándo:** resultado de `responder_consulta_normativa`.
 
-**Campos que usa:** artifact `ResultadoTool.datos` (veredicto corto generado por el LLM **solo** con los fragmentos recuperados) + `citas` verificadas en código.
-
-Salida real con Gemini (26/09/2026, "¿hay que avisar antes de aplicar en El Trébol?"):
+**Campos que usa:** veredicto corto (Sí / No / Depende) y la regla en una oración, redactados por el LLM **solo** con los fragmentos recuperados, más las citas verificadas en código.
 
 ```
-*Si.* Toda persona que decida aplicar productos fitosanitarios debe comunicar dicha situación y adjuntar la receta agronómica a la autoridad competente antes de realizar la aplicación.
+*No.* Se prohiben las pulverizaciones de cualquier tipo cuando los vientos superen los 8 km/hora y puedan producir derivas hacia la planta urbana.
 
 *Fuentes*
-- Ordenanza 841/2010, art. 5 (el-trebol)
+- Ordenanza 841/2010, art. 4 (el-trebol)
 ```
 
 ## `consulta_articulo`
 
-**Cuándo:** resultado de `consultar_articulo` ("¿qué dice el artículo 33?").
+**Cuándo:** resultado de `consultar_articulo` ("¿me pasás el artículo 33 de la ley 11273?").
 
-**Campos que usa:** artifact `ResultadoTool.datos` (`norma_legible`, `numero`, `jurisdiccion_id`, `partes`). El texto del artículo va **literal** (sin pasar por el LLM), con las líneas cortadas del PDF ya unidas y un renglón por inciso. No lleva la intro del LLM ni sección *Fuentes*: el encabezado ya cita norma, artículo y jurisdicción. Si el PDF trae más de un texto con el mismo número, se muestran todos ("texto 1 de 2"). Una norma con un artículo de más de 4096 caracteres se parte por oraciones en varios mensajes. Con el número en varias normas la tool repregunta cuál (lista); sin el número o sin encontrarlo, `repregunta` / `no_resuelto`.
+**Campos que usa:** `norma_legible`, `numero`, `jurisdiccion_id`, `partes`. El texto va **literal**, sin pasar por el LLM, con las líneas cortadas del PDF ya unidas y un renglón por inciso. No lleva *Fuentes*: el encabezado ya cita norma, artículo y jurisdicción. Si el PDF trae más de un texto con el mismo número se muestran todos; un artículo de más de 4096 caracteres se parte en varios mensajes. Sin localidad y sin norma nombrada, avisa que buscó en la normativa provincial y nacional; con el número en varias normas, pregunta cuál (lista).
 
 ```
-*Ley 055297/2017, art. 51 (santa-fe)*
-Las excepciones a que refiere el Artículo 33 de la Ley Nº 11.273 podrán establecerse por ordenanza únicamente en los siguientes casos:
-a) La aplicación aérea de productos fitosanitarios de clases toxicológicas C y D podrá realizarse dentro del radio de los quinientos ( 500 ) metros cuando resulte imposible.
-b) La aplicación aérea de clase B solo podrá efectuarse dentro del sector comprendido entre los 500 y los 3.000 metros.
-
-⚠️ Busqué en la normativa provincial y nacional. Si es de una ordenanza, decime la localidad
+*Ley 11273/1995, art. 33 (santa-fe)*
+Prohíbese la aplicación aérea de productos fitosanitarios de clase toxicológica A y B dentro del radio de 3.000 metros de las plantas urbanas. Excepcionalmente podrán aplicarse productos de clase toxicológica C o D dentro del radio de 500 metros, cuando en la jurisdicción exista ordenanza municipal o comunal que lo autorice, y en los casos que taxativamente establecerá la reglamentación de la presente. Idéntica excepción y con iguales requisitos podrán establecerse con los productos de clase toxicológica B para ser aplicados en el sector comprendido entre los 500 y 3.000 metros.
 ```
 
 ## `limitaciones`
 
-**Cuándo:** resultado de `listar_limitaciones` ("¿qué limitaciones hay en El Trébol?", "¿puedo aplicar a 1000 m bajo alguna condición?").
+**Cuándo:** resultado de `listar_limitaciones` ("¿a qué distancia del pueblo puedo tirar Tordon D 30 con avión en Sastre?", "¿qué limitaciones hay en El Trébol?", "¿qué puedo aplicar a 1000 m?").
 
-**Campos que usa:** artifact `ResultadoTool.datos`, armado con las reglas de `reglas.csv` (no por similitud): `prohibiciones` (`N`), `condicionales` (`S`) y, si se dio una distancia, `restricciones` (cada prohibición que alcanza esa distancia con las excepciones que permitirían aplicar). Una excepción de una norma más general no se ofrece contra la prohibición de una norma más local (la excepción de la ley provincial "por ordenanza" no levanta la prohibición de la ordenanza). Las reglas leídas del PDF llevan un aviso de verificación.
+**Campos que usa:** las reglas de `reglas.csv` (no por similitud): `prohibiciones` (`N`), `condicionales` (`S`), las distancias que rigen y, con una distancia, qué se puede a esa distancia. Arriba va *Distancia mínima que rige*: por zona, tipo de aplicación y banda, la prohibición más restrictiva (el mismo criterio que el dictamen), con "salvo excepciones" si una condicional habilita más cerca. Una excepción de una norma más general no levanta la prohibición de una más local. Las reglas leídas del PDF llevan un aviso de verificación.
 
-Sin distancia:
+Con un producto (la banda sale del registro; si vino otra banda, se avisa que se usa la del registro):
+
+```
+*Limitaciones en Sastre*
+
+Para *Tordon D 30*: banda III (azul)
+
+*Distancia mínima que rige*
+- Zona urbana · aérea: banda III: 3000 m (Ordenanza 1174/2019)
+- Escuelas · aérea: banda III: 200 m (Ordenanza 1174/2019)
+
+*Aplicación aérea*
+- Zona urbana · bandas III, IV: a menos de 500 m no se puede aplicar (Ley 11273/1995, art. 33)
+- Escuelas · todas las bandas: a menos de 200 m no se puede aplicar (Ordenanza 1174/2019)
+- Zona urbana · todas las bandas: a menos de 3000 m no se puede aplicar (Ordenanza 1174/2019)
+
+*Excepciones*
+- Zona urbana · aérea · bandas III, IV: se puede con condiciones (Ley 055297/2017, art. 51)
+
+*Fuentes*
+- SENASA, Reg. 30735 (detalle API)
+- Ley 11273/1995, art. 33
+- Ordenanza 1174/2019 (sastre)
+- Ley 055297/2017, art. 51
+```
+
+Localidad sin ordenanza cargada:
 
 ```
 *Limitaciones en Rosario*
 
 ⚠️ No se cuenta con la normativa municipal de Rosario: las limitaciones son las de la normativa provincial
 
-*Aplicación aérea*
-- Zona urbana · banda II: a menos de 3000 m no se puede aplicar (Ley 11273/1995, art. 33)
+*Distancia mínima que rige*
+- Zona urbana · terrestre: banda II: 500 m (Ley 11273/1995, art. 34)
 
 *Aplicación terrestre*
 - Zona urbana · bandas Ia, Ib, II: a menos de 500 m no se puede aplicar (Ley 11273/1995, art. 34)
 
-*Excepciones*
-- Zona urbana · aérea · banda II: se puede aplicar desde 500 m, si: <condiciones> (Ley 055297/2017, art. 51)
+*Fuentes*
+- Ley 11273/1995, art. 34
+```
+
+Un equipo que las normas no nombran (drone como aérea, mochila como terrestre) lleva un aviso arriba: "⚠️ Las normas cargadas no mencionan los drones: muestro las reglas de aplicación aérea, que es como se los suele encuadrar. Confirmalo con la autoridad de aplicación antes de aplicar". Una comparación ("¿es lo mismo por avión que por tierra?") muestra las secciones *Aplicación aérea* y *Aplicación terrestre* en la misma respuesta.
+
+Con una distancia (`distancia_m`):
+
+```
+*A 1000 m de la zona urbana en Rosario*
+- *Terrestre:* ✅ Ia, Ib, II, III y IV
+- *Aérea:* ✅ III y IV · ⚠️ II solo con excepción (Ley 055297/2017, art. 51) · ❌ Ia y Ib
+
+⚠️ No se cuenta con la normativa municipal de Rosario: las limitaciones son las de la normativa provincial
 
 *Fuentes*
-- Ley 11273/1995, art. 33 (santa-fe)
+- Ley 11273/1995, art. 33
+- Ley 055297/2017, art. 51
+```
+
+## `consulta_vehiculo`
+
+**Cuándo:** resultado de `resolver_vehiculo`, si el operario pregunta por un equipo.
+
+```
+*Vehículo:* pulverizador autopropulsado (terrestre)
+```
+
+## `evento_registrado`
+
+**Cuándo:** resultado de `registrar_evento`. Las horas van en la hora local del operario.
+
+```
+✅ *Aplicación iniciada*
+- *Vehículo:* pulverizador autopropulsado
+- *Lote:* 4
+- *Inicio:* domingo 27/09/2026, 10:14
+```
+
+```
+✅ *Aplicación finalizada*
+- *Lote:* 4
+- *Inicio:* domingo 27/09/2026, 10:14
+- *Fin:* domingo 27/09/2026, 10:14
+```
+
+## `agenda`
+
+**Cuándo:** resultado de `consultar_agenda`, de uno o varios días.
+
+```
+*Agenda del lunes 28/09/2026 al sábado 03/10/2026*
+*Lunes 28/09/2026:* sin tareas
+*Martes 29/09/2026:* sin tareas
 ...
+*Sábado 03/10/2026:* sin tareas
 ```
 
-Con distancia (`distancia_m`):
+## `agendar_aplicacion`
+
+**Cuándo:** resultado de `agendar_aplicacion`. Sin fecha pregunta el día; sin hora muestra la agenda de ese día y pregunta el horario (esta plantilla muestra lo que falta, no pasa por `repregunta`).
 
 ```
-*A 1000 m en Rosario*
+¿Para qué fecha querés agendar la aplicación? Podés decirme un día (por ejemplo "martes" o "mañana") o una fecha (por ejemplo 25/09).
+```
 
-- Zona urbana · aérea · banda II: a menos de 3000 m no se puede aplicar (Ley 11273/1995, art. 33)
-  *Excepciones posibles:*
-  - Zona urbana · aérea · banda II: se puede aplicar desde 500 m, si: <condiciones> (Ley 055297/2017, art. 51)
+Agendada, con el pronóstico de la franja y la regla de viento de la localidad. Si ya había tareas a esa hora se avisa una vez por cultivo y lote ("⚠️ Ya tenías 6 aplicaciones de soja (sin lote) agendadas a las 09:00"):
+
+```
+✅ *Aplicación agendada* — lunes 28/09/2026, 09:00 hs
+- *Cultivo:* soja
+
+*Pronóstico en El Trébol, de 07:00 a 11:00* (Open-Meteo, consultado el 27/09 10:10)
+- Viento del sureste (empuja hacia el noroeste), 10 a 16 km/h, ráfagas de hasta 32 km/h
+- Lluvia: 1,8 mm (probabilidad de hasta 58 %)
+- Temperatura: 17 a 19 °C · humedad desde 83 %
+📋 Ordenanza 841/2010, art. 4: prohíbe pulverizar con vientos de más de 8 km/h que puedan producir derivas hacia la planta urbana.
+Es un pronóstico: verificá el viento en el lote antes de empezar.
 ```
 
 ## `repregunta`
 
-**Cuándo:** faltan parámetros requeridos (con o sin tool ejecutada — si no se ejecutó ninguna tool, `RespuestaAgente.faltantes` viene poblado directamente).
-
-**Campos que usa:** `RespuestaAgente.faltantes` o `ResultadoTool.faltantes` de la última tool ejecutada (hasta 3 `CampoFaltante`, priorizados).
+**Cuándo:** falta un dato. Si una tool del turno ya dijo qué falta (y con qué opciones), manda eso; si no, `RespuestaAgente.faltantes`. Hasta 3 datos; cada uno con su pregunta y, si corresponde, botones o lista.
 
 ```
-Para evaluar la receta me faltan 2 datos:
-1. *Localidad*: ¿En qué localidad o municipio se va a realizar la aplicación?
-2. *Tipo de aplicación*: elegí una opción.
-[Terrestre] [Aérea]
+¿En qué localidad se aplica?
+[LISTA: El Trébol | Sastre | San Jorge | ...]
+```
+
+**Respuesta neutra:** si el modelo repregunta sin decir qué falta (pasa con "me equivoqué de foto, después te la mando"), o ante un saludo, un agradecimiento o un "No, gracias", o si eligió un tipo que muestra datos de una tool sin que haya corrido ninguna:
+
+```
+Dale. Cuando quieras, mandame la foto de la receta o escribime tu consulta (un producto, una localidad o una norma).
 ```
 
 ## `fuera_de_dominio`
 
-**Cuándo:** el orquestador clasifica el mensaje como fuera de dominio, **antes** de llamar cualquier tool.
-
-**Campos que usa:** ninguno de tool (no hay artifacts); texto fijo.
+**Cuándo:** el orquestador clasifica el mensaje como fuera de dominio antes de llamar tools (clima, fútbol, pedir las instrucciones internas). Texto fijo.
 
 ```
-Solo puedo ayudarte con recetas de fitosanitarios: leer y validar recetas, verificar productos registrados en SENASA y responder dudas sobre la normativa de aplicación de las localidades cargadas. ¿Me mandás una receta o una consulta sobre eso?
+Solo puedo ayudarte con recetas de fitosanitarios: leer y validar recetas, verificar productos registrados en SENASA, responder dudas sobre la normativa de aplicación de las localidades cargadas, y registrar/consultar tus aplicaciones en el campo. ¿Me mandás una receta o una consulta sobre eso?
 ```
 
 ## `no_resuelto`
 
-**Cuándo:** una tool devuelve `estado="no_resuelto"` con un `MotivoNoResuelto`.
+**Cuándo:** una tool devuelve `estado="no_resuelto"` con un `MotivoNoResuelto`. Tres formas:
 
-**Campos que usa:** `ResultadoTool.motivo` (vía `DESCRIPCION_MOTIVO`), `ResultadoTool.chequeos_no_realizados` / lo que sí se evaluó (de otras tools del mismo turno si las hubo).
+Sin respaldo en el RAG (`NORMATIVA_SIN_RESPALDO`, `MARBETE_SIN_RESPALDO`): no es un error ni un dato mal dado, el bot no tiene esa información. Se dice así, sin avisos internos:
 
 ```
-⚠️ *No pude completar la evaluación*
-*Qué no pude determinar:* la distancia mínima a zonas protegidas.
-*Por qué:* el lote está fuera de las localidades cargadas en el sistema.
-*Qué sí evalué:* el producto está registrado y autorizado para soja ✅
-*Qué podés hacer:* consultar la ordenanza de esa localidad o al área de ambiente del municipio.
+ℹ️ *No cuento con esa información*
+No encontré en la normativa cargada nada que responda tu pregunta, así que no te doy una respuesta sin una norma que la respalde.
+*Qué podés hacer:* consultalo al área de ambiente del municipio o a tu ingeniero agrónomo.
+```
+
+(Para el marbete: "No encontré en el marbete del producto nada que responda tu pregunta…" y "leé la etiqueta del envase o consultalo con tu ingeniero agrónomo".)
+
+Foto que no es una receta o no se lee (`IMAGEN_ILEGIBLE`):
+
+```
+📷 *No pude leer una receta en esa foto*
+Puede que no sea una receta, o que esté borrosa o cortada.
+*Qué podés hacer:* mandame una foto nítida de la receta completa, con buena luz.
+```
+
+El resto de los motivos (descripción de `dominio/motivos.py::DESCRIPCION_MOTIVO`):
+
+```
+⚠️ *No pude completar la consulta*
+*Por qué:* <descripción del motivo>
+*Detalle:* <primera advertencia de la tool, si hay>
+*Qué podés hacer:* revisá el dato e intentá de nuevo, o consultá al área de ambiente del municipio / a tu ingeniero agrónomo.
 ```
 
 ## `ayuda`
 
-**Cuándo:** el usuario saluda o pide ayuda genérica ("qué podés hacer", "hola"), sin que sea ni una consulta de dominio ni claramente fuera de dominio.
-
-**Campos que usa:** ninguno de tool; texto fijo que resume las capacidades del bot (mismo espíritu que `fuera_de_dominio` pero en tono de bienvenida, no de rechazo).
+**Cuándo:** el operario pide ayuda genérica ("¿qué podés hacer?"). Texto fijo.
 
 ```
 Hola 👋 Soy el asistente de recetas fitosanitarias. Puedo:
 - Leer una foto de tu receta y decirte si es apta para aplicar.
-- Buscar si un producto está registrado en SENASA.
+- Buscar si un producto está registrado en SENASA y qué dice su marbete (carencia, precauciones, mezclas).
 - Responder dudas sobre la normativa de aplicación de tu localidad, mostrarte el texto de un artículo o decirte qué limitaciones tiene.
+- Registrar cuando empezás y terminás de aplicar.
+- Contarte tu agenda del día.
 Mandame una foto de receta o contame qué necesitás.
 ```
 
-**Pendiente de decidir en Fase 7:** si este tipo se mantiene separado o se resuelve como un caso particular de `fuera_de_dominio` (ver nota al principio de este documento).
-
 ## `error`
 
-**Cuándo:** una tool devuelve `estado="error"` (falla técnica real, no un estado esperable) o el propio orquestador captura una excepción no manejada.
-
-**Campos que usa:** ninguno del dominio (nunca se exponen detalles internos/stacktraces al usuario); el detalle real va al log estructurado por turno, no al mensaje.
+**Cuándo:** una tool devuelve `estado="error"` o el orquestador captura una excepción. Nunca se muestran detalles internos: van al log del turno.
 
 ```
 ⚠️ Tuve un problema técnico y no pude procesar tu mensaje. Probá de nuevo en unos minutos; si sigue fallando, contactá a soporte.

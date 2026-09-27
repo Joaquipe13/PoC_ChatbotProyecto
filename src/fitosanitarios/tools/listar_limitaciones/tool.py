@@ -43,7 +43,7 @@ class ListarLimitacionesArgs(BaseModel):
     banda: str | None = None
     tipo_zona: str | None = None
     distancia_m: float | None = None
-    producto: str | None = None  # para tomar su banda si no la dijo
+    producto: str | None = None  # su banda del registro manda sobre `banda`
 
 
 def regla_a_dict(r: ReglaCandidata) -> dict:
