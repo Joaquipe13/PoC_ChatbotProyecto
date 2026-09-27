@@ -46,7 +46,7 @@ Al levantar `cloudflared tunnel --url http://localhost:8000` para probar el cana
 
 Después de verificar la URL del webhook (Meta respondió `200 OK` al handshake `GET`, confirmado en el log del servidor), mandar "Hola" desde el número de prueba no generaba ningún `POST /webhook` -- el mensaje nunca llegaba. Causa: faltaba suscribir el campo `messages` de la cuenta de WhatsApp Business, que en el dashboard de Meta está en una sección separada ("Webhooks" a nivel de toda la app, seleccionando el objeto "Cuenta de WhatsApp Business"), no en la pantalla "WhatsApp > Configuración" donde se carga la URL y el verify token -- y en algunos casos esa sección de suscripción de campos solo aparece habilitada después de que la verificación de la URL fue exitosa. Una vez suscripto, el flujo completo funcionó de punta a punta (confirmado con filas reales en `operacion.turno`).
 
-### Pendiente: warning de LangGraph por tipo no registrado en el checkpoint
+### Warning de LangGraph por tipo no registrado en el checkpoint (resuelto el 27/09/2026)
 
 Con el flujo ya funcionando, el log mostró:
 
@@ -55,6 +55,8 @@ Deserializing unregistered type fitosanitarios.dominio.modelos.RespuestaAgente f
 ```
 
 No rompe nada hoy (es solo un warning), pero `langgraph` avisa que una versión futura va a bloquear la deserialización automática de tipos custom desde el checkpointer de Postgres si no están explícitamente permitidos. Si se actualiza `langgraph` más adelante y el checkpointer deja de recuperar el historial de conversación (o tira un error de deserialización), es por esto. **Pendiente:** registrar `('fitosanitarios.dominio.modelos', 'RespuestaAgente')` en `allowed_msgpack_modules` al crear el `PostgresSaver` (`orquestador/agente.py::checkpointer_postgres`), o setear `LANGGRAPH_STRICT_MSGPACK=true` y confirmar que sigue andando -- no se aplicó todavía, solo queda anotado para no perderlo de vista antes de la entrega.
+
+**Resuelto (27/09/2026):** `checkpointer_postgres` usa un serializador con los tipos propios permitidos de forma explícita (`orquestador/agente.py::TIPOS_DEL_CHECKPOINT`). Relevando los ~3.300 checkpoints reales de las bases de desarrollo y de evaluación aparecieron dos, no uno: `RespuestaAgente` y `MotivoNoResuelto`. Con el serializador nuevo se cargan todos sin ningún tipo bloqueado ni sin registrar, y `tests/orquestador/test_checkpoint.py` controla que la respuesta y el motivo vuelvan del checkpoint sin avisos. Si se agrega otro tipo propio al estado del agente, hay que sumarlo a esa lista: si no, LangGraph lo bloquea y lo avisa en el log.
 
 ## Orquestador: a veces repregunta por la foto en vez de confirmar la receta parcial
 

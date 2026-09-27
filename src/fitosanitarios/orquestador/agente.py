@@ -21,9 +21,11 @@ from langchain.agents.structured_output import ToolStrategy
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import AIMessage, HumanMessage
 from langgraph.checkpoint.postgres import PostgresSaver
+from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
 
 from fitosanitarios.config import Settings
 from fitosanitarios.dominio.modelos import RespuestaAgente
+from fitosanitarios.dominio.motivos import MotivoNoResuelto
 from fitosanitarios.orquestador.prompt_sistema import PROMPT_SISTEMA
 from fitosanitarios.tools.agendar_aplicacion import agendar_aplicacion
 from fitosanitarios.tools.completar_receta import completar_receta
@@ -152,11 +154,26 @@ def crear_agente(model: BaseChatModel, checkpointer=None, imagen_base64: str | N
     )
 
 
+# Los tipos propios que quedan en el checkpoint (la respuesta estructurada del agente y
+# su motivo). LangGraph los deserializa hoy con un warning y anuncia que en una versión
+# futura los va a bloquear si no están permitidos de forma explícita: sin esto, el
+# historial de la conversación dejaría de recuperarse. Relevado sobre ~1.700 checkpoints
+# reales (27/09/2026): no hay otros.
+TIPOS_DEL_CHECKPOINT = (RespuestaAgente, MotivoNoResuelto)
+
+
+def serializador_checkpoint() -> JsonPlusSerializer:
+    return JsonPlusSerializer(
+        allowed_msgpack_modules=[(t.__module__, t.__name__) for t in TIPOS_DEL_CHECKPOINT]
+    )
+
+
 @contextmanager
 def checkpointer_postgres(database_url: str):
     """Context manager: `PostgresSaver.setup()` crea sus propias tablas la
     primera vez (ver skill: "Más las tablas propias del checkpointer de
     LangGraph"), no están en las migraciones de `datos/migraciones/`."""
     with PostgresSaver.from_conn_string(database_url) as saver:
+        saver.serde = serializador_checkpoint()
         saver.setup()
         yield saver
