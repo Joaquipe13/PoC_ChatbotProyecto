@@ -115,6 +115,14 @@ def test_la_norma_puede_venir_escrita_a_mano(base):
     assert r.estado == "ok" and r.datos["norma"] == "ley-11273-1995"
 
 
+def test_con_la_norma_nombrada_no_pide_la_localidad(base):
+    """Plan de pruebas (27/09/2026): "el artículo 33 de la ley 11273" avisaba "Si es de una
+    ordenanza, decime la localidad", aunque ya había dicho que era una ley provincial."""
+    base["filas"] = [ART_33, ART_6_OTRA_NORMA]
+    r = _consultar(numero_articulo="33", norma="ley 11273")
+    assert not any("decime la localidad" in a for a in r.advertencias)
+
+
 def test_norma_que_no_esta_cargada_lista_las_que_si(base):
     r = _consultar(numero_articulo="33", norma="ley 999")
     assert r.estado == "no_resuelto" and r.motivo == MotivoNoResuelto.ARTICULO_NO_ENCONTRADO

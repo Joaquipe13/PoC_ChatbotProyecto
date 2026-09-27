@@ -58,10 +58,13 @@ def plantilla_riesgo(respuesta: RespuestaAgente, resultados: list[ResultadoTool]
     bloque_observaciones = "\n".join(
         ["⚠️ *Observaciones*"] + [f"{i}. {o}" for i, o in enumerate(observaciones, start=1)]
     ) if observaciones else ""
+    # Con la dosis fuera de rango no se ofrece agendar. "La banda de cada producto" solo
+    # si hay más de uno: con uno, ya está en el encabezado de las condiciones.
+    varios = len((condiciones or {}).get("productos_por_banda") or {}) > 1
     if not condiciones:
         seguimiento = ""
     elif observaciones:
-        seguimiento = SEGUIMIENTO_SOLO_INFO
+        seguimiento = SEGUIMIENTO_SOLO_INFO if varios else ""
     else:
         seguimiento = SEGUIMIENTO_COMPLETO
     return unir_secciones(

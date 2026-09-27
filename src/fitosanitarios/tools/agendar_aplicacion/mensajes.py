@@ -24,11 +24,14 @@ def motivo_hora_no_entendida(texto: str) -> str:
     return f"no entendí el horario '{texto}'"
 
 
-def advertencia_choque(cultivo: str | None, lote: str | None, hora: str) -> str:
-    return (
-        f"Ya tenías {cultivo or 'una tarea'} ({f'lote {lote}' if lote else 'sin lote'}) "
-        f"agendada a las {hora}"
-    )
+def advertencia_choque(cultivo: str | None, lote: str | None, hora: str, veces: int = 1) -> str:
+    lugar = f"lote {lote}" if lote else "sin lote"
+    if veces > 1:
+        return (
+            f"Ya tenías {veces} aplicaciones de {cultivo or 'otra tarea'} ({lugar}) "
+            f"agendadas a las {hora}"
+        )
+    return f"Ya tenías {cultivo or 'una tarea'} ({lugar}) agendada a las {hora}"
 
 
 def resumen_para_llm(estado: str, fecha_iso: str | None) -> str:

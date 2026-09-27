@@ -20,6 +20,7 @@ from dataclasses import dataclass, field
 
 from fitosanitarios.dominio.modelos import Cita, CondicionesAplicacion, Dictamen, Observacion
 from fitosanitarios.servicios.dosis import ChequeoDosis
+from fitosanitarios.servicios.formato import num
 
 
 def observacion_de_dosis(chd: ChequeoDosis) -> str:
@@ -27,8 +28,8 @@ def observacion_de_dosis(chd: ChequeoDosis) -> str:
     `evaluar_riesgo`, que también compara la dosis."""
     direccion = "por encima" if chd.porcentaje_desvio > 0 else "por debajo"
     return (
-        f"Dosis {chd.valor_declarado} {chd.unidad_declarada}: {direccion} del rango "
-        f"registrado ({chd.valor_min_registrado}-{chd.valor_max_registrado} "
+        f"Dosis {num(chd.valor_declarado)} {chd.unidad_declarada}: {direccion} del rango "
+        f"registrado ({num(chd.valor_min_registrado)}-{num(chd.valor_max_registrado)} "
         f"{chd.unidad_declarada}), {abs(chd.porcentaje_desvio):.0f}% de desvío."
     )
 

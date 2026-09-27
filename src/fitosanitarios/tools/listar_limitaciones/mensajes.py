@@ -54,6 +54,13 @@ def aviso_producto_no_encontrado(nombre: str) -> str:
     return f"No encontré '{nombre}' en el registro de SENASA: muestro todas las bandas"
 
 
+def aviso_banda_distinta_del_registro(marca: str, banda: str) -> str:
+    return (
+        f"{marca} es banda {banda} ({COLOR_BANDA[banda]}) en el registro de SENASA: "
+        "uso esa banda"
+    )
+
+
 def aviso_producto_sin_banda(marca: str) -> str:
     return f"{marca} no tiene banda registrada en SENASA: muestro todas las bandas"
 

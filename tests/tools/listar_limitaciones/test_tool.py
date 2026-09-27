@@ -154,14 +154,38 @@ def test_con_un_producto_filtra_por_su_banda_y_lo_cita(base, monkeypatch):
     assert r.citas[0].registro_senasa == "30735"
 
 
-def test_la_banda_que_dijo_el_operario_manda_sobre_el_producto(base, monkeypatch):
-    def no_se_busca(*_):
-        raise AssertionError("con la banda dicha no hace falta buscar el producto")
+def test_la_banda_del_registro_manda_sobre_la_dicha(base, monkeypatch):
+    """Gemini pasó banda="roja" junto con Tordon D 30 (banda III) y se filtraba con Ia/Ib:
+    la distancia mostrada era la de otra banda."""
+    _con_catalogo(monkeypatch, [_producto(1, "Tordon D 30", "III", "30735")])
+    r = _listar(producto="Tordon D 30", banda="roja")
+    assert r.datos["filtros"]["bandas"] == ["III"]
+    assert r.datos["producto"]["marca"] == "Tordon D 30"
+    assert any("banda III (azul)" in a for a in r.advertencias)
 
-    monkeypatch.setattr(modulo, "buscar_productos_por_nombre", no_se_busca)
-    r = _listar(producto="Tordon D 30", banda="verde")
+
+def test_la_banda_dicha_que_coincide_con_el_registro_no_avisa(base, monkeypatch):
+    _con_catalogo(monkeypatch, [_producto(1, "Tordon D 30", "III", "30735")])
+    r = _listar(producto="Tordon D 30", banda="azul")
+    assert r.datos["filtros"]["bandas"] == ["III"]
+    assert not any("registro de SENASA" in a for a in r.advertencias)
+
+
+def test_producto_ambiguo_con_banda_dicha_usa_la_banda_sin_preguntar(base, monkeypatch):
+    _con_catalogo(monkeypatch, [
+        _producto(1, "Roundup Fg", "III"), _producto(2, "Roundup Wg", "IV"),
+    ])
+    r = _listar(producto="Roundup", banda="verde")
+    assert r.estado == "ok"
     assert r.datos["filtros"]["bandas"] == ["IV"]
     assert r.datos["producto"] is None
+
+
+def test_producto_que_no_esta_con_banda_dicha_usa_la_banda_sin_avisar(base, monkeypatch):
+    _con_catalogo(monkeypatch, [])
+    r = _listar(producto="Inventadol", banda="verde")
+    assert r.datos["filtros"]["bandas"] == ["IV"]
+    assert not any("Inventadol" in a for a in r.advertencias)
 
 
 def test_producto_con_variantes_de_distinta_banda_pregunta_cual(base, monkeypatch):

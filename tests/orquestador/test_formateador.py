@@ -241,7 +241,23 @@ def test_evaluar_riesgo_con_dosis_fuera_de_rango_lo_dice_y_no_ofrece_agendar():
     texto = _un_mensaje(RespuestaAgente(tipo="dictamen"), [resultado])
     assert texto.startswith("⚠️ *Observaciones*\n1. Flyer 10 Ec: Dosis 500.0 cm3/ha: por encima")
     assert "Agendar" not in texto
-    assert texto.endswith("[Sí] [No]")
+    assert texto.endswith("[Sí] [No]")  # dos productos: la banda de cada uno suma
+
+
+def test_evaluar_riesgo_con_dosis_fuera_de_rango_y_un_producto_no_ofrece_la_banda():
+    """Plan de pruebas (27/09/2026): con un solo producto preguntaba "¿Querés la banda de
+    cada producto?" justo debajo de "banda II (amarilla)"."""
+    condiciones = {**_CONDICIONES_EL_TREBOL, "productos_por_banda": {"Flyer 10 Ec": "II"}}
+    resultado = ResultadoTool(
+        estado="observado",
+        datos={
+            "jurisdiccion_id": "el-trebol", "condiciones": condiciones,
+            "observaciones": ["Flyer 10 Ec: Dosis 500 cm3/ha: por encima del rango"],
+        },
+    )
+    texto = _un_mensaje(RespuestaAgente(tipo="dictamen"), [resultado])
+    assert "Agendar" not in texto
+    assert "banda de cada producto" not in texto
 
 
 def test_detalle_bandas_lista_la_banda_de_cada_producto():
@@ -1264,3 +1280,25 @@ def test_aviso_de_choque_sin_lote():
     assert sin_lote == "Ya tenías soja (sin lote) agendada a las 09:00"
     con_lote = advertencia_choque("soja", "4", "09:00")
     assert con_lote == "Ya tenías soja (lote 4) agendada a las 09:00"
+
+
+def test_aviso_de_choque_con_varias_tareas_iguales_es_uno():
+    """Plan de pruebas (27/09/2026): el mismo aviso salía 6 veces, una por tarea igual."""
+    from fitosanitarios.tools.agendar_aplicacion.mensajes import advertencia_choque
+
+    assert advertencia_choque("soja", None, "09:00", 6) == (
+        "Ya tenías 6 aplicaciones de soja (sin lote) agendadas a las 09:00"
+    )
+
+
+def test_observacion_de_dosis_con_coma_decimal_y_sin_punto_cero():
+    from fitosanitarios.servicios.dictamen import observacion_de_dosis
+    from fitosanitarios.servicios.dosis import ChequeoDosis
+
+    chd = ChequeoDosis(
+        cumple=False, comparable=True, valor_declarado=500.0, unidad_declarada="cm3/ha",
+        valor_min_registrado=0.5, valor_max_registrado=180.0, porcentaje_desvio=177.8,
+    )
+    assert observacion_de_dosis(chd) == (
+        "Dosis 500 cm3/ha: por encima del rango registrado (0,5-180 cm3/ha), 178% de desvío."
+    )

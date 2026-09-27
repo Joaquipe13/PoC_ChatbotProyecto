@@ -7,8 +7,9 @@ Sale de las reglas cargadas (`reglas.csv`), no de una búsqueda por similitud: l
 lista es completa y cada línea cita norma y artículo. Las prohibiciones (`N`) son
 las que bloquean el dictamen; las condicionales (`S`) solo se muestran acá.
 
-Si el operario nombra un producto y no la banda ("tengo Roundup, ¿a cuánto del pueblo lo
-puedo tirar?"), la banda sale del registro de SENASA y se filtra con ella.
+Si el operario nombra un producto ("tengo Roundup, ¿a cuánto del pueblo lo puedo
+tirar?"), la banda sale del registro de SENASA y se filtra con ella, aunque venga también
+una banda.
 """
 
 from langchain_core.tools import tool
@@ -123,19 +124,28 @@ def listar_limitaciones_logica(
         bandas = None
     tipo_zona = normalizar_tipo_zona(args.tipo_zona)
 
-    # La banda que dijo el operario manda; si no la dijo, la del producto que nombró.
+    # Si nombró un producto, manda la banda del registro: una banda dicha (o supuesta por el
+    # modelo) que no coincide cambiaría la distancia. La dicha solo se usa si el producto no
+    # está, no tiene banda o es ambiguo.
     producto = None
     citas_producto: list[Cita] = []
-    if args.producto and args.producto.strip() and bandas is None:
+    if args.producto and args.producto.strip():
         producto, corte = _producto_con_banda(conn, modelo_embeddings, args.producto.strip())
         if corte is not None:
-            return corte
-        if producto is None:
-            advertencias.append(mensajes.aviso_producto_no_encontrado(args.producto.strip()))
+            if bandas is None:
+                return corte
+        elif producto is None:
+            if bandas is None:
+                advertencias.append(mensajes.aviso_producto_no_encontrado(args.producto.strip()))
         elif producto["banda"] is None:
-            advertencias.append(mensajes.aviso_producto_sin_banda(producto["marca"]))
+            if bandas is None:
+                advertencias.append(mensajes.aviso_producto_sin_banda(producto["marca"]))
             producto = None
         else:
+            if bandas is not None and bandas != [producto["banda"]]:
+                advertencias.append(
+                    mensajes.aviso_banda_distinta_del_registro(producto["marca"], producto["banda"])
+                )
             bandas = [producto["banda"]]
             if producto["numero_inscripcion"]:
                 citas_producto = [Cita(

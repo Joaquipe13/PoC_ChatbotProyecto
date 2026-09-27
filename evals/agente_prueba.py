@@ -123,13 +123,20 @@ def ruta_imagen(escenario: dict) -> Path | None:
 
 
 def reiniciar_thread(thread: str) -> None:
-    """El checkpointer de la base de evaluación guarda la conversación entre corridas: un
-    caso repetido arrancaría con el historial viejo."""
+    """La base de evaluación guarda la conversación, la agenda y los eventos entre
+    corridas: un caso repetido arrancaría con el historial viejo y, al agendar, avisaba un
+    choque con cada aplicación agendada en las corridas anteriores."""
+    import psycopg
+
     from fitosanitarios.config import get_settings
     from fitosanitarios.orquestador.agente import checkpointer_postgres
 
-    with checkpointer_postgres(get_settings().database_url) as checkpointer:
+    url = get_settings().database_url
+    with checkpointer_postgres(url) as checkpointer:
         checkpointer.delete_thread(thread)
+    with psycopg.connect(url) as conn:
+        conn.execute("DELETE FROM operacion.evento_aplicacion WHERE thread_id = %s", (thread,))
+        conn.execute("DELETE FROM operacion.receta WHERE thread_id = %s", (thread,))
 
 
 def conversar(

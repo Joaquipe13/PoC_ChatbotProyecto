@@ -15,6 +15,7 @@ pronóstico del tiempo de esa franja (ver DECISIONES.md, "Pronóstico del tiempo
 agendar"). Es información: si no se puede obtener, se agenda igual.
 """
 
+from collections import Counter
 from datetime import date, datetime, time
 
 from langchain_core.runnables import RunnableConfig
@@ -143,9 +144,11 @@ def agendar_aplicacion_logica(
             ),
         },
     )
+    # Un aviso por cultivo y lote: las tareas iguales a la misma hora se cuentan.
+    iguales = Counter((t.get("cultivo"), t.get("lote")) for t in choques)
     advertencias = [
-        mensajes.advertencia_choque(t.get("cultivo"), t.get("lote"), hora_legible(hora))
-        for t in choques
+        mensajes.advertencia_choque(cultivo, lote, hora_legible(hora), veces)
+        for (cultivo, lote), veces in iguales.items()
     ]
     pronostico = _pronostico(
         conn, args.localidad, fecha, hora, hoy, cliente_meteo, horizonte_dias

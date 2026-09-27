@@ -64,7 +64,9 @@ def consultar_articulo_logica(args: ConsultarArticuloArgs, conn) -> ResultadoToo
     advertencias: list[str] = []
     if con_localidad and not ubicacion.con_normativa_municipal:
         advertencias.append(mensajes.advertencia_sin_normativa_municipal(ubicacion.nombre))
-    if not con_localidad:
+    # Si nombró la norma ("art. 33 de la ley 11273") no hace falta pedir la localidad:
+    # si es una ordenanza que no está en el alcance, el filtro de abajo lo dice.
+    if not con_localidad and not (args.norma and args.norma.strip()):
         advertencias.append(mensajes.ADVERTENCIA_SIN_LOCALIDAD)
 
     filas = articulos_por_numero(conn, numero, ubicacion.localidad_id, ubicacion.provincia_id)

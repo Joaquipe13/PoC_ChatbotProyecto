@@ -20,9 +20,10 @@ Args:
     provincia: solo si la tool la pidió.
     tipo_aplicacion: el tipo o el equipo tal como lo dijo ("aérea", "terrestre", "avión",
         "mosquito", "drone", "mochila"), si lo dijo. No lo traduzcas: la tool lo interpreta.
-    banda: Ia, Ib, II, III, IV o su color (roja, amarilla, azul, verde), si la dijo;
-        una o varias ("amarilla y verde").
+    banda: Ia, Ib, II, III, IV o su color (roja, amarilla, azul, verde), solo si el
+        operario la dijo; una o varias ("amarilla y verde"). Nunca la supongas por el
+        producto: para eso está `producto`.
     tipo_zona: "zona urbana", "escuela" o "curso de agua", si la dijo.
     distancia_m: metros entre el lote y la zona a la que quiere aplicar, si los dio.
         Nunca la dosis ni la superficie.
-    producto: nombre comercial del producto, si lo nombró y no dijo la banda."""
+    producto: nombre comercial del producto, si lo nombró. Su banda sale del registro."""
