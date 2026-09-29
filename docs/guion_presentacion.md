@@ -2,10 +2,10 @@
 
 Guía para grabar el video del TP: el caso de negocio por arriba, los problemas que resuelve
 el chatbot alternados con chats reales, las herramientas y los problemas que surgieron. Los
-tiempos son orientativos (total ~17 min); si hay que recortar, las secciones marcadas como
+tiempos son orientativos (total ~18 min); si hay que recortar, las secciones marcadas como
 *opcional* son las primeras en salir.
 
-Las salidas de los chats son las que dio el bot con Gemini real el 26/09/2026. Gemini varía
+Las salidas de los chats son las que dio el bot con Gemini real el 27/09/2026. Gemini varía
 entre corridas: **ensayar cada chat antes de grabar** (con `USE_FIXTURES=false`, una
 conversación nueva por caso). El guion técnico caso por caso está en `docs/guion-demo.md`.
 
@@ -56,62 +56,192 @@ un envase con su banda de color).
 
 ---
 
-## 3. Los problemas que resuelve, con ejemplos (3:00 – 11:30)
+## 3. Lo que hace el bot, con un recorrido completo (3:00 – 12:00)
 
-Para cada problema: una frase del problema, el chat en pantalla y una frase de qué hay que
-notar. No leer la respuesta entera: señalar lo importante.
+Un recorrido por las 14 herramientas (tools) del bot en dos partes: **un día de trabajo** con
+una receta (de la foto al registro de la aplicación, en una sola conversación) y **las dudas
+del día**, cada una en una conversación nueva. Para cada chat: una frase del problema, el chat
+en pantalla y una frase de qué hay que notar. No leer la respuesta entera: señalar lo
+importante.
 
-### 3.1 "Tengo que leer y cargar la receta" (3:00 – 4:00)
+| Chat | Tools que se ven |
+|---|---|
+| 3.1 La receta, de la foto al dictamen | `leer_receta`, `completar_receta`, `evaluar_viabilidad_legal` |
+| 3.2 Agendar, con el pronóstico | `agendar_aplicacion` |
+| 3.3 En el campo | `registrar_evento` (con `resolver_vehiculo` adentro), `consultar_agenda` |
+| 3.4 "¿Puedo aplicar esto?" | `evaluar_riesgo`, `validar_producto_registro`, `consultar_productos` |
+| 3.5 "¿A qué distancia del pueblo?" | `listar_limitaciones` |
+| 3.6 "¿Qué dice la etiqueta?" | `consultar_marbete` |
+| 3.7 "¿Qué dice la norma?" | `responder_consulta_normativa`, `consultar_articulo` |
 
-**Problema:** la receta viene en papel o foto; transcribirla es lento y se cometen errores.
+Las salidas son las que dio el bot con Gemini real el 27/09/2026. La fecha del agendado y el
+pronóstico van a ser otros el día que se grabe.
 
-**Chat:** adjuntar la foto de una receta de ejemplo (`data/recetas_ejemplo/01_apta_terrestre.jpg`).
-*[Ensayar: no hay una salida verificada del 26/09 para este caso.]*
+### Parte 1: un día de trabajo (una sola conversación, 3.1 a 3.3)
 
-**Qué notar:** el bot lee la foto con un modelo multimodal y muestra lo que leyó para
-**confirmar** antes de evaluar. Si falta un dato obligatorio (cultivo, localidad, dosis…), lo
-pregunta en vez de adivinarlo.
+#### 3.1 La receta, de la foto al dictamen (3:00 – 4:45)
 
-### 3.2 "¿Puedo aplicar esto?" — el dictamen (4:00 – 5:30)
+**Problema:** la receta viene en papel o en foto; transcribirla es lento, y verificar a mano el
+registro, el cultivo, la dosis y la normativa lleva tiempo y se cometen errores.
 
-**Problema:** verificar el registro, el cultivo, la dosis y la normativa a mano.
+**Chat:** adjuntar `data/recetas_ejemplo/02_apta_aerea_banda_ii.jpg` con "te paso la receta".
 
-**Chat:**
-> Quiero validar la receta completa: Flyer 10 Ec en soja, 170 cm3/ha, terrestre, en El Trébol, contra chinche de la alfalfa
+```
+*Leí la receta N.° 1002*. Falta la siguiente información obligatoria:
+
+1. *Localidad:* ¿En qué localidad se aplica?
+
+*Lo que pude leer:*
+- *Cultivo:* Soja
+- *Lote:* 3
+- *Superficie:* 25 ha
+- *Adversidad:* Chinche de la alfalfa
+- *Producto:* Flyer 10 Ec — 170 cm3/ha
+- *Tipo de aplicación:* aérea
+```
+
+> El Trébol
+
+```
+*Leí la receta N.° 1002*. Confirmá los datos:
+- *Cultivo:* Soja
+- *Lote:* 3
+- *Localidad:* El Trébol
+...
+[Confirmar] [Corregir]
+```
+
+> *(botón)* Confirmar
 
 ```
 *Dictamen* — El Trébol
 *Resultado:* ✅ APTA
 
-*Condiciones de aplicación* — El Trébol · terrestre · banda II (amarilla)
-- *Distancia mínima a zona urbana:* 500 m (Ley 11273/1995, art. 34)
+*Condiciones de aplicación* — El Trébol · aérea · banda II (amarilla)
+- *Distancia mínima a zona urbana:* 3000 m (Ley 11273/1995, art. 33)
 
 *Fuentes*
 - SENASA, Reg. 41881 (detalle API)
 
+- Ordenanza 841/2010, art. 6 (el-trebol)
+- Ordenanza 841/2010, art. 7 (el-trebol)
 ¿Agendamos la aplicación?
-[BOTONES: Agendar | No, gracias]
+[Agendar] [No, gracias]
 ```
 
-Y con una dosis equivocada (500 cm3/ha):
+**Qué notar:** el bot lee la foto con un modelo multimodal, y lo que falta (la localidad) **lo
+pregunta en vez de adivinarlo**; con la respuesta completa la receta que ya leyó, sin volver a
+leerla. Siempre se confirma antes de evaluar. El dictamen **no lo decide el LLM**: lo calcula
+código contra el registro de SENASA y las reglas cargadas, y cada dato trae su fuente.
+
+#### 3.2 Agendar, con el pronóstico (4:45 – 5:30)
+
+**Problema:** coordinar cuándo aplicar, y el viento y la lluvia cambian lo que conviene.
+
+> *(botón)* Agendar
 
 ```
-*Resultado:* ❌ OBSERVADA
-
-*Observaciones*
-1. Dosis 500.0 cm3/ha: por encima del rango registrado (160.0-180.0 cm3/ha), 178% de desvío.
+¿Para qué fecha querés agendar la aplicación? Podés decirme un día (por ejemplo "martes" o "mañana") o una fecha (por ejemplo 25/09).
 ```
 
-**Qué notar:** de una frase en lenguaje natural sale el producto, el cultivo, la dosis y la
-localidad; pero **el dictamen no lo decide el LLM**: lo calcula código contra el registro de
-SENASA y las reglas cargadas, y cada afirmación trae su fuente.
+> el lunes a las 9
 
-### 3.3 "¿A qué distancia del pueblo puedo tirar?" (5:30 – 7:00)
+```
+✅ *Aplicación agendada* — lunes 28/09/2026, 09:00 hs
+- *Cultivo:* Soja
+- *Lote:* 3
 
-**Problema:** la distancia depende de la localidad, del tipo de aplicación y de la banda, y
-la fijan varias normas a la vez.
+*Pronóstico en El Trébol, de 07:00 a 11:00* (Open-Meteo, consultado el 27/09 22:00)
+- Viento del sureste (empuja hacia el noroeste), 13 a 17 km/h, ráfagas de hasta 32 km/h
+- Lluvia: 2,2 mm (probabilidad de hasta 67 %)
+- Temperatura: 15 a 16 °C · humedad desde 89 %
+📋 Ordenanza 841/2010, art. 4: prohíbe pulverizar con vientos de más de 8 km/h que puedan producir derivas hacia la planta urbana.
+Es un pronóstico: verificá el viento en el lote antes de empezar.
+```
 
-**Chat:**
+**Qué notar:** "el lunes" lo resuelve código, no el LLM. El pronóstico es **información**, no
+un control: dice hacia dónde va la deriva y trae la norma de viento de la localidad.
+
+#### 3.3 En el campo (5:30 – 6:15)
+
+> Arranco a aplicar con la mosquito en el lote 8
+
+```
+✅ *Aplicación iniciada*
+- *Vehículo:* pulverizador autopropulsado
+- *Lote:* 8
+- *Inicio:* domingo 27/09/2026, 22:07
+```
+
+> Listo, terminé
+
+```
+✅ *Aplicación finalizada*
+- *Lote:* 8
+- *Inicio:* domingo 27/09/2026, 22:07
+- *Fin:* domingo 27/09/2026, 22:08
+```
+
+> ¿Qué tengo agendado para esta semana?
+
+```
+*Agenda del lunes 28/09/2026 al sábado 03/10/2026* (1)
+*Lunes 28/09/2026:*
+1. ⏳ 09:00 — Soja — lote 3 (pendiente)
+*Martes 29/09/2026:* sin tareas
+...
+```
+
+**Qué notar:** "la mosquito" es como le dicen en el campo al pulverizador autopropulsado: el bot
+lo reconoce contra un catálogo de equipos. La agenda muestra la aplicación que se agendó en 3.2.
+
+### Parte 2: las dudas del día (una conversación nueva para cada una)
+
+#### 3.4 "¿Puedo aplicar esto?" (6:15 – 7:45)
+
+**Problema:** antes de comprar o aplicar, saber si un producto sirve y a qué dosis.
+
+> ¿Puedo usar Flyer 10 Ec en soja a 500 cm3/ha por tierra en El Trébol?
+
+```
+
+⚠️ *Observaciones*
+1. Flyer 10 Ec: Dosis 500 cm3/ha: por encima del rango registrado (25-180 cm3/ha), 178% de desvío.
+*Condiciones de aplicación* — El Trébol · terrestre · banda II (amarilla)
+- *Distancia mínima a zona urbana:* 500 m (Ley 11273/1995, art. 34)
+```
+
+> ¿Y cuál sería la dosis correcta?
+
+```
+*Flyer 10 Ec* · Reg. SENASA 41881 · Banda II · ✅ autorizado para Soja
+Dosis registrada para Soja:
+- 25 a 35 cm3/ha (Oruga De Las Leguminosas)
+- 150 cm3/ha (Trips Del Poroto)
+- 160-180 cm3/ha (Chinche De La Alfalfa)
+- 160-180 cm3/ha (Chinche Verde)
+```
+
+> ¿Qué productos banda verde hay registrados para soja?
+
+```
+*Productos registrados* (10 de 20)
+1. *Aceite Quimeco Plus* · Reg. SENASA 37227 · Banda IV · Yuyo Colorado · 250 cm3 por ha
+2. *Agrolufen 5 Ec* · Reg. SENASA 38947 · Banda IV · Falsa Medidora · 200-300 cm3/ha
+...
+Es lo que figura en el registro; qué aplicar lo define la receta del ingeniero agrónomo.
+```
+
+**Qué notar:** la dosis está fuera de **todos** los rangos registrados para soja, así que es
+una observación sea cual sea la plaga; con una dosis dentro de alguno, el bot pide la plaga
+antes de dar por buena la receta. Con la dosis mal, **no ofrece agendar**. El listado informa lo
+registrado, no recomienda.
+
+#### 3.5 "¿A qué distancia del pueblo puedo tirar?" (7:45 – 9:00)
+
+**Problema:** la distancia depende de la localidad, del tipo de aplicación y de la banda, y la
+fijan varias normas a la vez.
+
 > voy a tirar Tordon D 30 con avion en Sastre, a cuanto del pueblo tengo que estar?
 
 ```
@@ -124,27 +254,29 @@ Para *Tordon D 30*: banda III (azul)
 - Escuelas · aérea: banda III: 200 m (Ordenanza 1174/2019)
 ```
 
-**Qué notar:** el operario no dijo la banda: el bot la busca en el registro. La ley
-provincial dice 500 m y la ordenanza de Sastre 3000 m: el bot dice **cuál manda** (la más
-restrictiva). Con "drone" o "mochila", que las normas no nombran, avisa que es una
-suposición.
+*Aplicación aérea*
+- Zona urbana · bandas III, IV: a menos de 500 m no se puede aplicar (Ley 11273/1995, art. 33)
+- Escuelas · todas las bandas: a menos de 200 m no se puede aplicar (Ordenanza 1174/2019)
+- Zona urbana · todas las bandas: a menos de 3000 m no se puede aplicar (Ordenanza 1174/2019)
+...
 
-*Opcional:* "¿es lo mismo aplicar por avión que por tierra en Sastre?" (compara los dos) o
-"¿qué banda toxicológica tiene el Tordon D 30?" (→ "Banda III (azul)").
+**Qué notar:** el operario no dijo la banda: el bot la toma del registro. La ley provincial dice
+500 m y la ordenanza de Sastre 3000 m: el bot dice **cuál manda** (la más restrictiva). Con
+"drone" o "mochila", que las normas no nombran, avisa que es una suposición.
 
-### 3.4 "¿Qué dice la etiqueta?" — el marbete (7:00 – 8:30)
+*Opcional:* "¿es lo mismo aplicar por avión que por tierra en Sastre?" (compara los dos en una
+sola respuesta).
 
-**Problema:** la etiqueta del producto (el marbete) tiene carencias, precauciones, mezclas,
-qué hacer ante un derrame… en un PDF de 10 páginas.
+#### 3.6 "¿Qué dice la etiqueta?" — el marbete (9:00 – 10:15)
 
-**Chat:**
+**Problema:** la etiqueta del producto (el marbete) tiene carencias, precauciones, mezclas, qué
+hacer ante un derrame… en un PDF de 10 páginas.
+
 > ¿Qué hago si se me vuelca Banvel en el galpón?
 
 ```
 *Banvel* · Reg. SENASA 30596
-Cubra el derrame con tierra o arena, barra el material absorbente y colóquelo en
-recipientes identificados para su destrucción. Luego, lave las superficies contaminadas con
-agua jabonosa o carbonatada.
+Hay que cubrir el derrame con material absorbente como tierra o arena, barrerlo para recolectarlo en recipientes identificados y lavar la superficie con agua carbonatada o jabonosa.
 
 *Fuentes*
 - SENASA, Reg. 30596 (marbete, pág. 8)
@@ -154,17 +286,22 @@ agua jabonosa o carbonatada.
 lo que encontró, citando la página. El operario dijo "se me vuelca en el galpón" y el marbete
 dice "derrame": ver 5.2.
 
-### 3.5 "¿Qué dice la ordenanza?" — y cuándo no sabe (8:30 – 9:45)
+#### 3.7 "¿Qué dice la norma?" — y cuándo no sabe (10:15 – 12:00)
 
-**Chat:**
 > ¿Se puede fumigar con viento en El Trébol?
 
 ```
-*Depende.* Se prohíben las pulverizaciones cuando los vientos superen los 8 km/hora y
-puedan producir derivas hacia la planta urbana.
+*Depende.* Se prohiben las pulverizaciones si el viento supera los 8 km/hora y puede producir deriva hacia la planta urbana.
 
 *Fuentes*
 - Ordenanza 841/2010, art. 4 (el-trebol)
+```
+
+> Pasame el artículo 33 de la ley 11273
+
+```
+*Ley 11273/1995, art. 33 (santa-fe)*
+Prohíbese la aplicación aérea de productos fitosanitarios de clase toxicológica A y B dentro del radio de 3.000 metros de las plantas urbanas. Excepcionalmente podrán aplicarse productos de clase toxicológica C o D dentro del radio de 500 metros, cuando en la jurisdicción exista ordenanza municipal o comunal que lo autorice, [...]
 ```
 
 Y una que la normativa cargada no responde:
@@ -172,41 +309,18 @@ Y una que la normativa cargada no responde:
 
 ```
 ℹ️ *No cuento con esa información*
-No encontré en la normativa cargada nada que responda tu pregunta, así que no te doy una
-respuesta sin una norma que la respalde.
+No encontré en la normativa cargada nada que responda tu pregunta, así que no te doy una respuesta sin una norma que la respalde.
+*Qué podés hacer:* consultalo al área de ambiente del municipio o a tu ingeniero agrónomo.
 ```
 
-**Qué notar:** la cita se **verifica en código** contra lo recuperado; si el modelo cita algo
-que no se recuperó, se descarta. Sin fuente, el bot prefiere decir que no sabe.
-
-### 3.6 Organizar el trabajo: agenda y pronóstico (9:45 – 11:30)
-
-**Problema:** coordinar cuándo aplicar, y el viento y la lluvia cambian lo que conviene.
-
-**Chat** (después del dictamen de 3.2):
-> sí, agendala para el lunes a las 9
-
-```
-✅ *Aplicación agendada* — lunes 28/09/2026, 09:00 hs
-- *Cultivo:* soja
-
-*Pronóstico en El Trébol, de 07:00 a 11:00* (Open-Meteo, consultado el 26/09 19:18)
-- Viento del sureste (empuja hacia el noroeste), 13 a 16 km/h, ráfagas de hasta 32 km/h
-- Lluvia: 7,4 mm (probabilidad de hasta 50 %)
-- Temperatura: 18 a 20 °C · humedad desde 90 %
-📋 Ordenanza 841/2010, art. 4: prohíbe pulverizar con vientos de más de 8 km/h que puedan
-producir derivas hacia la planta urbana.
-Es un pronóstico: verificá el viento en el lote antes de empezar.
-```
-
-**Qué notar:** las fechas ("el lunes") las resuelve código, no el LLM. El pronóstico es
-**información**, no un control: dice hacia dónde va la deriva y trae la norma de viento de la
-localidad como referencia. *Opcional:* "¿qué tengo para esta semana?" (agenda) o "empecé a
-aplicar con la mosquito en el lote 4" (registro de eventos).
+**Qué notar:** la pregunta libre es RAG sobre la normativa, y la cita se **verifica en código**
+contra lo recuperado. El artículo por número no pasa por el LLM: es el **texto literal** de la
+ley. Sin una norma que la respalde, el bot prefiere decir que no sabe. *[Ensayar la última:
+según la corrida puede encontrar o no un artículo relacionado.]*
 
 ---
 
-## 4. Cómo está hecho (11:30 – 14:00)
+## 4. Cómo está hecho (12:00 – 14:30)
 
 **En pantalla:** el diagrama de arquitectura (`plandefases.md`) y el ER
 (`docs/modelo-datos.md`).
@@ -237,7 +351,7 @@ aplicar con la mosquito en el lote 4" (registro de eventos).
 
 ---
 
-## 5. Problemas que surgieron y cómo los resolvimos (14:00 – 16:30)
+## 5. Problemas que surgieron y cómo los resolvimos (14:30 – 17:00)
 
 Elegir 4 o 5; cada uno en dos frases (problema → solución).
 
@@ -265,7 +379,7 @@ Elegir 4 o 5; cada uno en dos frases (problema → solución).
 
 ---
 
-## 6. Cierre (16:30 – 17:30)
+## 6. Cierre (17:00 – 18:00)
 
 **Qué decir:**
 - **Qué logra:** respuestas al instante, en lenguaje de campo, siempre con la fuente, y que
@@ -281,5 +395,6 @@ Elegir 4 o 5; cada uno en dos frases (problema → solución).
 
 ## Recorte a 15 minutos
 
-Sacar: los opcionales de 3.3 y 3.6, el caso "no cuento con esa información" de 3.5 (se puede
-nombrar sin mostrar), y dejar 4 problemas en la sección 5 (1, 2, 5 y 7).
+Sacar: el listado de productos de 3.4, el opcional de 3.5, el caso "no cuento con esa
+información" de 3.7 (se puede nombrar sin mostrar), mostrar 3.3 solo con la agenda, y dejar 4
+problemas en la sección 5 (1, 2, 5 y 7).

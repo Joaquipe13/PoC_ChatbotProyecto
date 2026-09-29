@@ -88,12 +88,12 @@ def armar_dictamen(
         if not chd.comparable:
             if chd.requiere_volumen_caldo:
                 no_realizados.append(
-                    f"Dosis {chd.valor_declarado} {chd.unidad_declarada}: no se pudo "
+                    f"Dosis {num(chd.valor_declarado)} {chd.unidad_declarada}: no se pudo "
                     "convertir a dosis por hectárea sin el volumen de caldo aplicado"
                 )
             else:
                 no_realizados.append(
-                    f"Dosis {chd.valor_declarado} {chd.unidad_declarada}: "
+                    f"Dosis {num(chd.valor_declarado)} {chd.unidad_declarada}: "
                     f"{chd.motivo_no_comparable or 'no comparable con el registro'}"
                 )
         elif not chd.cumple:

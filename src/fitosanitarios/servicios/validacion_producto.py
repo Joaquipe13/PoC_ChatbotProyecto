@@ -64,6 +64,52 @@ def _dosis_sin_ambiguedad_de_adversidad(
 
 
 def resolver_y_validar_producto(
+def _chequeo_sin_un_unico_rango(
+    usos_cultivo: list[dict], cultivo: str, dosis_valor: float, dosis_unidad: str,
+    tolerancia_pct: float,
+) -> ChequeoDosis:
+    """La dosis contra varios rangos registrados para el cultivo (uno por plaga) cuando no se
+    sabe la plaga. Fuera de todos, es una observación sea cual sea la plaga (se compara contra
+    el rango completo, del mínimo al máximo). Si entra en alguno, o cae entre dos, depende de
+    la plaga: no se verifica y se dice por qué, nunca se elige un rango (ver
+    `_dosis_sin_ambiguedad_de_adversidad`)."""
+    rangos = [
+        u["dosis"] for u in usos_cultivo
+        if (u.get("dosis") or {}).get("parseable")
+        and u["dosis"].get("valor_min") is not None and u["dosis"].get("valor_max") is not None
+    ]
+    no_verificada = ChequeoDosis(
+        cumple=False, comparable=False, valor_declarado=dosis_valor,
+        unidad_declarada=dosis_unidad, valor_min_registrado=None, valor_max_registrado=None,
+        porcentaje_desvio=None,
+        motivo_no_comparable=(
+            f"el rango registrado para {cultivo} depende de la plaga; indicá contra qué plaga "
+            "se aplica" if rangos else
+            f"el registro no trae un rango de dosis comparable para {cultivo}"
+        ),
+    )
+    if not rangos:
+        return no_verificada
+    por_rango = [
+        comparar_dosis(
+            dosis_valor, dosis_unidad, r["valor_min"], r["valor_max"], r.get("unidad"),
+            tolerancia_pct,
+        )
+        for r in rangos
+    ]
+    if not all(c.comparable for c in por_rango) or any(c.cumple for c in por_rango):
+        return no_verificada
+    unidades = {r.get("unidad") for r in rangos}
+    if len(unidades) != 1:
+        return no_verificada
+    completo = comparar_dosis(
+        dosis_valor, dosis_unidad, min(r["valor_min"] for r in rangos),
+        max(r["valor_max"] for r in rangos), unidades.pop(), tolerancia_pct,
+    )
+    # Entre dos rangos (fuera de cada uno pero dentro del completo): también depende de la plaga.
+    return completo if completo.comparable and not completo.cumple else no_verificada
+
+
     conn,
     modelo_embeddings,
     producto_nombre: str,
@@ -147,6 +193,13 @@ def resolver_y_validar_producto(
             )
 
     return ResolucionProducto(
+        else:
+            # Antes, sin un único rango (depende de la plaga y no se dijo cuál, o el registro
+            # no trae uno comparable) la dosis no se comparaba ni se avisaba: 500 cm3/ha de
+            # Flyer en soja, sin plaga, daba APTA (plan del video, 27/09/2026).
+            chequeo_dosis = _chequeo_sin_un_unico_rango(
+                usos_cultivo, cultivo, dosis_valor, dosis_unidad, tolerancia_pct
+            )
         numero_inscripcion=producto.numero_inscripcion, marca=producto.marca,
         banda_toxicologica=producto.banda_toxicologica,
         chequeo_producto=chequeo_producto, chequeo_dosis=chequeo_dosis,

@@ -282,13 +282,23 @@ def _forma_de(datos: dict | None) -> str | None:
     return None
 
 
-def _respuestas_de_consultas(resultados: list[ResultadoTool]) -> list[tuple[str, ResultadoTool]]:
+def _forma_de_evaluacion(datos: dict | None, tipo: str) -> str | None:
+    """El resultado de `evaluar_riesgo` o `evaluar_viabilidad_legal` entre otras consultas del
+    turno: sin esto no se mostraba, y se perdía, por ejemplo, el aviso de dosis fuera de rango."""
+    if datos and any(isinstance(datos.get(k), dict) for k in ("dictamen", "condiciones")):
+        return "detalle_bandas" if tipo == "detalle_bandas" else "dictamen"
+    return None
+
+
+def _respuestas_de_consultas(
+    resultados: list[ResultadoTool], tipo: str = ""
+) -> list[tuple[str, ResultadoTool]]:
     """Cada consulta distinta que el turno contestó, con su plantilla. Llamadas idénticas (el
     LLM repitió una tool con los mismos argumentos) cuentan una sola vez."""
     vistas: set[tuple[str, str]] = set()
     respuestas: list[tuple[str, ResultadoTool]] = []
     for r in resultados:
-        forma = _forma_de(r.datos)
+        forma = _forma_de(r.datos) or _forma_de_evaluacion(r.datos, tipo)
         if forma is None:
             continue
         clave = (forma, json.dumps(r.datos, sort_keys=True, default=str))
@@ -305,7 +315,7 @@ def _texto_de_varias_consultas(
     se contesta entero: una sección por cada consulta, y al final lo que una tool todavía
     necesita saber. Antes se mostraba solo el primer resultado y el resto se perdía
     (hallazgo H3 de la evaluación conversacional). `None` si no es ese caso."""
-    respuestas = _respuestas_de_consultas(resultados)
+    respuestas = _respuestas_de_consultas(resultados, respuesta.tipo)
     pendientes = [
         r for r in resultados if r.estado == "faltan_datos" and r.faltantes and not r.datos
     ]

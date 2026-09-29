@@ -2,7 +2,10 @@
 adversidad (ver skill, "Dosis"): hallazgo real de la Fase 7, ver
 DECISIONES.md."""
 
-from fitosanitarios.servicios.validacion_producto import _dosis_sin_ambiguedad_de_adversidad
+from fitosanitarios.servicios.validacion_producto import (
+    _chequeo_sin_un_unico_rango,
+    _dosis_sin_ambiguedad_de_adversidad,
+)
 
 
 def _uso(cultivo, adversidad, valor_min, valor_max, unidad="cm³/ha"):
@@ -78,3 +81,37 @@ def test_los_usos_del_cultivo_son_solo_los_del_cultivo_y_la_adversidad_consultad
         None, None, "Flyer 10 Ec", "trigo", None, None, None, 10.0
     )
     assert otro.usos_del_cultivo == [] and otro.chequeo_producto.cultivo_autorizado is False
+
+
+# --- dosis sin un único rango (plan del video, 27/09/2026: 500 cm3/ha de Flyer en soja,
+# sin plaga, daba APTA porque la dosis no se comparaba ni se avisaba) ---
+
+_FLYER_SOJA = [
+    _uso("soja", "oruga de las leguminosas", 25, 35),
+    _uso("soja", "trips del poroto", 150, 150),
+    _uso("soja", "chinche de la alfalfa", 160, 180),
+]
+
+
+def test_fuera_de_todos_los_rangos_es_observacion_sea_cual_sea_la_plaga():
+    chd = _chequeo_sin_un_unico_rango(_FLYER_SOJA, "soja", 500, "cm³/ha", 10)
+    assert chd.comparable and not chd.cumple
+    assert (chd.valor_min_registrado, chd.valor_max_registrado) == (25, 180)
+
+
+def test_dentro_de_algun_rango_depende_de_la_plaga_y_no_se_verifica():
+    chd = _chequeo_sin_un_unico_rango(_FLYER_SOJA, "soja", 170, "cm³/ha", 10)
+    assert not chd.comparable
+    assert "depende de la plaga" in chd.motivo_no_comparable
+
+
+def test_entre_dos_rangos_tambien_depende_de_la_plaga():
+    chd = _chequeo_sin_un_unico_rango(_FLYER_SOJA, "soja", 100, "cm³/ha", 10)
+    assert not chd.comparable
+
+
+def test_sin_ningun_rango_comparable_no_se_verifica_y_lo_dice():
+    usos = [{"cultivo": "soja", "adversidad": None, "dosis": {"parseable": False}}]
+    chd = _chequeo_sin_un_unico_rango(usos, "soja", 170, "cm³/ha", 10)
+    assert not chd.comparable
+    assert "no trae un rango" in chd.motivo_no_comparable

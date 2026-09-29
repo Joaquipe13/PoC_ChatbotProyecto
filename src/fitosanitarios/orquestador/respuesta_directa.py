@@ -28,6 +28,14 @@ TIPO_POR_TOOL = {
     "agendar_aplicacion": "agendar_aplicacion",
 }
 
+# Las que no cortan el turno pero pueden correr en el mismo turno que una que sí: su tipo si
+# el modelo no llegó a elegirlo (plan del video, 27/09/2026: `evaluar_riesgo` con
+# `listar_limitaciones` terminaba en "Tuve un problema técnico").
+_TIPO_SI_NO_DECIDIO_EL_MODELO = {
+    "evaluar_riesgo": "dictamen",
+    "resolver_vehiculo": "consulta_vehiculo",
+}
+
 # Su plantilla ya sabe mostrar qué falta (además de la pregunta muestra, p. ej., la agenda del día).
 _MUESTRAN_SUS_FALTANTES = ("agendar_aplicacion",)
 
@@ -39,7 +47,13 @@ def respuesta_de_las_tools(
     dieron un resultado, en orden; `resultados`: esos resultados. `None` si no hay ninguno
     (la tool falló antes de devolver algo, por argumentos inválidos): ahí tiene que volver a
     decidir el modelo."""
-    if not resultados or any(n not in TIPO_POR_TOOL for n in nombres):
+    # Solo con alguna que corta el turno: si no, el modelo sigue y elige él.
+    tipos = {**_TIPO_SI_NO_DECIDIO_EL_MODELO, **TIPO_POR_TOOL}
+    if (
+        not resultados
+        or not any(n in TIPO_POR_TOOL for n in nombres)
+        or any(n not in tipos for n in nombres)
+    ):
         return None
 
     sin_datos = [r for r in resultados if not r.datos]
@@ -48,4 +62,4 @@ def respuesta_de_las_tools(
     if any(r.estado == "faltan_datos" and r.faltantes for r in sin_datos):
         if not all(n in _MUESTRAN_SUS_FALTANTES for n in nombres):
             return RespuestaAgente(tipo="repregunta")
-    return RespuestaAgente(tipo=TIPO_POR_TOOL[nombres[0]])
+    return RespuestaAgente(tipo=tipos[nombres[0]])

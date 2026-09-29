@@ -57,6 +57,13 @@ def test_una_tool_que_no_corta_el_turno_no_se_infiere():
     assert respuesta_de_las_tools(["evaluar_riesgo"], [OK]) is None
 
 
+def test_evaluar_riesgo_con_una_tool_que_corta_el_turno_es_un_dictamen():
+    """Plan del video (27/09/2026): `evaluar_riesgo` y `listar_limitaciones` en el mismo
+    turno terminaban en "Tuve un problema técnico": el modelo no llegó a elegir el tipo."""
+    respuesta = respuesta_de_las_tools(["evaluar_riesgo", "listar_limitaciones"], [OK, OK])
+    assert respuesta.tipo == "dictamen"
+
+
 def test_las_tools_que_cortan_son_las_que_tienen_tipo_y_solo_esas():
     """`return_direct` de cada tool y `TIPO_POR_TOOL` no pueden desincronizarse."""
     for t in [*TOOLS, *construir_tools("aW1n")]:

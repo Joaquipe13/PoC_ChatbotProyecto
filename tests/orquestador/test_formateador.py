@@ -245,6 +245,29 @@ def test_evaluar_riesgo_con_dosis_fuera_de_rango_lo_dice_y_no_ofrece_agendar():
 
 
 def test_evaluar_riesgo_con_dosis_fuera_de_rango_y_un_producto_no_ofrece_la_banda():
+def test_evaluar_riesgo_entre_varias_consultas_no_pierde_el_aviso_de_dosis():
+    """Plan del video (27/09/2026): con `evaluar_riesgo` y `validar_producto_registro` en el
+    mismo turno se mostraba solo el producto y se perdía la dosis fuera de rango."""
+    condiciones = {**_CONDICIONES_EL_TREBOL, "productos_por_banda": {"Flyer 10 Ec": "II"}}
+    riesgo = ResultadoTool(
+        estado="observado",
+        datos={
+            "jurisdiccion_id": "el-trebol", "condiciones": condiciones,
+            "observaciones": ["Flyer 10 Ec: Dosis 500 cm3/ha: por encima del rango"],
+        },
+    )
+    producto = ResultadoTool(
+        estado="ok",
+        datos={
+            "producto": "Flyer 10 Ec", "numero_inscripcion": "41881", "banda_toxicologica": "II",
+            "cultivo": "soja", "cultivo_autorizado": True, "usos_del_cultivo": [],
+        },
+    )
+    texto = _un_mensaje(RespuestaAgente(tipo="dictamen"), [riesgo, producto])
+    assert texto.startswith("⚠️ *Observaciones*")
+    assert "*Flyer 10 Ec* · Reg. SENASA 41881" in texto
+
+
     """Plan de pruebas (27/09/2026): con un solo producto preguntaba "¿Querés la banda de
     cada producto?" justo debajo de "banda II (amarilla)"."""
     condiciones = {**_CONDICIONES_EL_TREBOL, "productos_por_banda": {"Flyer 10 Ec": "II"}}
