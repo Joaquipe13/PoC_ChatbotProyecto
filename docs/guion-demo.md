@@ -6,13 +6,14 @@ reales: catálogo SENASA real (Fase 2) y la normativa real cargada de El Trébol
 Sastre y San Jorge, más la Ley 11.273 de Santa Fe y su decreto — no hay
 fixtures ni LLM fake en la demo.
 
-**Plan B si el túnel de WhatsApp no está disponible**: correr
-`notebooks/demo_e2e.ipynb` con kernel limpio en vez del canal real. El
-mismo guion sirve para los dos casos; solo cambia el canal por el que se
-manda el mensaje (WhatsApp real vs. celda de la notebook).
+**Plan B si el túnel de WhatsApp no está disponible**: mandar los mensajes
+desde `notebooks/chat.ipynb` (chat con el mismo orquestador), o correr
+`notebooks/demo_e2e.ipynb` con kernel limpio. El mismo guion sirve para los
+dos casos; solo cambia el canal por el que se manda el mensaje.
 
 Requisitos antes de arrancar: `docker compose up -d db`, al menos una
-`GEMINI_API_KEY_*` real en `.env`.
+`GEMINI_API_KEY_*` real en `.env` (con varias, el agente pasa a la siguiente
+si una se queda sin cuota).
 
 **Cambio (26/09/2026):** los casos usaban San Carlos Centro y Colonia Vecina,
 localidades y normas inventadas para los tests que no estaban en la base de
@@ -79,14 +80,32 @@ resultado sea negativo, y lista *todas* las observaciones si hay más de una
 
 > "¿Qué productos hay registrados para yuyo colorado en soja?"
 
-**Esperado:** `tipo=consulta_producto`, lista de 3 productos (Imazamox 70 Wg
-Brilliance, Jafar 48 ×2 usos) con registro SENASA, banda y dosis. Cierra con
-la aclaración "es lo que figura en el registro; qué aplicar lo define la
-receta del ingeniero agrónomo" — nunca recomienda.
+**Esperado** (Gemini real, 28/09/2026: una llamada con `cultivo="soja"` y
+`adversidad="yuyo colorado"`):
+
+```
+*Productos para soja contra yuyo colorado*
+
+(10 de 167)
+1. *2,4db 100 Aca* · Reg. SENASA 30005 · Banda III · 1 a 1,25 l/hm2
+2. *2,4-db 93.1 Brilliance* · Reg. SENASA 41974 · Banda III · 5 dosis distintas según la plaga
+3. *Aceite Quimeco Plus* · Reg. SENASA 37227 · Banda IV · 250 cm3 por ha
+...
+
+⚠️ Solo aparecen los productos que tienen cultivos y plagas cargados en SENASA; puede haber otros registrados sin esos datos
+
+Es lo que figura en el registro; qué aplicar lo define la receta del ingeniero agrónomo.
+```
+
+Una fila por producto con el total real; cierra con la aclaración de que
+nunca recomienda.
 
 **Qué señalar:** distinto de `validar_producto_registro` (caso 1): acá el
 operario no nombra un producto puntual, pide un listado por adversidad y
-cultivo.
+cultivo. Los filtros se combinan libremente (aptitud, banda, firma, marca,
+principio activo) y una distancia al pueblo se traduce en las bandas que se
+pueden aplicar ahí: "¿qué fungicidas para trigo puedo aplicar con avión a 1500
+m de El Trébol?" lista solo los de banda III y IV, con la ordenanza que lo fija.
 
 ### 4. Repregunta agrupada
 

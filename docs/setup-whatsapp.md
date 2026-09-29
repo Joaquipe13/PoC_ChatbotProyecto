@@ -115,12 +115,19 @@ Con el túnel activo y el número de prueba configurado:
 2. Mandar una foto real de una receta agronómica -> debería llegar la
    confirmación de datos extraídos (`tipo=confirmacion_receta`).
 3. Revisar los logs del proceso: cada turno deja una fila en
-   `operacion.turno` (ver `orquestador/estado.py::registrar_turno`).
+   `operacion.turno` (ver `orquestador/estado.py::registrar_turno`). Un turno
+   que terminó en "Tuve un problema técnico" guarda la excepción en
+   `salida.error`.
+
+El webhook procesa los mensajes en segundo plano, pero de a uno por operario:
+si alguien manda la foto mientras se procesa su mensaje anterior, espera a que
+termine. Con varias `GEMINI_API_KEY_*`, el agente pasa a la siguiente si una
+se queda sin cuota.
 
 Esta prueba es manual, no corre en CI (depende de credenciales reales y del
 túnel). Si el túnel falla el día de la defensa, el plan B es
-`notebooks/demo_e2e.ipynb` (invoca el orquestador directo, sin depender de
-Meta).
+`notebooks/chat.ipynb` (el mismo orquestador, sin depender de Meta) o
+`notebooks/demo_e2e.ipynb` (el guion de la demo).
 
 **Verificada (12/09/2026):** paso 1 confirmado con cloudflared + el número
 de prueba real -- webhook verificado, `POST /webhook` con firma válida,
@@ -141,6 +148,9 @@ list" -- ver `DIFICULTADES.md` para el diagnóstico completo).
   a la misma app cuyo secreto se copió).
 - **Token vencido**: si se usó el token temporal del panel en vez del de
   System User, empieza a devolver 401 a las 24 h -- ver paso 2.
+- **"Tuve un problema técnico"**: mirar `salida.error` del turno en
+  `operacion.turno`. Si es de cuota (429 / RESOURCE_EXHAUSTED) con todas las
+  keys, sumar otra `GEMINI_API_KEY_*` o esperar a que se renueve la cuota.
 - **La app no aparece habilitada para mensajes de producción**: Meta
   restringe (desde el 15/01/2026) el uso de bots de propósito general en
   WhatsApp Business API -- la descripción de la app en Meta for Developers

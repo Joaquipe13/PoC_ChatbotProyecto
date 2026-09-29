@@ -226,17 +226,41 @@ Dosis registrada para Soja:
 > ¿Qué productos banda verde hay registrados para soja?
 
 ```
-*Productos registrados* (10 de 20)
-1. *Aceite Quimeco Plus* · Reg. SENASA 37227 · Banda IV · Yuyo Colorado · 250 cm3 por ha
-2. *Agrolufen 5 Ec* · Reg. SENASA 38947 · Banda IV · Falsa Medidora · 200-300 cm3/ha
+*Productos para soja, banda IV*
+
+(10 de 151)
+1. *Aceite Quimeco Plus* · Reg. SENASA 37227 · Banda IV · 250 cm3 por ha
+2. *Agrolufen 5 Ec* · Reg. SENASA 38947 · Banda IV · 200-300 cm3/ha
 ...
+⚠️ Solo aparecen los productos que tienen cultivos y plagas cargados en SENASA; puede haber otros registrados sin esos datos
+
 Es lo que figura en el registro; qué aplicar lo define la receta del ingeniero agrónomo.
+```
+
+Y una pregunta con varias condiciones a la vez (*opcional*):
+
+> ¿Qué fungicidas para trigo puedo aplicar a 1500 metros de El Trébol?
+
+```
+*Fungicidas para trigo* a 1500 m de la zona urbana de El Trébol
+
+*Aérea:* ✅ III y IV · ❌ Ia, Ib y II
+(10 de 84)
+1. *Abril 50 Curasemilla* · Reg. SENASA 38052 · Banda III
+...
+*Terrestre:* ✅ todas las bandas
+(10 de 115)
+...
+*Fuentes*
+- Ley 11273/1995, art. 33
+- Ordenanza 841/2010, art. 7 (el-trebol)
 ```
 
 **Qué notar:** la dosis está fuera de **todos** los rangos registrados para soja, así que es
 una observación sea cual sea la plaga; con una dosis dentro de alguno, el bot pide la plaga
 antes de dar por buena la receta. Con la dosis mal, **no ofrece agendar**. El listado informa lo
-registrado, no recomienda.
+registrado, no recomienda; la distancia al pueblo se traduce en las bandas que se pueden
+aplicar ahí (con la norma que lo fija), y sin tipo de aplicación responde para los dos.
 
 #### 3.5 "¿A qué distancia del pueblo puedo tirar?" (7:45 – 9:00)
 

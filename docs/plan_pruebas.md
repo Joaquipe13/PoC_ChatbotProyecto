@@ -73,7 +73,8 @@ uv run python -m evals.base_eval borrar         # al terminar
 ```
 
 Hace falta al menos una `GEMINI_API_KEY_*` real en `.env` (mejor varias: el bot y el
-simulador las usan en orden inverso para repartir la cuota). La corrida completa tarda del
+simulador las usan en orden inverso para repartir la cuota, y el bot pasa a la siguiente
+si una se queda sin cuota). La corrida completa tarda del
 orden de 20 a 30 minutos. El caso `plan_receta_foto_apta` usa
 `data/recetas_ejemplo/01_apta_terrestre.jpg`, que no está en el repositorio: se genera con
 `uv run python scripts/generar_recetas_ejemplo_el_trebol.py`.

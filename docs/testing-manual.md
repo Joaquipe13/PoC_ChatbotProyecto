@@ -1,10 +1,11 @@
 # Guía de testing manual — todas las tools del agente
 
-Checklist de preguntas/mensajes para probar a mano, desde `notebooks/chat.ipynb`, cada una de las
-10 tools del agente (`leer_receta`, `validar_producto_registro`, `consultar_productos`,
-`evaluar_riesgo`, `evaluar_viabilidad_legal`, `responder_consulta_normativa`,
-`resolver_vehiculo`, `registrar_evento`, `consultar_agenda`, `agendar_aplicacion`)
-y el comportamiento
+Checklist de preguntas/mensajes para probar a mano, desde `notebooks/chat.ipynb`, las tools
+del agente (`leer_receta` y `completar_receta`, `validar_producto_registro`,
+`consultar_productos`, `evaluar_riesgo`, `evaluar_viabilidad_legal`,
+`responder_consulta_normativa`, `resolver_vehiculo`, `registrar_evento`,
+`consultar_agenda`, `agendar_aplicacion`; las de normativa y marbetes tienen su guía en
+`docs/casos_prueba.md`) y el comportamiento
 general del orquestador (repregunta, ambigüedad, fuera de dominio, etc.).
 
 No reemplaza `docs/guion-demo.md` (guion fijo para la defensa, 6+3 casos ya
@@ -73,9 +74,12 @@ avión"/"la avioneta"), dron, y dos aviones puntuales con RAG por embeddings:
   pidiendo una foto nítida de la receta.
 - [ ] Confirmar una receta leída ("Confirmar") → esperado: pasa a evaluación
   (dispara `evaluar_viabilidad_legal` o pide lo que falte, p. ej. la localidad).
-- [ ] Corregir un dato después de leer la foto ("Corregir", el cultivo es X
-  no Y") → esperado: el orquestador actualiza el dato sin volver a llamar
-  `leer_receta`.
+- [ ] Corregir un dato después de leer la foto ("el cultivo es X, no Y") →
+  esperado: `completar_receta` actualiza el dato sin volver a llamar
+  `leer_receta` y muestra la receta para confirmar.
+- [ ] Tocar el botón "Corregir" sin decir qué → esperado: "¿Qué dato querés
+  corregir?" con un ejemplo; nunca la misma receta de nuevo ni "Dale. Cuando
+  quieras…".
 - [ ] Mandar una foto en medio de otra conversación (p. ej. estabas
   preguntando normativa) → esperado: la tool se llama igual, sin pedir la
   foto de nuevo ni ignorar la imagen.
@@ -96,8 +100,13 @@ avión"/"la avioneta"), dron, y dos aviones puntuales con RAG por embeddings:
 - [ ] "¿Está habilitado el 'ProductoQueNoExiste123' para soja?" → esperado:
   `no_resuelto` / `PRODUCTO_NO_ENCONTRADO`.
 - [ ] Preguntar por un producto sin decir el cultivo ("¿el Flyer 10 Ec está
-  habilitado?") → esperado: repregunta pidiendo el cultivo (requerido),
-  **no** debería derivar a `consultar_productos`.
+  habilitado?") → esperado: registro y banda del producto, sin chequear
+  ningún cultivo; **no** debería derivar a `consultar_productos`.
+- [ ] Un producto sin usos publicados por SENASA ("¿es correcta la dosis de
+  60 cc/ha de Manto en maíz?") → esperado: *Manto* · Reg. 38008 · Banda III y
+  "no puedo verificar si 60 cc/ha es correcta"; nunca "No pude completar la
+  consulta". Con uno que tiene marbete ("¿cuál es la dosis del 2,4-db Sigma
+  en soja?") → además *Según su marbete:* y la página en *Fuentes*.
 
 ## 3. `consultar_productos` (RF11 — listado)
 
@@ -108,11 +117,22 @@ avión"/"la avioneta"), dron, y dos aviones puntuales con RAG por embeddings:
 - [ ] "Dame productos para soja con banda máxima III" (excluye Ia/Ib/II) →
   esperado: lista filtrada, sin productos de banda II (p. ej. sin Flyer 10 Ec
   si aparece, chequear que se filtró bien).
-- [ ] "¿Qué productos hay?" (sin cultivo/adversidad/principio activo) →
-  esperado: repregunta pidiendo al menos uno de esos tres, la tool no debería
-  ejecutarse (requiere ≥1 filtro).
-- [ ] "¿Qué productos hay para un cultivo que no existe, 'kiwi lunar'?" →
-  esperado: `faltan_datos` pidiendo aclarar el cultivo (no matchea nada).
+- [ ] Filtros combinados: "¿qué herbicidas hay para soja?", "fungicidas de
+  Syngenta banda verde", "¿qué hay con metsulfuron?", "los Roundup" →
+  esperado: una fila por producto, el total real ("10 de 246") y un título que
+  dice qué se buscó. Nunca un producto de otra aptitud ni repetido.
+- [ ] Distancia como filtro: "¿qué fungicidas para trigo puedo aplicar con
+  avión a 1500 metros de El Trébol?" → esperado: una sola respuesta con
+  "Aérea: ✅ III y IV · ❌ Ia, Ib y II", solo fungicidas de banda III y IV, y
+  la Ordenanza 841/2010, art. 7 en *Fuentes*. Sin "con avión": una sección
+  aérea y otra terrestre (una sola, "lo mismo para las dos", si coinciden).
+- [ ] "¿Puedo aplicar metsulfuron en El Trébol?" → esperado: productos con
+  metsulfuron, sin tomar El Trébol como cultivo ni suponer uno (trigo).
+- [ ] "¿Qué productos hay?" (sin ningún filtro) → esperado: repregunta
+  pidiendo un filtro; la tool no debería ejecutarse.
+- [ ] Un filtro que no está en el registro ("fungicidas para trigo de la
+  firma Xyz") → esperado: el listado sin ese filtro y "No encontré la firma
+  'Xyz' en el registro: busqué sin ese filtro".
 - [ ] Comparar con el punto anterior de la sección 2: preguntar por listado
   ("¿qué hay para X?") vs. por un producto puntual ("¿el Y está habilitado
   para X?") y confirmar que cada una dispara la tool correcta.

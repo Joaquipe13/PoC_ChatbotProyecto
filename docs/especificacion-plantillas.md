@@ -6,7 +6,7 @@ Una entrada por cada valor de `RespuestaAgente.tipo` (`src/fitosanitarios/domini
 
 **Formato WhatsApp general:** `*negrita*`, listas con `-`/`1.`, sin tablas ni encabezados markdown, ≤ 4096 caracteres por mensaje (si se pasa, se parte por sección), coma decimal con unidad separada ("1,8 mm", "500 cm3/ha", sin ".0"), fechas `dd/mm/aaaa` y horas en la hora local del operario, sección `*Fuentes*` al final si hay citas que no se mostraron en la misma línea. Los botones se escriben `[BOTONES: A | B]` y las listas `[LISTA: A | B]` en los ejemplos: el canal los manda como botones o lista interactiva de WhatsApp.
 
-Los ejemplos son **salidas reales** del bot contra la base de desarrollo (la mayoría de las conversaciones del plan de pruebas del 26 y 27/09/2026, `docs/plan_pruebas.md`).
+Los ejemplos son **salidas reales** del bot contra la base de desarrollo (la mayoría de las conversaciones del plan de pruebas del 26 y 27/09/2026, `docs/plan_pruebas.md`; los de productos y "Corregir", del 28/09/2026).
 
 ## `confirmacion_receta`
 
@@ -40,6 +40,12 @@ Con todos los datos:
 - *Producto:* Acefato 75% — 0,5 kg/ha (Acefato)
 - *Tipo de aplicación:* terrestre
 [BOTONES: Confirmar | Corregir]
+```
+
+"Corregir" sin decir qué dato (`completar_receta` sin argumentos) va como `repregunta`:
+
+```
+¿Qué dato querés corregir? Escribilo con el valor correcto, por ejemplo: "la dosis es 200 cc/ha" o "es en Sastre".
 ```
 
 ## `dictamen`
@@ -117,15 +123,63 @@ Hay varios productos parecidos a 'Roundup'. ¿Cuál es?
 [LISTA: Roundup Fg | Roundup Wg | Roundup Max | Roundup Fg W | Roundup Ready]
 ```
 
-Listado (una línea por uso registrado: el mismo producto aparece una vez por plaga):
+Un producto registrado del que SENASA no publica usos ni dosis (6 de cada 7): lo que se sabe y qué no se puede verificar. Si tiene marbete con texto, suma lo que dice su marbete sobre la dosis para ese cultivo, con la página en *Fuentes*:
 
 ```
-*Productos registrados* (10 de 20)
-1. *Aceite Quimeco Plus* · Reg. SENASA 37227 · Banda IV · Yuyo Colorado · 250 cm3 por ha
-2. *Agrolufen 5 Ec* · Reg. SENASA 38947 · Banda IV · Falsa Medidora · 200-300 cm3/ha
-3. *Agrolufen 5 Ec* · Reg. SENASA 38947 · Banda IV · Oruga De Las Leguminosas · 200-300 cm3/ha
+*Manto* · Reg. SENASA 38008 · Banda III (azul)
+⚠️ SENASA no publica para qué cultivos ni en qué dosis está registrado, así que no puedo verificar si 60 cc/ha es correcta para maiz.
+*Qué podés hacer:* fijate la dosis en la etiqueta del envase o consultalo con el ingeniero agrónomo que firmó la receta.
+```
+
+```
+*2,4-db Sigma* · Reg. SENASA 38806 · Banda II (amarilla)
+⚠️ SENASA no publica para qué cultivos ni en qué dosis está registrado, así que no puedo decirte la dosis registrada para soja.
+*Según su marbete:* El marbete indica que para el cultivo de soja se debe usar en mezcla y no superar los 50 cm3/ha del producto.
+*Qué podés hacer:* confirmalo con el ingeniero agrónomo que firmó la receta.
+
+*Fuentes*
+- SENASA, Reg. 38806 (marbete, pág. 1)
+```
+
+Listado: una fila por producto, con el total real y un título que dice qué se buscó (cualquier combinación de cultivo, plaga, principio activo, aptitud, banda, firma y marca). Con cultivo o plaga avisa que solo aparecen los productos con usos cargados; un filtro que no está en el registro se omite y se avisa:
+
+```
+*Herbicidas para soja*
+
+(10 de 246)
+1. *2,4db 100 Aca* · Reg. SENASA 30005 · Banda III · 1 a 1,25 l/hm2
+2. *2,4-db 93.1 Brilliance* · Reg. SENASA 41974 · Banda III · 5 dosis distintas según la plaga
 ...
+
+⚠️ Solo aparecen los productos que tienen cultivos y plagas cargados en SENASA; puede haber otros registrados sin esos datos
+
 Es lo que figura en el registro; qué aplicar lo define la receta del ingeniero agrónomo.
+```
+
+Con una localidad y una distancia, una sección por tipo de aplicación con las bandas que se pueden a esa distancia de la zona urbana (una sola, "Aérea y terrestre (lo mismo para las dos)", si coinciden) y las normas en *Fuentes*:
+
+```
+*Fungicidas para trigo* a 1500 m de la zona urbana de El Trébol
+
+*Aérea:* ✅ III y IV · ❌ Ia, Ib y II
+(10 de 84)
+1. *Abril 50 Curasemilla* · Reg. SENASA 38052 · Banda III
+2. *Adama Almagor* · Reg. SENASA 36471 · Banda III · 1250 cc/ha
+...
+
+*Terrestre:* ✅ todas las bandas
+(10 de 115)
+1. *Abril 50 Curasemilla* · Reg. SENASA 38052 · Banda III
+2. *Acento Induxor* · Reg. SENASA 40082 · Banda II · 700 cc/ha
+...
+
+⚠️ Solo aparecen los productos que tienen cultivos y plagas cargados en SENASA; puede haber otros registrados sin esos datos
+
+Es lo que figura en el registro; qué aplicar lo define la receta del ingeniero agrónomo.
+
+*Fuentes*
+- Ley 11273/1995, art. 33
+- Ordenanza 841/2010, art. 7 (el-trebol)
 ```
 
 ## `consulta_marbete`
@@ -345,6 +399,8 @@ El resto de los motivos (descripción de `dominio/motivos.py::DESCRIPCION_MOTIVO
 *Qué podés hacer:* revisá el dato e intentá de nuevo, o consultá al área de ambiente del municipio / a tu ingeniero agrónomo.
 ```
 
+Algunos motivos tienen su propio *Qué podés hacer* (`formateador.py::_QUE_HACER`): `SIN_USOS_REGISTRADOS` dice "fijate la dosis en la etiqueta del envase o consultalo con el ingeniero agrónomo que firmó la receta" (en `validar_producto_registro` ese caso ya no llega acá: ver `consulta_producto`).
+
 ## `ayuda`
 
 **Cuándo:** el operario pide ayuda genérica ("¿qué podés hacer?"). Texto fijo.
@@ -361,7 +417,7 @@ Mandame una foto de receta o contame qué necesitás.
 
 ## `error`
 
-**Cuándo:** una tool devuelve `estado="error"` o el orquestador captura una excepción. Nunca se muestran detalles internos: van al log del turno.
+**Cuándo:** una tool devuelve `estado="error"` o el orquestador captura una excepción. Nunca se muestran detalles internos: van al log del turno (desde el 28/09/2026, el tipo y el mensaje de la excepción quedan en `operacion.turno.salida.error`). Un error de cuota de Gemini primero se reintenta con las otras keys configuradas.
 
 ```
 ⚠️ Tuve un problema técnico y no pude procesar tu mensaje. Probá de nuevo en unos minutos; si sigue fallando, contactá a soporte.

@@ -1,6 +1,6 @@
 # Matriz de parámetros de las tools
 
-Los argumentos de las 14 tools tal como están en el código (`src/fitosanitarios/tools/<tool>/tool.py`, clase `...Args`), qué hace cada una cuando falta algo y en qué tipo de respuesta termina. Lo que lee el LLM para elegir la tool y completar los argumentos está en `tools/<tool>/prompts.py` (`DESCRIPCION`); lo que lee el operario, en `tools/<tool>/mensajes.py`. Actualizado al 27/09/2026.
+Los argumentos de las 14 tools tal como están en el código (`src/fitosanitarios/tools/<tool>/tool.py`, clase `...Args`), qué hace cada una cuando falta algo y en qué tipo de respuesta termina. Lo que lee el LLM para elegir la tool y completar los argumentos está en `tools/<tool>/prompts.py` (`DESCRIPCION`); lo que lee el operario, en `tools/<tool>/mensajes.py`. Actualizado al 28/09/2026.
 
 Fuentes para completar un parámetro, en este orden: **mensaje actual → receta en curso → turnos previos**. Nunca por suposición (ver skill, "Matriz de parámetros"). Los textos del operario (fechas, horas, tipo de aplicación, banda, equipo) se pasan **tal como los dijo**: los interpreta el código, no el LLM.
 
@@ -9,7 +9,7 @@ Fuentes para completar un parámetro, en este orden: **mensaje actual → receta
 | Tool | Requeridos | Opcionales | Si falta | `tipo` de respuesta |
 |---|---|---|---|---|
 | `leer_receta` | la foto (va ligada al turno, sin argumentos para el LLM) | — | no aplica: con foto, se llama siempre primero | `confirmacion_receta` |
-| `completar_receta` | al menos un dato de la receta | cultivo, lote, localidad, tipo de aplicación, adversidad, superficie, dosis por producto | sin receta leída en la conversación: pide la foto | `confirmacion_receta` |
+| `completar_receta` | — | cultivo, lote, localidad, tipo de aplicación, adversidad, superficie, dosis por producto | sin receta leída en la conversación: pide la foto. Sin ningún dato (el botón "Corregir"): pregunta qué dato corregir | `confirmacion_receta` |
 | `validar_producto_registro` | producto | cultivo, adversidad, dosis + unidad | producto ambiguo: lista de candidatos | `consulta_producto` |
 | `consultar_productos` | al menos un filtro: cultivo, adversidad, principio activo, aptitud, banda, firma, marca, o localidad + distancia | cualquier combinación de esos; tipo de aplicación, provincia | distancia sin localidad: lista de las cargadas. Filtro que no está en el registro: se omite y se avisa | `consulta_producto` |
 | `consultar_marbete` | producto, pregunta | — | producto ambiguo: lista de candidatos | `consulta_marbete` |
@@ -56,7 +56,7 @@ class CompletarRecetaArgs(BaseModel):
     dosis: list[DosisDeProducto] = []
 ```
 
-Para los datos que faltaban o una corrección ("soja, en Sastre", "la dosis es 200 cc"). Aplica lo que dijo el operario sobre la **última receta de la conversación tomada del artifact de la tool anterior**, no de lo que recuerde el LLM, y vuelve a mostrarla: con lo que todavía falte preguntado, o completa para confirmar.
+Para los datos que faltaban o una corrección ("soja, en Sastre", "la dosis es 200 cc"). Aplica lo que dijo el operario sobre la **última receta de la conversación tomada del artifact de la tool anterior**, no de lo que recuerde el LLM, y vuelve a mostrarla: con lo que todavía falte preguntado, o completa para confirmar. Sin ningún dato (el botón "Corregir" solo) no vuelve a mostrar la misma receta: pregunta "¿Qué dato querés corregir?".
 
 ## `validar_producto_registro`
 
@@ -96,6 +96,8 @@ Listado de lo registrado, con cualquier combinación de filtros ("¿qué hay par
 Una localidad y una distancia equivalen a filtrar por banda: las que se pueden aplicar a esa distancia de la zona urbana, con el mismo criterio que `listar_limitaciones` (`servicios/limitaciones.py::bandas_a_distancia`). "¿Qué fungicidas para trigo puedo aplicar con avión a 1500 m de El Trébol?" es una sola llamada. Sin tipo de aplicación, responde para aérea y terrestre; si las dos permiten las mismas bandas, es una sola lista que lo aclara. Las normas que deciden van en *Fuentes*.
 
 Un filtro que no está en el registro (una firma o una aptitud que no existen, un cultivo que no se reconoce) se omite en la búsqueda y se avisa. Con cultivo o plaga, avisa que solo aparecen los productos con usos cargados en SENASA.
+
+Controles en código sobre lo que pasa el LLM: un cultivo que no aparece en la conversación (lo que dijo el operario o devolvió una tool) se descarta, y también uno que es una localidad cargada ("en el trébol"); una `marca` que ningún producto tiene en el nombre se prueba como principio activo ("metsulfuron").
 
 ## `consultar_marbete`
 
