@@ -6,50 +6,26 @@ usaría el marbete, recupera los fragmentos de su marbete con búsqueda híbrida
 responde solo con esos fragmentos. Cada página que cita se verifica en código contra lo
 recuperado: si no está, se descarta; sin ninguna cita verificada no hay respuesta."""
 
-import json
-import logging
-
 from langchain_core.tools import tool
 from pydantic import BaseModel
 
-from fitosanitarios.datos.retrievers.catalogo import (
-    buscar_productos_por_nombre,
-    fragmentos_de_marbete,
-    palabras_de,
-)
+from fitosanitarios.datos.retrievers.catalogo import buscar_productos_por_nombre
 from fitosanitarios.dominio.modelos import CampoFaltante, Cita, ResultadoTool
 from fitosanitarios.dominio.motivos import MotivoNoResuelto
-from fitosanitarios.servicios.busqueda_hibrida import seleccionar
 from fitosanitarios.servicios.demo_reformulacion import comparar_con_y_sin_reformular
+from fitosanitarios.servicios.marbete import responder_con_el_marbete
 from fitosanitarios.servicios.matching import Candidato, hay_empate_ambiguo, rankear_candidatos
 from fitosanitarios.servicios.reformulacion import consulta_de_busqueda
 from fitosanitarios.tools.consultar_marbete import mensajes
 from fitosanitarios.tools.consultar_marbete.prompts import (
     DESCRIPCION,
-    PLANTILLA_FRAGMENTO,
-    PLANTILLA_PROMPT_USUARIO,
     PROMPT_REFORMULACION,
-    PROMPT_SISTEMA_MARBETE,
 )
-
-logger = logging.getLogger(__name__)
-
-TOP_K_FRAGMENTOS = 5
 
 
 class ConsultarMarbeteArgs(BaseModel):
     producto: str
     pregunta: str
-
-
-def _parsear_json(respuesta: str) -> dict | None:
-    texto = respuesta.strip().removeprefix("```json").removeprefix("```").removesuffix("```")
-    try:
-        datos = json.loads(texto.strip())
-    except json.JSONDecodeError:
-        logger.warning("El LLM no devolvió JSON válido para consultar_marbete")
-        return None
-    return datos if isinstance(datos, dict) else None
 
 
 def consultar_marbete_logica(
@@ -98,67 +74,33 @@ def _responder_con_el_marbete(
     )
     if consulta is None:
         return sin_respaldo
-
-    # Retrieval híbrido: los fragmentos del marbete de ese producto, rankeados por
-    # similitud de significado y por palabras (BM25), fusionados.
-    del_marbete = fragmentos_de_marbete(
-        conn, modelo_embeddings.encode(consulta).tolist(), producto.id
+    respuesta = responder_con_el_marbete(
+        pregunta, consulta, producto.id, producto.marca, conn, modelo_embeddings, cliente_llm,
+        umbral_similitud,
     )
-    elegidos = seleccionar(
-        [f["score"] for f in del_marbete], [f["palabras"] for f in del_marbete],
-        palabras_de(conn, consulta), umbral_similitud, TOP_K_FRAGMENTOS,
-    )
-    fragmentos = [del_marbete[p.indice] for p in elegidos]
-    if not fragmentos:
-        return sin_respaldo
-
-    # Generación: el LLM responde solo con esos fragmentos.
-    contexto = "\n\n".join(
-        PLANTILLA_FRAGMENTO.format(pagina=f["pagina"], texto=f["texto"]) for f in fragmentos
-    )
-    respuesta_llm = cliente_llm.generar(
-        PLANTILLA_PROMPT_USUARIO.format(
-            producto=producto.marca, pregunta=pregunta, contexto=contexto
-        ),
-        system=PROMPT_SISTEMA_MARBETE,
-    )
-    datos_llm = _parsear_json(respuesta_llm)
-    if datos_llm is None:
+    if respuesta.sin_json:
         return ResultadoTool(
             estado="no_resuelto", motivo=MotivoNoResuelto.MARBETE_SIN_RESPALDO,
             advertencias=[mensajes.ADVERTENCIA_SIN_JSON],
         )
-
-    # Verificación: cada página citada tiene que estar entre los fragmentos recuperados.
-    recuperadas = {f["pagina"] for f in fragmentos}
-    paginas: list[int] = []
-    advertencias: list[str] = []
-    for pagina in datos_llm.get("paginas_citadas") or []:
-        try:
-            numero = int(pagina)
-        except (TypeError, ValueError):
-            numero = None
-        if numero in recuperadas and numero not in paginas:
-            paginas.append(numero)
-        elif numero not in paginas:
-            advertencias.append(mensajes.advertencia_pagina_descartada(pagina))
-    if not paginas:
+    if not respuesta.paginas:
         return sin_respaldo
-
     return ResultadoTool(
         estado="ok",
         datos={
             "marca": producto.marca, "numero_inscripcion": producto.numero_inscripcion,
-            "respuesta": datos_llm.get("respuesta") or "",
+            "respuesta": respuesta.respuesta,
         },
         citas=[
             Cita(
                 fuente="senasa", registro_senasa=producto.numero_inscripcion,
                 documento=f"marbete, pág. {p}",
             )
-            for p in sorted(paginas)
+            for p in respuesta.paginas
         ],
-        advertencias=advertencias,
+        advertencias=[
+            mensajes.advertencia_pagina_descartada(p) for p in respuesta.paginas_descartadas
+        ],
     )
 
 

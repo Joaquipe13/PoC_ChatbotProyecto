@@ -331,32 +331,40 @@ Sin ningún fragmento, o sin ninguna página citada que esté entre lo recuperad
 
 ### `consultar_productos`
 
-Listado filtrado por cultivo/adversidad/principio activo/banda; los `*_id` ya vienen resueltos por embedding+trigram contra `catalogo.cultivo`/`adversidad`/`principio_activo` en un paso previo.
+Una fila por producto que cumple todos los filtros dados, en cualquier combinación (`datos/retrievers/catalogo.py::listar_productos_por_filtro`). Cultivo, adversidad y principio activo llegan resueltos por embedding + trigram contra su tabla; la aptitud se filtra sobre el JSONB del registro; la firma, por trigram de palabras (`resolver_firmas`); la marca, por texto contenido. Las bandas salen de lo que dijo el operario o, con una localidad y una distancia, de las reglas de distancia a la zona urbana.
 
 ```sql
-SELECT DISTINCT
-    p.id,
-    p.numero_inscripcion,
-    p.marca,
-    p.banda_toxicologica,
-    ur.dosis,
-    c.nombre AS cultivo,
-    a.nombre_comun AS adversidad
-FROM catalogo.uso_registrado ur
-JOIN catalogo.producto p ON p.id = ur.producto_id
-JOIN catalogo.cultivo c ON c.id = ur.cultivo_id
-LEFT JOIN catalogo.adversidad a ON a.id = ur.adversidad_id
-LEFT JOIN catalogo.producto_principio_activo ppa ON ppa.producto_id = p.id
-LEFT JOIN catalogo.principio_activo pa ON pa.id = ppa.principio_activo_id
-WHERE (:cultivo_id IS NULL OR c.id = :cultivo_id)
-  AND (:adversidad_id IS NULL OR a.id = :adversidad_id)
-  AND (:principio_activo_id IS NULL OR pa.id = :principio_activo_id)
-  AND (:bandas_hasta_banda_maxima IS NULL OR p.banda_toxicologica = ANY(:bandas_hasta_banda_maxima))
-ORDER BY p.marca
+WITH usos AS (
+    SELECT ur.producto_id,
+           array_remove(array_agg(DISTINCT NULLIF(ur.dosis->>'texto_original', '')), NULL) AS dosis,
+           count(DISTINCT ur.adversidad_id) AS adversidades
+    FROM catalogo.uso_registrado ur
+    WHERE :con_usos                       -- solo si se filtró por cultivo o adversidad
+      AND (:cultivo_id IS NULL OR ur.cultivo_id = :cultivo_id)
+      AND (:adversidad_id IS NULL OR ur.adversidad_id = :adversidad_id)
+    GROUP BY ur.producto_id
+)
+SELECT p.id, p.numero_inscripcion, p.marca, p.banda_toxicologica,
+       f.nombre AS firma, u.dosis, u.adversidades,
+       count(*) OVER () AS total          -- el total real, no el LIMIT
+FROM catalogo.producto p
+LEFT JOIN catalogo.firma f ON f.id = p.firma_id
+LEFT JOIN usos u ON u.producto_id = p.id
+WHERE (NOT :con_usos OR u.producto_id IS NOT NULL)
+  AND (:principio_id IS NULL OR EXISTS (
+        SELECT 1 FROM catalogo.producto_principio_activo ppa
+        WHERE ppa.producto_id = p.id AND ppa.principio_activo_id = :principio_id))
+  AND (:aptitudes IS NULL OR EXISTS (
+        SELECT 1 FROM jsonb_array_elements(p.crudo_api->'productos_aptitudes') apt
+        WHERE apt->'nomenclador'->>'descripcion' = ANY(:aptitudes)))
+  AND (:firma_ids IS NULL OR p.firma_id = ANY(:firma_ids))
+  AND (:marca IS NULL OR p.marca ILIKE '%' || :marca || '%')
+  AND (:bandas IS NULL OR p.banda_toxicologica = ANY(:bandas))
+ORDER BY p.marca, p.numero_inscripcion
 LIMIT :limite OFFSET :offset;
 ```
 
-Al menos uno de `cultivo_id` / `adversidad_id` / `principio_activo_id` es requerido (ver `docs/matriz-parametros.md`); si los tres son `NULL` la tool no ejecuta esta consulta y repregunta antes.
+Hace falta al menos un filtro (ver `docs/matriz-parametros.md`). Hasta el 28/09/2026 era una fila por uso registrado (el mismo producto salía una vez por maleza), el total era el `LIMIT` y la aptitud se aceptaba pero no se filtraba.
 
 ## Por qué no es una tabla plana
 

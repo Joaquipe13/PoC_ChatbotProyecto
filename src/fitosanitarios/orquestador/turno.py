@@ -65,7 +65,7 @@ def ejecutar_turno(
         resultado_grafo = agente.invoke(
             {"messages": [{"role": "user", "content": texto_usuario}]}, config=config
         )
-    except Exception:
+    except Exception as exc:
         # Hallazgo real (Fase 7, evals): un ValueError de validación de
         # argumentos de una tool (p. ej. consultar_productos sin ningún
         # filtro) se propaga sin capturar y rompía el turno entero en vez
@@ -76,7 +76,10 @@ def ejecutar_turno(
         logger.exception("Excepción no controlada ejecutando el turno (thread %s)", thread_id)
         respuesta = RespuestaAgente(tipo="error")
         if conn_log is not None:
-            registrar_turno(conn_log, thread_id, texto_usuario, [], respuesta.tipo)
+            registrar_turno(
+                conn_log, thread_id, texto_usuario, [], respuesta.tipo,
+                error=f"{type(exc).__name__}: {exc}",
+            )
         return respuesta, formatear_respuesta(respuesta, [])
 
     respuesta: RespuestaAgente | None = resultado_grafo.get("structured_response")
@@ -106,7 +109,10 @@ def ejecutar_turno(
         logger.warning("El agente no devolvió structured_response (thread %s)", thread_id)
         respuesta = RespuestaAgente(tipo="error")
         if conn_log is not None:
-            registrar_turno(conn_log, thread_id, texto_usuario, tool_calls, respuesta.tipo)
+            registrar_turno(
+                conn_log, thread_id, texto_usuario, tool_calls, respuesta.tipo,
+                error="el agente no devolvió structured_response",
+            )
         return respuesta, formatear_respuesta(respuesta, [])
 
     if respuesta.tipo == "repregunta" and respuesta.faltantes:

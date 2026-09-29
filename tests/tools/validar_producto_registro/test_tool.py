@@ -25,14 +25,21 @@ def test_producto_real_con_cultivo_no_autorizado(conexion, modelo_embeddings):
     assert len(resultado.advertencias) == 1
 
 
-def test_producto_sin_usos_registrados(conexion, modelo_embeddings):
-    args = ValidarProductoRegistroArgs(producto_nombre="Glynomyl Dd", cultivo="Soja")
+def test_producto_sin_usos_registrados_dice_lo_que_sabe_y_que_no_verifica(
+    conexion, modelo_embeddings
+):
+    """Caso real (28/09/2026): "¿es correcta la dosis para Manto?" terminaba en "No pude
+    completar la consulta" con el motivo en jerga, sin decir que el producto está
+    registrado ni su banda."""
+    args = ValidarProductoRegistroArgs(
+        producto_nombre="Manto", cultivo="MAIZ", dosis_valor=60, dosis_unidad="cc/ha"
+    )
     resultado = validar_producto_registro_logica(args, conexion, modelo_embeddings, TOLERANCIA_PCT)
-    assert resultado.estado == "no_resuelto"
-
-    from fitosanitarios.dominio.motivos import MotivoNoResuelto
-
-    assert resultado.motivo == MotivoNoResuelto.SIN_USOS_REGISTRADOS
+    assert resultado.estado == "ok"
+    assert resultado.datos["numero_inscripcion"] == "38008"
+    assert resultado.datos["sin_usos_registrados"] is True
+    assert resultado.datos["marbete"] is None  # sin cliente LLM no se busca en el marbete
+    assert "60 cc/ha" in resultado.chequeos_no_realizados[0]
 
 
 def test_producto_no_encontrado(conexion, modelo_embeddings):

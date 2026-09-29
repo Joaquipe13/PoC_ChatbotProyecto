@@ -14,12 +14,13 @@ Complementa a `docs/testing-manual.md` (una checklist por tool) y a `docs/guion-
 
 ```bash
 docker compose up -d db
-USE_FIXTURES=false uv run uvicorn fitosanitarios.canales.web.app_produccion:app --port 8001
+uv run jupyter notebook notebooks/chat.ipynb
 ```
 
-Abrí `http://localhost:8001/`. `USE_FIXTURES=false` es obligatorio: con `true` el LLM de
-consultas normativas es un fake. Usá **"Nueva conversación"** entre casos para no arrastrar
-estado. Para WhatsApp real: `docs/testing-manual.md` y el pendiente de la URL del túnel
+Corré la celda de preparación y usá el chat del notebook (o `enviar("...")`). El notebook
+fija `USE_FIXTURES=false` por su cuenta: con `true` (el default de `.env`) `leer_receta` y
+las respuestas con RAG usan un LLM fake y degradan en silencio. Usá **"Nueva conversación"** (o `nueva()`) entre casos para no
+arrastrar estado. Para WhatsApp real: `docs/testing-manual.md` y el pendiente de la URL del túnel
 (cambia en cada arranque de cloudflared).
 
 **Qué hay cargado**

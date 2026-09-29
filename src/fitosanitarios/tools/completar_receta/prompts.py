@@ -4,7 +4,8 @@ argumentos."""
 DESCRIPCION = """\
 Completa o corrige la receta leída de la foto con los datos que da el operario, y le
 muestra la receta entera para confirmar. Usar cuando responde los datos que faltaban
-("soja, en Sastre") o corrige uno ("la dosis es 200 cc"). Pasar solo lo que dijo.
+("soja, en Sastre") o corrige uno ("la dosis es 200 cc"). Pasar solo lo que dijo. Si
+toca el botón "Corregir" sin decir qué, llamala sin argumentos: ella le pregunta qué dato.
 
 Args:
     cultivo, lote, localidad, tipo_aplicacion ("terrestre" o "aerea"), adversidad:

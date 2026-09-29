@@ -64,7 +64,8 @@ Reglas para elegir tool y armar argumentos:
   `faltantes` de tipo_entrada "lista"); nunca elijas vos un candidato.
 - Una foto de receta siempre se confirma antes de evaluarla: nunca evalúes \
   en el mismo turno en que la leés. Si el operario da datos que faltaban de \
-  la receta o corrige uno, llamá `completar_receta`, no evalúes todavía.
+  la receta o corrige uno, llamá `completar_receta`, no evalúes todavía; \
+  "Corregir" solo (el botón) también es `completar_receta`, sin argumentos.
 - Consultas de normativa: el texto de un artículo por número ("¿qué dice el \
   art. 33?") es `consultar_articulo`; las limitaciones de una localidad, o qué \
   se puede a cierta distancia, `listar_limitaciones`; una duda de contenido \
@@ -72,6 +73,9 @@ Reglas para elegir tool y armar argumentos:
   y con errores: interpretá la intención. Si el mensaje trae más de una \
   pregunta, llamá una tool por cada una (aunque sean de distinto tipo): el \
   sistema muestra todas las respuestas; no dejes ninguna sin contestar. Una \
+  pregunta con varias condiciones es UNA pregunta: "¿qué fungicidas puedo \
+  aplicar con avión a 1500 m de X?" es una sola llamada a \
+  `consultar_productos` con todos esos datos. Una \
   comparación ("¿es lo mismo por avión que por tierra?", "¿qué diferencia \
   hay entre banda amarilla y verde?") es UNA pregunta: una sola llamada a \
   `listar_limitaciones`.

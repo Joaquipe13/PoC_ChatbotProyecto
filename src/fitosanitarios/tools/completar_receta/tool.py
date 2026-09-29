@@ -61,9 +61,21 @@ def _item_de(items: list[dict], producto: str | None) -> dict | None:
     return items[0] if len(items) == 1 else None
 
 
+def _sin_ningun_dato(args: CompletarRecetaArgs) -> bool:
+    campos = (args.cultivo, args.lote, args.localidad, args.tipo_aplicacion, args.adversidad)
+    return (
+        all(es_sin_dato(c) for c in campos) and args.superficie_ha is None
+        and not any(not es_sin_dato(d.dosis) for d in args.dosis)
+    )
+
+
 def completar_receta_logica(args: CompletarRecetaArgs, receta_previa: dict | None) -> ResultadoTool:
     if receta_previa is None:
         return ResultadoTool(estado="faltan_datos", faltantes=[mensajes.faltante_foto()])
+    if _sin_ningun_dato(args):
+        # El botón "Corregir" sin decir qué: antes volvía a mostrar la misma receta para
+        # confirmar, como si no hubiera pasado nada (caso real, 28/09/2026).
+        return ResultadoTool(estado="faltan_datos", faltantes=[mensajes.faltante_correccion()])
 
     datos = {**receta_previa, "items": [dict(i) for i in receta_previa.get("items", [])]}
     for campo in ("cultivo", "lote", "localidad", "adversidad"):

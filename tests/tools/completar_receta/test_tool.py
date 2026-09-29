@@ -59,8 +59,10 @@ def test_corrige_la_dosis_del_producto_nombrado_y_el_tipo_de_aplicacion():
 
 def test_no_pisa_un_dato_con_no_figura():
     receta = {**RECETA_1001, "cultivo": "Soja", "localidad": "Sastre"}
-    resultado = completar_receta_logica(CompletarRecetaArgs(cultivo="NO FIGURA"), receta)
-    assert resultado.datos["cultivo"] == "Soja"
+    resultado = completar_receta_logica(
+        CompletarRecetaArgs(cultivo="NO FIGURA", lote="9"), receta
+    )
+    assert (resultado.datos["cultivo"], resultado.datos["lote"]) == ("Soja", "9")
 
 
 def test_sin_receta_leida_pide_la_foto():
@@ -143,3 +145,12 @@ def test_confirmar_sin_haber_dado_lo_que_falta_no_evalua_con_no_figura(evaluacio
     assert evaluaciones == []
     assert respuesta.tipo == "repregunta"
     assert "¿Qué cultivo es?" in mensajes[0] and "¿En qué localidad se aplica?" in mensajes[0]
+
+
+def test_corregir_sin_decir_que_pregunta_que_dato_corregir():
+    """Caso real (28/09/2026): el botón "Corregir" llamaba a `completar_receta` sin
+    argumentos y volvía a mostrar la misma receta para confirmar."""
+    resultado = completar_receta_logica(CompletarRecetaArgs(), RECETA_1001)
+    assert resultado.estado == "faltan_datos" and resultado.datos is None
+    assert resultado.faltantes[0].campo == "correccion"
+    assert "¿Qué dato querés corregir?" in resultado.faltantes[0].pregunta_sugerida

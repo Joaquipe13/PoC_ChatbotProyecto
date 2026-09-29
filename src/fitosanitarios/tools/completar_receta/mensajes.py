@@ -16,11 +16,29 @@ def faltante_foto() -> CampoFaltante:
     )
 
 
+PREGUNTA_CORRECCION = (
+    "¿Qué dato querés corregir? Escribilo con el valor correcto, por ejemplo: "
+    "\"la dosis es 200 cc/ha\" o \"es en Sastre\"."
+)
+
+
+def faltante_correccion() -> CampoFaltante:
+    return CampoFaltante(
+        campo="correccion", motivo="el operario quiere corregir la receta sin decir qué",
+        pregunta_sugerida=PREGUNTA_CORRECCION, tipo_entrada="texto",
+    )
+
+
 def aviso_producto_no_encontrado(nombre: str) -> str:
     return f"No encontré '{nombre}' entre los productos de la receta"
 
 
 def resumen_para_llm(resultado: ResultadoTool) -> str:
+    if resultado.faltantes and resultado.faltantes[0].campo == "correccion":
+        return (
+            "completar_receta: se le preguntó al operario qué dato quiere corregir; "
+            "esperá su respuesta."
+        )
     if not resultado.datos:
         return "completar_receta: no hay una receta leída; se le pidió la foto al operario."
     texto = f"Receta actualizada. Datos de la receta: {datos_para_llm(resultado.datos)}."

@@ -6,6 +6,7 @@ from fitosanitarios.dominio.modelos import CampoFaltante, Cita, RespuestaAgente,
 from fitosanitarios.dominio.motivos import MotivoNoResuelto
 from fitosanitarios.orquestador.formateador import formatear_respuesta, partir_por_seccion
 
+BANDAS_TODAS = ["Ia", "Ib", "II", "III", "IV"]
 
 def _un_mensaje(respuesta, resultados) -> str:
     mensajes = formatear_respuesta(respuesta, resultados)
@@ -244,7 +245,6 @@ def test_evaluar_riesgo_con_dosis_fuera_de_rango_lo_dice_y_no_ofrece_agendar():
     assert texto.endswith("[Sí] [No]")  # dos productos: la banda de cada uno suma
 
 
-def test_evaluar_riesgo_con_dosis_fuera_de_rango_y_un_producto_no_ofrece_la_banda():
 def test_evaluar_riesgo_entre_varias_consultas_no_pierde_el_aviso_de_dosis():
     """Plan del video (27/09/2026): con `evaluar_riesgo` y `validar_producto_registro` en el
     mismo turno se mostraba solo el producto y se perdía la dosis fuera de rango."""
@@ -268,6 +268,7 @@ def test_evaluar_riesgo_entre_varias_consultas_no_pierde_el_aviso_de_dosis():
     assert "*Flyer 10 Ec* · Reg. SENASA 41881" in texto
 
 
+def test_evaluar_riesgo_con_dosis_fuera_de_rango_y_un_producto_no_ofrece_la_banda():
     """Plan de pruebas (27/09/2026): con un solo producto preguntaba "¿Querés la banda de
     cada producto?" justo debajo de "banda II (amarilla)"."""
     condiciones = {**_CONDICIONES_EL_TREBOL, "productos_por_banda": {"Flyer 10 Ec": "II"}}
@@ -433,43 +434,134 @@ def test_agenda_muestra_la_hora_y_la_fecha_legible():
     assert texto == "*Agenda del martes 22/09/2026* (1)\n1. ⏳ 08:00 — soja — lote 4 (pendiente)"
 
 
+def _listado(productos, total=None, aplicaciones=(), bandas=None, **bandas_a_distancia):
+    return {
+        "aplicaciones": list(aplicaciones), "bandas": bandas, "productos": productos,
+        "total": len(productos) if total is None else total,
+        "permitidas": None, "con_excepcion": [], "prohibidas": [], **bandas_a_distancia,
+    }
+
+
 def test_consulta_producto_listado():
     respuesta = RespuestaAgente(tipo="consulta_producto")
     resultado = ResultadoTool(
         estado="ok",
         datos={
-            "total": 1,
-            "productos": [{
+            "filtros": {"cultivo": "Soja", "aptitudes": ["Insecticida"]},
+            "listados": [_listado([{
                 "marca": "Flyer 10 Ec", "numero_inscripcion": "41881",
-                "banda_toxicologica": "II",
-                "dosis": {"texto_original": "160-180 cm3/ha"},
-            }],
+                "banda_toxicologica": "II", "dosis": ["160-180 cm3/ha"],
+            }])],
         },
         citas=[Cita(fuente="senasa", documento="vademécum")],
     )
     texto = _un_mensaje(respuesta, [resultado])
-    assert "*Productos registrados* (1 de 1)" in texto
-    assert "Flyer 10 Ec" in texto
-    assert "Banda II" in texto
-    assert "160-180 cm3/ha" in texto
+    assert texto.startswith("*Insecticidas para soja*\n\n1. *Flyer 10 Ec*")
+    assert "1. *Flyer 10 Ec* · Reg. SENASA 41881 · Banda II · 160-180 cm3/ha" in texto
     assert "*Fuentes*" not in texto
 
 
-def test_consulta_producto_listado_largo_dice_cuantos_muestra_y_la_plaga():
-    """Se muestran 10: el encabezado lo dice. El mismo producto aparece una vez por plaga
-    registrada; sin la plaga, las filas se veían repetidas."""
-    respuesta = RespuestaAgente(tipo="consulta_producto")
+def test_consulta_producto_listado_largo_dice_cuantos_muestra_de_cuantos():
+    """Una fila por producto; si hay más de 10, se dice cuántos hay en total (antes el total
+    era el LIMIT de la consulta y el mismo producto salía una vez por plaga)."""
     productos = [
-        {"marca": "2,4-db 93.1 Brilliance", "numero_inscripcion": "41974",
-         "banda_toxicologica": "III", "adversidad": f"Maleza {i}",
-         "dosis": {"texto_original": "40 cm3/ha"}}
-        for i in range(20)
+        {"marca": f"Producto {i}", "numero_inscripcion": str(40000 + i),
+         "banda_toxicologica": "III", "dosis": ["40 cm3/ha", "60 cm3/ha"]}
+        for i in range(10)
     ]
-    resultado = ResultadoTool(estado="ok", datos={"total": 20, "productos": productos})
-    texto = _un_mensaje(respuesta, [resultado])
-    assert "*Productos registrados* (10 de 20)" in texto
-    assert "Banda III · Maleza 0 · 40 cm3/ha" in texto
-    assert "Maleza 10" not in texto
+    resultado = ResultadoTool(
+        estado="ok", datos={"filtros": {"cultivo": "trigo"}, "listados": [_listado(productos, 84)]}
+    )
+    texto = _un_mensaje(RespuestaAgente(tipo="consulta_producto"), [resultado])
+    assert "(10 de 84)" in texto
+    assert "Banda III · 2 dosis distintas según la plaga" in texto
+
+
+def test_consulta_producto_a_una_distancia_muestra_las_bandas_de_cada_aplicacion():
+    """Sin tipo de aplicación: una lista por tipo, cada una con sus bandas permitidas, y las
+    normas en *Fuentes*."""
+    fungicida = {"marca": "Amistar", "numero_inscripcion": "1", "banda_toxicologica": "III"}
+    resultado = ResultadoTool(
+        estado="ok",
+        datos={
+            "filtros": {"cultivo": "trigo", "aptitudes": ["Fungicida"]},
+            "localidad": "El Trébol", "distancia_m": 1500,
+            "listados": [
+                _listado([fungicida], aplicaciones=["aerea"], bandas=["III", "IV"],
+                         permitidas=["III", "IV"], prohibidas=["Ia", "Ib", "II"]),
+                _listado([fungicida], aplicaciones=["terrestre"], bandas=BANDAS_TODAS,
+                         permitidas=BANDAS_TODAS),
+            ],
+        },
+        citas=[Cita(fuente="normativa", norma="ordenanza-841-2010", articulo="7",
+                    jurisdiccion_id="el-trebol")],
+    )
+    texto = _un_mensaje(RespuestaAgente(tipo="consulta_producto"), [resultado])
+    assert texto.startswith(
+        "*Fungicidas para trigo* a 1500 m de la zona urbana de El Trébol\n\n"
+        "*Aérea:* ✅ III y IV · ❌ Ia, Ib y II\n1. *Amistar*"
+    )
+    assert "*Terrestre:* ✅ todas las bandas" in texto
+    assert "*Fuentes*\n- Ordenanza 841/2010, art. 7" in texto
+
+
+def test_consulta_producto_a_una_distancia_con_las_mismas_bandas_es_una_sola_lista():
+    resultado = ResultadoTool(
+        estado="ok",
+        datos={
+            "filtros": {"aptitudes": ["Herbicida"]}, "localidad": "El Trébol",
+            "distancia_m": 5000,
+            "listados": [_listado(
+                [{"marca": "X", "numero_inscripcion": "1", "banda_toxicologica": "II"}],
+                aplicaciones=["aerea", "terrestre"], bandas=BANDAS_TODAS,
+                permitidas=BANDAS_TODAS,
+            )],
+        },
+    )
+    texto = _un_mensaje(RespuestaAgente(tipo="consulta_producto"), [resultado])
+    assert "*Aérea y terrestre (lo mismo para las dos):* ✅ todas las bandas" in texto
+
+
+def test_producto_sin_usos_registrados_dice_que_no_verifica_la_dosis():
+    """Caso real (28/09/2026): "¿es correcta la dosis para Manto?" decía "No pude completar
+    la consulta" con el motivo en jerga y "revisá el dato"."""
+    resultado = ResultadoTool(
+        estado="ok",
+        datos={
+            "producto": "Manto", "numero_inscripcion": "38008", "banda_toxicologica": "III",
+            "cultivo": "maíz", "cultivo_autorizado": None, "usos_del_cultivo": [],
+            "sin_usos_registrados": True, "dosis_declarada": "60 cc/ha", "marbete": None,
+        },
+        citas=[Cita(fuente="senasa", registro_senasa="38008", documento="detalle API")],
+    )
+    texto = _un_mensaje(RespuestaAgente(tipo="consulta_producto"), [resultado])
+    assert texto == (
+        "*Manto* · Reg. SENASA 38008 · Banda III (azul)\n"
+        "⚠️ SENASA no publica para qué cultivos ni en qué dosis está registrado, así que no "
+        "puedo verificar si 60 cc/ha es correcta para maíz.\n"
+        "*Qué podés hacer:* fijate la dosis en la etiqueta del envase o consultalo con el "
+        "ingeniero agrónomo que firmó la receta."
+    )
+
+
+def test_producto_sin_usos_con_la_dosis_del_marbete_la_cita():
+    resultado = ResultadoTool(
+        estado="ok",
+        datos={
+            "producto": "2,4-db Sigma", "numero_inscripcion": "38806",
+            "banda_toxicologica": "II", "cultivo": "soja", "cultivo_autorizado": None,
+            "usos_del_cultivo": [], "sin_usos_registrados": True, "dosis_declarada": None,
+            "marbete": "En soja, no superar los 50 cm3/ha.",
+        },
+        citas=[
+            Cita(fuente="senasa", registro_senasa="38806", documento="detalle API"),
+            Cita(fuente="senasa", registro_senasa="38806", documento="marbete, pág. 1"),
+        ],
+    )
+    texto = _un_mensaje(RespuestaAgente(tipo="consulta_producto"), [resultado])
+    assert "*Según su marbete:* En soja, no superar los 50 cm3/ha." in texto
+    assert "*Fuentes*\n- SENASA, Reg. 38806 (marbete, pág. 1)" in texto
+    assert "detalle API" not in texto
 
 
 def test_consulta_producto_puntual():
@@ -1128,7 +1220,9 @@ def test_la_pregunta_de_una_tool_no_se_tapa_con_el_listado_vacio_de_otra():
         pregunta_sugerida="Hay varios productos parecidos a 'glifosato'. ¿Cuál es?",
         opciones=["Glifosato 48 Sl Assa", "Glifosato Full Sigma"],
     )])
-    listado_vacio = ResultadoTool(estado="ok", datos={"productos": [], "total": 0})
+    listado_vacio = ResultadoTool(
+        estado="ok", datos={"filtros": {}, "listados": [_listado([])]}
+    )
     texto = _un_mensaje(RespuestaAgente(tipo="consulta_producto"), [pregunta, listado_vacio])
     assert texto.startswith("Hay varios productos parecidos a 'glifosato'. ¿Cuál es?")
     assert "   - Glifosato Full Sigma" in texto and "No encontré" not in texto

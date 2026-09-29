@@ -38,7 +38,7 @@ class ClienteLLMMultimodal(Protocol):
     ) -> str: ...
 
 
-def _es_error_cuota(exc: BaseException) -> bool:
+def es_error_cuota(exc: BaseException) -> bool:
     texto = str(exc).upper()
     return "429" in texto or "RESOURCE_EXHAUSTED" in texto or "RATE LIMIT" in texto
 
@@ -114,7 +114,7 @@ class ClienteGemini:
                 if imagen is not None and _es_imagen_rechazada(exc):
                     # La imagen es la misma con cualquier key: no tiene sentido rotar.
                     raise ImagenRechazada(str(exc)) from exc
-                if not _es_error_cuota(exc):
+                if not es_error_cuota(exc):
                     raise
                 ultimo_error = exc
                 continue
@@ -125,7 +125,7 @@ class ClienteGemini:
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=1, max=8),
-        retry=retry_if_exception(_es_error_cuota),
+        retry=retry_if_exception(es_error_cuota),
         reraise=True,
     )
     def _generar_con_key(
@@ -166,7 +166,7 @@ class ClienteGroq:
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=1, max=8),
-        retry=retry_if_exception(_es_error_cuota),
+        retry=retry_if_exception(es_error_cuota),
         reraise=True,
     )
     def generar(self, prompt: str, *, system: str | None = None) -> str:
@@ -180,7 +180,7 @@ class ClienteGroq:
         try:
             respuesta = cliente.chat.completions.create(model=self._model, messages=mensajes)
         except Exception as exc:
-            if _es_error_cuota(exc):
+            if es_error_cuota(exc):
                 raise ServicioLLMNoDisponible("Groq agotó la cuota configurada") from exc
             raise
         return respuesta.choices[0].message.content

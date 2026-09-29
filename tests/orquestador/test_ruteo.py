@@ -43,9 +43,9 @@ def test_ruteo_consultar_productos(conexion):
     respuesta, mensajes, _ = _turno_con_respuestas([
         mensaje_llama_tool("consultar_productos", {"cultivo": "Soja"}),
         mensaje_respuesta_estructurada({"tipo": "consulta_producto"}),
-    ])
+    ], mensaje="¿qué productos hay para soja?")
     assert respuesta.tipo == "consulta_producto"
-    assert "Productos registrados" in mensajes[0]
+    assert mensajes[0].startswith("*Productos para soja*")
 
 
 def test_ruteo_evaluar_riesgo(conexion):

@@ -59,7 +59,7 @@ def _plantilla_consulta_producto(
     """Un listado (`consultar_productos`) o un producto puntual
     (`validar_producto_registro`), según la forma del resultado."""
     datos = primer_dato(resultados) or {}
-    if "productos" in datos:
+    if "listados" in datos:
         return plantilla_listado(respuesta, resultados)
     return plantilla_producto(respuesta, resultados)
 
@@ -137,6 +137,20 @@ _QUE_HACER_SIN_INFORMACION = {
 }
 
 
+# Con un producto sin usos no hay "dato" que revisar ni tiene que ver el municipio (caso
+# real: "¿es correcta la dosis para Manto?", 28/09/2026).
+_QUE_HACER = {
+    MotivoNoResuelto.SIN_USOS_REGISTRADOS: (
+        "fijate la dosis en la etiqueta del envase o consultalo con el ingeniero agrónomo "
+        "que firmó la receta."
+    ),
+}
+_QUE_HACER_POR_DEFECTO = (
+    "revisá el dato e intentá de nuevo, o consultá al área de ambiente del municipio / a "
+    "tu ingeniero agrónomo."
+)
+
+
 # Una foto que no es una receta, o que no se lee: antes decía "la extracción no alcanzó la
 # confianza mínima en campos clave… revisá el dato" (plan de pruebas, 26/09/2026).
 _IMAGEN_ILEGIBLE = (
@@ -165,10 +179,7 @@ def _plantilla_no_resuelto(respuesta: RespuestaAgente, resultados: list[Resultad
     lineas = ["⚠️ *No pude completar la consulta*", f"*Por qué:* {porque}"]
     if advertencias:
         lineas.append(f"*Detalle:* {advertencias[0]}")
-    lineas.append(
-        "*Qué podés hacer:* revisá el dato e intentá de nuevo, o consultá al área de "
-        "ambiente del municipio / a tu ingeniero agrónomo."
-    )
+    lineas.append(f"*Qué podés hacer:* {_QUE_HACER.get(motivo, _QUE_HACER_POR_DEFECTO)}")
     return "\n".join(lineas)
 
 
@@ -355,10 +366,10 @@ _FORMAS_PROPIAS = {
     "consulta_articulo": lambda datos: isinstance(datos.get("partes"), list),
     "consulta_marbete": lambda datos: "respuesta" in datos and "numero_inscripcion" in datos,
     "consulta_normativa": lambda datos: "veredicto" in datos and "regla" in datos,
-    # el listado de `consultar_productos` trae `total` (los datos de `evaluar_riesgo` también
-    # traen `productos`, pero no `total`); uno vacío no tiene qué mostrar: no cuenta
+    # el listado de `consultar_productos` trae `listados` (una lista por tipo de aplicación);
+    # uno vacío no tiene qué mostrar: no cuenta
     "consulta_producto": lambda datos: (
-        (bool(datos.get("productos")) and "total" in datos)
+        any(lst.get("productos") for lst in datos.get("listados") or [])
         or ("numero_inscripcion" in datos and "cultivo_autorizado" in datos)
     ),
 }

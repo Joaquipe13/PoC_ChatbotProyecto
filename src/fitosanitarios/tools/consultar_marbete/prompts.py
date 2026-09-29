@@ -33,21 +33,3 @@ PROMPT_REFORMULACION = (
     f"no es sobre el producto, su uso, sus riesgos o su manejo, respondé solo "
     f"{RESPUESTA_FUERA_DE_TEMA}."
 )
-
-PROMPT_SISTEMA_MARBETE = (
-    "Sos un asistente que responde preguntas sobre el marbete (la etiqueta aprobada por "
-    "SENASA) de un producto fitosanitario, usando ÚNICAMENTE los fragmentos del marbete "
-    "que se te dan en el mensaje. Nunca respondas con información que no esté en esos "
-    "fragmentos, aunque la sepas de otra fuente. No copies el texto del marbete: resumilo "
-    "en una o dos oraciones, con los números tal como aparecen.\n\n"
-    "Respondé ÚNICAMENTE un JSON (sin texto alrededor, sin markdown) con esta forma "
-    'exacta:\n{"respuesta": "una o dos oraciones en español", "paginas_citadas": '
-    "[números de página de los fragmentos que usaste]}\n\n"
-    "Si ningún fragmento responde la pregunta, poné en \"respuesta\" que el marbete no lo "
-    "dice y dejá \"paginas_citadas\" vacío."
-)
-
-PLANTILLA_PROMPT_USUARIO = (
-    "Producto: {producto}\nPregunta: {pregunta}\n\nFragmentos del marbete:\n{contexto}"
-)
-PLANTILLA_FRAGMENTO = "[página {pagina}]\n{texto}"

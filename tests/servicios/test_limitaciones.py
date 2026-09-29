@@ -2,8 +2,8 @@
 
 import pytest
 
-from fitosanitarios.servicios.reglas import ReglaCandidata
-from fitosanitarios.tools.listar_limitaciones.utils import (
+from fitosanitarios.servicios.limitaciones import (
+    bandas_a_distancia,
     distancias_que_rigen,
     filtrar_reglas,
     normalizar_bandas,
@@ -11,6 +11,7 @@ from fitosanitarios.tools.listar_limitaciones.utils import (
     normalizar_tipo_zona,
     restricciones_a_distancia,
 )
+from fitosanitarios.servicios.reglas import ReglaCandidata
 
 
 def _regla(zona, aplicacion, bandas, distancia, articulo, permitido=False, condiciones=None):
@@ -197,3 +198,26 @@ def test_una_condicional_mas_lejos_que_la_distancia_que_rige_no_es_excepcion():
     desde_1200 = _regla("zona_urbana", "terrestre", ["II"], 1200, None, True, "condiciones")
     rigen = distancias_que_rigen([rige], [desde_1200], tipo_aplicacion="terrestre", bandas=["II"])
     assert rigen[0].tramos[0].con_excepciones is False
+
+
+# --- una distancia a la zona urbana equivale a un filtro de bandas (consultar_productos) ---
+
+
+def test_bandas_a_distancia_separa_permitidas_condicionales_y_prohibidas():
+    prohibiciones = [
+        _regla("zona_urbana", "aerea", ["todas"], 500, "33"),
+        _regla("zona_urbana", "aerea", ["Ia", "Ib", "II"], 3000, "7"),
+    ]
+    excepcion = _regla("zona_urbana", "aerea", ["II"], 1000, "51", permitido=True)
+    a_1500 = bandas_a_distancia(prohibiciones, [excepcion], 1500, "aerea")
+    assert a_1500.permitidas == ["III", "IV"]
+    assert a_1500.con_excepcion == ["II"]
+    assert a_1500.prohibidas == ["Ia", "Ib"]
+    assert [r.articulo for r in a_1500.reglas] == ["7", "51"]
+
+
+def test_bandas_a_distancia_sin_prohibicion_que_alcance_permite_todas():
+    prohibiciones = [_regla("zona_urbana", "aerea", ["todas"], 500, "33")]
+    assert bandas_a_distancia(prohibiciones, [], 800, "terrestre").permitidas == [
+        "Ia", "Ib", "II", "III", "IV"
+    ]

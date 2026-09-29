@@ -186,6 +186,7 @@ def correr_turno(
         checkpointer_postgres,
         crear_agente,
         crear_modelo_chat_gemini,
+        modelos_de_respaldo,
     )
     from fitosanitarios.orquestador.turno import ejecutar_turno
 
@@ -208,7 +209,12 @@ def correr_turno(
     try:
         with checkpointer_postgres(settings.database_url) as checkpointer:
             agente = _AgenteGrabador(
-                crear_agente(modelo, checkpointer=checkpointer, imagen_base64=imagen_b64)
+                crear_agente(
+                    modelo, checkpointer=checkpointer, imagen_base64=imagen_b64,
+                    respaldo=modelos_de_respaldo(
+                        settings, temperature=registro.TEMPERATURA, indice_key=n - 1
+                    ),
+                )
             )
             t0 = time.perf_counter()
             with psycopg.connect(settings.database_url) as conn:

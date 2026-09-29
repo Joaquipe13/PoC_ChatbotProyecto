@@ -26,6 +26,7 @@ from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
 from fitosanitarios.config import Settings
 from fitosanitarios.dominio.modelos import RespuestaAgente
 from fitosanitarios.dominio.motivos import MotivoNoResuelto
+from fitosanitarios.llm.client import es_error_cuota
 from fitosanitarios.orquestador.prompt_sistema import PROMPT_SISTEMA
 from fitosanitarios.tools.agendar_aplicacion import agendar_aplicacion
 from fitosanitarios.tools.completar_receta import completar_receta
@@ -77,8 +78,8 @@ def crear_modelo_chat_gemini(
     No reutiliza `llm/client.py::ClienteGemini` -- ese cliente es para
     llamadas de texto/imagen sueltas (extracción, RAG), no implementa el
     protocolo de tool-calling que `create_agent` necesita. Usa la primera
-    key configurada; la rotación ante 429 para el agente completo queda
-    pendiente (ver DECISIONES.md).
+    key configurada; las otras, para rotar ante un error de cuota, las arma
+    `modelos_de_respaldo` y las usa el middleware `RotarKeyAnteCuota`.
 
     `temperature` e `indice_key` son para las evaluaciones (`evals/chat.py`): fijar la
     temperatura más baja y repartir los turnos entre las keys. Con los valores por
@@ -89,9 +90,52 @@ def crear_modelo_chat_gemini(
         raise ValueError("Se necesita al menos una GEMINI_API_KEY_* para el agente real")
     keys = settings.gemini_api_keys
     opciones = {} if temperature is None else {"temperature": temperature}
+    if len(keys) > 1:
+        # Con otras keys para rotar (`RotarKeyAnteCuota`), no tiene sentido esperar los 6
+        # reintentos por defecto contra una key sin cuota.
+        opciones["max_retries"] = 2
     return ChatGoogleGenerativeAI(
         model=settings.gemini_model, google_api_key=keys[indice_key % len(keys)], **opciones
     )
+
+
+def modelos_de_respaldo(
+    settings: Settings, temperature: float | None = None, indice_key: int = 0
+) -> list[BaseChatModel]:
+    """Un modelo por cada una de las otras keys, en orden, para `RotarKeyAnteCuota`."""
+    total = len(settings.gemini_api_keys)
+    return [
+        crear_modelo_chat_gemini(settings, temperature, indice_key + i) for i in range(1, total)
+    ]
+
+
+class RotarKeyAnteCuota(AgentMiddleware):
+    """Si Gemini responde que se agotó la cuota (429 / RESOURCE_EXHAUSTED), la misma
+    llamada se repite con la key siguiente. Hasta el 28/09/2026 el agente usaba solo la
+    primera key: con dos operarios escribiendo a la vez, turnos que terminaban en "Tuve
+    un problema técnico" y funcionaban al reintentar (ver DIFICULTADES.md). Las llamadas
+    sueltas de las tools (`llm/client.py::ClienteGemini`) ya rotaban."""
+
+    def __init__(self, respaldo: list[BaseChatModel]):
+        super().__init__()
+        self.respaldo = respaldo
+
+    def wrap_model_call(self, request, handler):
+        try:
+            return handler(request)
+        except Exception as exc:
+            if not es_error_cuota(exc):
+                raise
+            ultimo = exc
+        for i, modelo in enumerate(self.respaldo, start=2):
+            logger.warning("Cuota agotada en Gemini: reintento con la key %d", i)
+            try:
+                return handler(request.override(model=modelo))
+            except Exception as exc:
+                if not es_error_cuota(exc):
+                    raise
+                ultimo = exc
+        raise ultimo
 
 
 def construir_tools(imagen_base64: str | None = None) -> list:
@@ -137,19 +181,28 @@ class LeerLaFotoPrimero(AgentMiddleware):
         return handler(request)
 
 
-def crear_agente(model: BaseChatModel, checkpointer=None, imagen_base64: str | None = None):
+def crear_agente(
+    model: BaseChatModel,
+    checkpointer=None,
+    imagen_base64: str | None = None,
+    respaldo: list[BaseChatModel] | None = None,
+):
     """`checkpointer=None` es válido (sin memoria entre invocaciones, útil
     para tests); en producción pasar un `PostgresSaver` (ver
     `checkpointer_postgres` acá abajo). `imagen_base64`: ver `construir_tools`
     -- arma un agente nuevo (barato, no reabre el checkpointer) con la tool
-    de lectura de receta ligada a esta imagen puntual."""
+    de lectura de receta ligada a esta imagen puntual. `respaldo`: los modelos de
+    las otras keys (`modelos_de_respaldo`), para rotar ante un error de cuota."""
     return create_agent(
         model=model,
         tools=construir_tools(imagen_base64),
         system_prompt=PROMPT_SISTEMA,
         response_format=ToolStrategy(RespuestaAgente),
+        # `RotarKeyAnteCuota` va última (la más interna): repite la llamada tal como la
+        # dejaron los otros middlewares, con las tools que haya elegido `LeerLaFotoPrimero`.
         middleware=[ToolCallLimitMiddleware(run_limit=LIMITE_TOOLS_POR_TURNO)]
-        + ([LeerLaFotoPrimero()] if imagen_base64 is not None else []),
+        + ([LeerLaFotoPrimero()] if imagen_base64 is not None else [])
+        + ([RotarKeyAnteCuota(respaldo)] if respaldo else []),
         checkpointer=checkpointer,
     )
 

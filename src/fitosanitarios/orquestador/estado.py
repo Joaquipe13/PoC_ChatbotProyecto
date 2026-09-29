@@ -141,11 +141,17 @@ def registrar_turno(
     texto_entrada: str,
     tool_calls: list[dict],
     tipo_salida: str,
+    error: str | None = None,
 ) -> None:
     """Log estructurado por turno (ver skill, "Log por turno"): intención
     (aproximada por `tipo_salida`), tool calls con args (saneados) y estado
     de cada resultado. No incluye latencia ni tokens en esta sesión
-    (pendiente, ver DECISIONES.md)."""
+    (pendiente, ver DECISIONES.md). `error`: la excepción que terminó el turno en
+    `tipo="error"` (tipo y mensaje, recortado); antes solo quedaba en la consola del
+    servidor y un error de un turno de WhatsApp no se podía diagnosticar después."""
+    salida = {"tipo": tipo_salida}
+    if error:
+        salida["error"] = error[:500]
     tool_calls_saneados = [
         {"nombre": tc.get("name"), "args": _sanear_args_tool(tc.get("args", {}))}
         for tc in tool_calls
@@ -160,7 +166,7 @@ def registrar_turno(
                 thread_id,
                 json.dumps({"texto": texto_entrada}),
                 json.dumps(tool_calls_saneados),
-                json.dumps({"tipo": tipo_salida}),
+                json.dumps(salida),
             ),
         )
     conn.commit()

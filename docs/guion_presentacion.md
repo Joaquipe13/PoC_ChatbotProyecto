@@ -9,16 +9,17 @@ Las salidas de los chats son las que dio el bot con Gemini real el 27/09/2026. G
 entre corridas: **ensayar cada chat antes de grabar** (con `USE_FIXTURES=false`, una
 conversación nueva por caso). El guion técnico caso por caso está en `docs/guion-demo.md`.
 
-**Antes de grabar:** `docker compose up -d db`, canal web levantado
-(`USE_FIXTURES=false uv run uvicorn fitosanitarios.canales.web.app_produccion:app --port 8001`),
-"Nueva conversación" antes de cada caso, y los datos del proyecto final completados donde
+**Antes de grabar:** `docker compose up -d db`, `notebooks/chat.ipynb` abierto con la celda
+de preparación corrida (`uv run jupyter notebook notebooks/chat.ipynb`),
+"Nueva conversación" antes de empezar la parte 1 y antes de cada chat de la parte 2 (en una
+conversación muy larga Gemini se equivoca más), y los datos del proyecto final completados donde
 dice *[completar]*.
 
 ---
 
 ## 1. Apertura (0:00 – 0:45)
 
-**En pantalla:** título y el chat del canal web abierto.
+**En pantalla:** título y el chat del notebook abierto.
 
 **Qué decir:**
 - Quiénes somos y qué vamos a mostrar: el módulo de chatbot de nuestro proyecto final, un
@@ -122,9 +123,9 @@ registro, el cultivo, la dosis y la normativa lleva tiempo y se cometen errores.
 
 *Fuentes*
 - SENASA, Reg. 41881 (detalle API)
-
 - Ordenanza 841/2010, art. 6 (el-trebol)
 - Ordenanza 841/2010, art. 7 (el-trebol)
+
 ¿Agendamos la aplicación?
 [Agendar] [No, gracias]
 ```
@@ -204,9 +205,9 @@ lo reconoce contra un catálogo de equipos. La agenda muestra la aplicación que
 > ¿Puedo usar Flyer 10 Ec en soja a 500 cm3/ha por tierra en El Trébol?
 
 ```
-
 ⚠️ *Observaciones*
 1. Flyer 10 Ec: Dosis 500 cm3/ha: por encima del rango registrado (25-180 cm3/ha), 178% de desvío.
+
 *Condiciones de aplicación* — El Trébol · terrestre · banda II (amarilla)
 - *Distancia mínima a zona urbana:* 500 m (Ley 11273/1995, art. 34)
 ```
@@ -252,13 +253,13 @@ Para *Tordon D 30*: banda III (azul)
 *Distancia mínima que rige*
 - Zona urbana · aérea: banda III: 3000 m (Ordenanza 1174/2019)
 - Escuelas · aérea: banda III: 200 m (Ordenanza 1174/2019)
-```
 
 *Aplicación aérea*
 - Zona urbana · bandas III, IV: a menos de 500 m no se puede aplicar (Ley 11273/1995, art. 33)
 - Escuelas · todas las bandas: a menos de 200 m no se puede aplicar (Ordenanza 1174/2019)
 - Zona urbana · todas las bandas: a menos de 3000 m no se puede aplicar (Ordenanza 1174/2019)
 ...
+```
 
 **Qué notar:** el operario no dijo la banda: el bot la toma del registro. La ley provincial dice
 500 m y la ordenanza de Sastre 3000 m: el bot dice **cuál manda** (la más restrictiva). Con
@@ -344,8 +345,8 @@ según la corrida puede encontrar o no un artículo relacionado.]*
   la pregunta; verificación de citas.
 - **Datos:** crawl del registro de SENASA (7.370 productos, 4.000 marbetes en PDF); normativa
   en PDF y reglas de distancia en un CSV revisado a mano; pronóstico de Open-Meteo.
-- **Canales:** WhatsApp Cloud API (webhook FastAPI) y un canal web para probar sin Meta.
-- **Calidad:** ~940 tests automáticos (sin red, con modelos falsos), una base de test aislada,
+- **Canales:** WhatsApp Cloud API (webhook FastAPI) y un notebook de chat para probar sin Meta.
+- **Calidad:** ~960 tests automáticos (sin red, con modelos falsos), una base de test aislada,
   y una **evaluación conversacional** en la que otro agente simula un operario y un analista
   revisa las conversaciones.
 

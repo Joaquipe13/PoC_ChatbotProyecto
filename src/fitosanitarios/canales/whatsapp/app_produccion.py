@@ -9,6 +9,8 @@ túnel HTTPS.
 """
 
 import logging
+import threading
+from collections import defaultdict
 from contextlib import ExitStack
 
 import psycopg
@@ -28,6 +30,7 @@ from fitosanitarios.orquestador.agente import (
     checkpointer_postgres,
     crear_agente,
     crear_modelo_chat_gemini,
+    modelos_de_respaldo,
 )
 from fitosanitarios.orquestador.estado import ContadorRepreguntas
 from fitosanitarios.orquestador.turno import ejecutar_turno
@@ -46,15 +49,30 @@ def _responder(settings: Settings, thread_id: str, mensajes: list[str]) -> None:
         )
 
 
-def construir_procesador(settings: Settings, model, checkpointer, contador) -> ProcesadorMensaje:
+def construir_procesador(
+    settings: Settings, model, checkpointer, contador, respaldo=None
+) -> ProcesadorMensaje:
     """El agente de solo-texto se arma una única vez y se reusa entre
     turnos; el agente con imagen se arma por turno porque la tool de lectura
     de receta queda ligada a esa imagen puntual (ver
-    `orquestador/agente.py::construir_tools`)."""
-    agente_default = crear_agente(model, checkpointer=checkpointer)
+    `orquestador/agente.py::construir_tools`).
+
+    Un turno a la vez por operario: el webhook procesa cada mensaje en un hilo, y si el
+    operario manda la foto mientras se procesa su mensaje anterior, los dos turnos leían
+    y escribían el mismo historial a la vez. Los de operarios distintos siguen en
+    paralelo."""
+    agente_default = crear_agente(model, checkpointer=checkpointer, respaldo=respaldo)
+    candados: defaultdict[str, threading.Lock] = defaultdict(threading.Lock)
+    candado_de_candados = threading.Lock()
 
     def procesar_mensaje(mensaje: dict, numero_from: str) -> None:
         thread_id = numero_canonico(numero_from)
+        with candado_de_candados:
+            candado = candados[thread_id]
+        with candado:
+            _procesar(mensaje, thread_id)
+
+    def _procesar(mensaje: dict, thread_id: str) -> None:
         if not tipo_soportado(mensaje):
             _responder(settings, thread_id, [MENSAJE_TIPO_NO_SOPORTADO])
             return
@@ -71,7 +89,10 @@ def construir_procesador(settings: Settings, model, checkpointer, contador) -> P
         agente = (
             agente_default
             if imagen_base64 is None
-            else crear_agente(model, checkpointer=checkpointer, imagen_base64=imagen_base64)
+            else crear_agente(
+                model, checkpointer=checkpointer, imagen_base64=imagen_base64,
+                respaldo=respaldo,
+            )
         )
 
         with psycopg.connect(settings.database_url) as conn:
@@ -85,8 +106,7 @@ def construir_procesador(settings: Settings, model, checkpointer, contador) -> P
 def crear_app_produccion(pila: ExitStack):
     settings = get_settings()
     if settings.use_fixtures:
-        # Ver `canales/web/app_produccion.py::crear_app_produccion` y
-        # DIFICULTADES.md: con USE_FIXTURES=true, leer_receta y
+        # Ver DIFICULTADES.md: con USE_FIXTURES=true, leer_receta y
         # responder_consulta_normativa usan un LLM fake para sus llamadas
         # internas aunque el agente use Gemini real.
         logger.warning(
@@ -99,7 +119,9 @@ def crear_app_produccion(pila: ExitStack):
     model = crear_modelo_chat_gemini(settings)
     checkpointer = pila.enter_context(checkpointer_postgres(settings.database_url))
     contador = ContadorRepreguntas()
-    procesador = construir_procesador(settings, model, checkpointer, contador)
+    procesador = construir_procesador(
+        settings, model, checkpointer, contador, modelos_de_respaldo(settings)
+    )
     return crear_app(settings, procesador)
 
 

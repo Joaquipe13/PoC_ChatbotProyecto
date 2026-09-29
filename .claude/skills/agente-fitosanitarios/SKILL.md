@@ -119,7 +119,7 @@ Más las tablas propias del checkpointer de LangGraph.
 | `evaluar_riesgo` | localidad por nombre, reglas de localidad + provincia + nación con norma y artículo, banda de cada producto, dosis del uso registrado | banda de la aplicación (la más peligrosa), distancia mínima por tipo de zona y rango de dosis en código. Una dosis fuera de rango va primero, como observación, y no se ofrece agendar |
 | `responder_consulta_normativa` | fragmentos de las normas (incluidos fallos y normas sin PDF) y reglas de `reglas.csv` por embedding, filtrados por localidad, provincia y nacional; la pregunta se reformula antes de buscar | el LLM responde solo con esos fragmentos; citas verificadas en código. Sin respaldo: "No cuento con esa información" |
 | `consultar_marbete` | el producto por trigram + embedding; los fragmentos de SU marbete por búsqueda híbrida (similitud + BM25) con la pregunta reformulada | el LLM responde solo con esos fragmentos; cada página citada se verifica en código. Sin respaldo: "No cuento con esa información" |
-| `consultar_productos` | productos registrados por cultivo, adversidad, principio activo, aptitud o banda: términos resueltos por embedding, después joins y filtros | lista con registro, banda y dosis registrada. Informa lo registrado; no recomienda qué aplicar (eso lo prescribe el agrónomo) |
+| `consultar_productos` | productos registrados por cualquier combinación de cultivo, adversidad, principio activo (resueltos por embedding), aptitud (JSONB del registro), banda, firma y marca; una localidad + distancia a la zona urbana se traduce en las bandas permitidas ahí (`servicios/limitaciones.py`) | una lista por tipo de aplicación (una sola si coinciden), una fila por producto con registro, banda y dosis. Filtro que no está en el registro: se omite y se avisa. Informa lo registrado; no recomienda qué aplicar (eso lo prescribe el agrónomo) |
 
 ### Otras tools de normativa (deterministas, sin RAG)
 
@@ -197,7 +197,7 @@ class RespuestaAgente(BaseModel):      # response_format del agente
 | `JURISDICCION_NO_CUBIERTA` | el punto no cae en ningún polígono cargado |
 | `SIN_REGLA_APLICABLE` | la jurisdicción no tiene regla para ese tipo de zona o aplicación |
 | `PRODUCTO_NO_ENCONTRADO` | ningún candidato supera el umbral de matching |
-| `SIN_USOS_REGISTRADOS` | el producto no tiene cultivos/dosis estructurados ni extraídos del marbete |
+| `SIN_USOS_REGISTRADOS` | el producto no tiene cultivos/dosis estructurados ni extraídos del marbete. En `validar_producto_registro` no se muestra como no resuelto: registro, banda, dosis no verificada y, si hay marbete con texto, lo que dice |
 | `DOSIS_NO_COMPARABLE` | unidades imposibles de normalizar entre receta y registro |
 | `NORMATIVA_SIN_RESPALDO` | ningún fragmento supera el umbral de similitud |
 | `IMAGEN_ILEGIBLE` | la extracción no alcanza la confianza mínima en campos clave |
@@ -221,7 +221,7 @@ Fuera de dominio no es un motivo de tool: lo decide el orquestador antes de llam
 | `evaluar_viabilidad_legal` | receta confirmada: localidad, tipo de aplicación, productos con dosis, cultivo | provincia, adversidad, superficie | localidad: lista de las cargadas. Receta incompleta o con "NO FIGURA": no evalúa |
 | `agendar_aplicacion` | fecha, hora (texto del operario, resuelto en código) | localidad (para el pronóstico), datos de la receta | fecha: pregunta el día. Hora: muestra la agenda de ese día y pregunta el horario |
 | `responder_consulta_normativa` | pregunta, jurisdicción (explícita o de la receta en curso) | provincia, tipo de aplicación, tipo de zona | jurisdicción: lista de las localidades cargadas |
-| `consultar_productos` | al menos uno: cultivo, adversidad o principio activo | aptitud, banda máxima | pedir cultivo o plaga |
+| `consultar_productos` | al menos un filtro: cultivo, adversidad, principio activo, aptitud, banda, firma, marca, o localidad + distancia | cualquier combinación; tipo de aplicación (sin él, aérea y terrestre), provincia | distancia sin localidad: lista de las cargadas |
 | `consultar_marbete` | producto, pregunta | — | producto ambiguo: lista de candidatos |
 | `consultar_articulo` | número de artículo | norma, localidad, provincia | número: pedirlo. Número en varias normas: lista para elegir |
 | `listar_limitaciones` | localidad (o de la receta en curso) | provincia, tipo de aplicación, banda, tipo de zona, distancia_m, producto | localidad: lista de las cargadas. Producto con variantes de distinta banda: lista para elegir |

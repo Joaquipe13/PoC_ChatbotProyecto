@@ -17,6 +17,7 @@ from fitosanitarios.servicios.matching import Candidato, hay_empate_ambiguo, ran
 @dataclass
 class ResolucionProducto:
     motivo_no_resuelto: MotivoNoResuelto | None = None
+    producto_id: int | None = None  # para buscar en su marbete si no tiene usos
     opciones_ambiguas: list[str] | None = None
     chequeo_producto: ChequeoProducto | None = None
     chequeo_dosis: ChequeoDosis | None = None
@@ -63,7 +64,6 @@ def _dosis_sin_ambiguedad_de_adversidad(
     return usos_cultivo[0].get("dosis")
 
 
-def resolver_y_validar_producto(
 def _chequeo_sin_un_unico_rango(
     usos_cultivo: list[dict], cultivo: str, dosis_valor: float, dosis_unidad: str,
     tolerancia_pct: float,
@@ -110,6 +110,7 @@ def _chequeo_sin_un_unico_rango(
     return completo if completo.comparable and not completo.cumple else no_verificada
 
 
+def resolver_y_validar_producto(
     conn,
     modelo_embeddings,
     producto_nombre: str,
@@ -151,6 +152,7 @@ def _chequeo_sin_un_unico_rango(
     if not producto.usos_registrados:
         return ResolucionProducto(
             motivo_no_resuelto=MotivoNoResuelto.SIN_USOS_REGISTRADOS,
+            producto_id=producto.id,
             numero_inscripcion=producto.numero_inscripcion,
             marca=producto.marca,
             banda_toxicologica=producto.banda_toxicologica,
@@ -191,8 +193,6 @@ def _chequeo_sin_un_unico_rango(
                 dosis_registrada.get("valor_min"), dosis_registrada.get("valor_max"),
                 dosis_registrada.get("unidad"), tolerancia_pct,
             )
-
-    return ResolucionProducto(
         else:
             # Antes, sin un único rango (depende de la plaga y no se dijo cuál, o el registro
             # no trae uno comparable) la dosis no se comparaba ni se avisaba: 500 cm3/ha de
@@ -200,6 +200,8 @@ def _chequeo_sin_un_unico_rango(
             chequeo_dosis = _chequeo_sin_un_unico_rango(
                 usos_cultivo, cultivo, dosis_valor, dosis_unidad, tolerancia_pct
             )
+
+    return ResolucionProducto(
         numero_inscripcion=producto.numero_inscripcion, marca=producto.marca,
         banda_toxicologica=producto.banda_toxicologica,
         chequeo_producto=chequeo_producto, chequeo_dosis=chequeo_dosis,

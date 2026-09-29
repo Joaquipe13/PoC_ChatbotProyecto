@@ -1,9 +1,13 @@
-"""Auxiliares de `listar_limitaciones`: las limitaciones que impone la normativa de una
+"""Las limitaciones que impone la normativa de una
 localidad -- las prohibiciones (`N`) y las reglas condicionales (`S`) del `reglas.csv`--,
 filtradas por lo que el usuario preguntó, y qué opciones hay a una distancia dada.
 
 Todo determinista, a partir de las reglas cargadas: el LLM solo interpreta la
 pregunta (qué filtros pasar), nunca decide qué limitaciones existen.
+
+Lo usan `listar_limitaciones` y `consultar_productos` (qué bandas se pueden a una
+distancia de la zona urbana: "¿qué fungicidas puedo tirar con avión a 1500 m?"). Antes
+estaba en `tools/listar_limitaciones/utils.py`.
 """
 
 from dataclasses import dataclass, field
@@ -231,4 +235,56 @@ def distancias_que_rigen(
                     tramos.append(TramoQueRige([banda], rige, con_excepciones))
             if any(t.regla is not None for t in tramos):
                 resultado.append(DistanciaQueRige(zona, aplicacion, tramos))
+    return resultado
+
+
+@dataclass
+class BandasADistancia:
+    """Qué bandas se pueden aplicar a una distancia de la zona, con un tipo de aplicación.
+    `con_excepcion`: solo si se cumple una regla condicional (`S`) que levanta cada
+    prohibición que la alcanza. `reglas`: las que deciden (prohibiciones que alcanzan a esa
+    distancia y sus excepciones), para citarlas."""
+
+    tipo_aplicacion: str
+    permitidas: list[str] = field(default_factory=list)
+    con_excepcion: list[str] = field(default_factory=list)
+    prohibidas: list[str] = field(default_factory=list)
+    reglas: list[ReglaCandidata] = field(default_factory=list)
+
+
+def _cubre(regla: ReglaCandidata, aplicacion: str, banda: str) -> bool:
+    return regla.tipo_aplicacion in (aplicacion, "todas") and (
+        regla.bandas == ["todas"] or banda in regla.bandas
+    )
+
+
+def bandas_a_distancia(
+    prohibiciones: list[ReglaCandidata],
+    condicionales: list[ReglaCandidata],
+    distancia_m: float,
+    tipo_aplicacion: str,
+) -> BandasADistancia:
+    """Decir una distancia y una localidad es decir qué bandas se pueden: las que ninguna
+    prohibición alcanza a esa distancia. Mismo criterio que la línea "✅ III y IV · ❌ Ia,
+    Ib y II" de `listar_limitaciones`. `prohibiciones` y `condicionales`, ya filtradas por
+    zona."""
+    resultado = BandasADistancia(tipo_aplicacion)
+    restricciones = restricciones_a_distancia(
+        prohibiciones, condicionales, distancia_m, tipo_aplicacion
+    )
+    for banda in BANDAS:
+        alcanzan = [x for x in restricciones if _cubre(x.prohibicion, tipo_aplicacion, banda)]
+        if not alcanzan:
+            resultado.permitidas.append(banda)
+            continue
+        condicional = all(
+            any(_cubre(e, tipo_aplicacion, banda) for e in x.excepciones) for x in alcanzan
+        )
+        (resultado.con_excepcion if condicional else resultado.prohibidas).append(banda)
+        # Una excepción se cita solo si habilita esa banda: si no, no decide nada.
+        for x in alcanzan:
+            habilitantes = [e for e in x.excepciones if _cubre(e, tipo_aplicacion, banda)]
+            for r in [x.prohibicion, *(habilitantes if condicional else [])]:
+                if r not in resultado.reglas:
+                    resultado.reglas.append(r)
     return resultado

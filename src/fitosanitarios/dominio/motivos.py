@@ -41,8 +41,8 @@ DESCRIPCION_MOTIVO: dict[MotivoNoResuelto, str] = {
         "Ningún candidato de producto superó el umbral de matching (trigram + embedding)."
     ),
     MotivoNoResuelto.SIN_USOS_REGISTRADOS: (
-        "El producto no tiene cultivos ni dosis registrados, ni estructurados "
-        "ni extraídos del marbete."
+        "SENASA no publica para qué cultivos ni en qué dosis está registrado el producto, "
+        "así que no se pueden verificar."
     ),
     MotivoNoResuelto.DOSIS_NO_COMPARABLE: (
         "No se pudieron normalizar las unidades de la dosis de la receta "

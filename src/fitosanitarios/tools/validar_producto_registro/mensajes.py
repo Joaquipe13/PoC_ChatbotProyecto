@@ -4,7 +4,12 @@ el producto al operario (una de las dos formas del tipo de respuesta
 
 from fitosanitarios.dominio.modelos import RespuestaAgente, ResultadoTool
 from fitosanitarios.servicios.condiciones_aplicacion import COLOR_BANDA
-from fitosanitarios.servicios.formato import primer_dato
+from fitosanitarios.servicios.formato import (
+    primer_dato,
+    seccion_fuentes,
+    todas_las_citas,
+    unir_secciones,
+)
 
 MOTIVO_PRODUCTO_AMBIGUO = "varios productos coinciden con ese nombre"
 _MAXIMO_DOSIS = 4
@@ -16,6 +21,12 @@ def pregunta_producto_ambiguo(nombre: str) -> str:
 
 def advertencia_sin_uso_registrado(marca: str, cultivo: str) -> str:
     return f"{marca} no tiene un uso registrado para {cultivo}"
+
+
+def no_verificado_sin_usos(cultivo: str | None, dosis: str | None) -> str:
+    que = f"si {dosis} es una dosis correcta" if dosis else "la dosis ni el cultivo"
+    para = f" para {cultivo}" if cultivo and dosis else ""
+    return f"No puedo verificar {que}{para}: SENASA no publica los usos de este producto"
 
 
 def resumen_para_llm(estado: str) -> str:
@@ -47,12 +58,45 @@ def _linea_del_producto(datos: dict) -> str:
     return f"*{nombre}* · Reg. SENASA {registro} · {banda_txt}"
 
 
+def _plantilla_sin_usos(datos: dict, citas: list) -> str:
+    """Producto registrado sin cultivos ni dosis publicados: lo que se sabe, qué no se
+    puede verificar y, si se encontró, lo que dice su marbete."""
+    cultivo = datos.get("cultivo")
+    dosis = datos.get("dosis_declarada")
+    if dosis and cultivo:
+        no_verifico = f"no puedo verificar si {dosis} es correcta para {cultivo.lower()}."
+    elif cultivo:
+        no_verifico = f"no puedo decirte la dosis registrada para {cultivo.lower()}."
+    else:
+        no_verifico = "no puedo decirte para qué cultivos ni en qué dosis se usa."
+    lineas = [
+        _linea_del_producto(datos),
+        f"⚠️ SENASA no publica para qué cultivos ni en qué dosis está registrado, así que "
+        f"{no_verifico}",
+    ]
+    marbete = datos.get("marbete")
+    if marbete:
+        lineas.append(f"*Según su marbete:* {marbete}")
+        que_hacer = "confirmalo con el ingeniero agrónomo que firmó la receta."
+    else:
+        que_hacer = (
+            "fijate la dosis en la etiqueta del envase o consultalo con el ingeniero "
+            "agrónomo que firmó la receta."
+        )
+    lineas.append(f"*Qué podés hacer:* {que_hacer}")
+    texto = "\n".join(lineas)
+    del_marbete = [c for c in citas if (c.documento or "").startswith("marbete")]
+    return unir_secciones(texto, seccion_fuentes(del_marbete)) if del_marbete else texto
+
+
 def plantilla_producto(respuesta: RespuestaAgente, resultados: list[ResultadoTool]) -> str:
     """Sin sección *Fuentes* aparte: ver
     `consultar_productos.mensajes.plantilla_listado`. La dosis registrada es la del cultivo
     consultado: nunca la de otro cultivo (bug real: se mostraba la del primer uso registrado,
     de duraznero, para una consulta sobre soja)."""
     datos = primer_dato(resultados) or {}
+    if datos.get("sin_usos_registrados"):
+        return _plantilla_sin_usos(datos, todas_las_citas(resultados))
     cultivo = datos.get("cultivo")
     if not cultivo and datos.get("cultivo_autorizado") is None:
         return _linea_del_producto(datos)

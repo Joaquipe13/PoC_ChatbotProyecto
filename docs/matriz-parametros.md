@@ -11,7 +11,7 @@ Fuentes para completar un parámetro, en este orden: **mensaje actual → receta
 | `leer_receta` | la foto (va ligada al turno, sin argumentos para el LLM) | — | no aplica: con foto, se llama siempre primero | `confirmacion_receta` |
 | `completar_receta` | al menos un dato de la receta | cultivo, lote, localidad, tipo de aplicación, adversidad, superficie, dosis por producto | sin receta leída en la conversación: pide la foto | `confirmacion_receta` |
 | `validar_producto_registro` | producto | cultivo, adversidad, dosis + unidad | producto ambiguo: lista de candidatos | `consulta_producto` |
-| `consultar_productos` | al menos uno: cultivo, adversidad o principio activo | aptitud, banda máxima | pide cultivo o plaga | `consulta_producto` |
+| `consultar_productos` | al menos un filtro: cultivo, adversidad, principio activo, aptitud, banda, firma, marca, o localidad + distancia | cualquier combinación de esos; tipo de aplicación, provincia | distancia sin localidad: lista de las cargadas. Filtro que no está en el registro: se omite y se avisa | `consulta_producto` |
 | `consultar_marbete` | producto, pregunta | — | producto ambiguo: lista de candidatos | `consulta_marbete` |
 | `evaluar_riesgo` | tipo de aplicación, productos, cultivo, dosis + unidad | localidad, provincia, adversidad | localidad: lista de las cargadas | la elige el modelo: `dictamen` o `detalle_bandas` |
 | `evaluar_viabilidad_legal` | tipo de aplicación, productos con dosis, cultivo | localidad, provincia, adversidad, superficie | localidad: lista de las cargadas | `dictamen` |
@@ -71,6 +71,8 @@ class ValidarProductoRegistroArgs(BaseModel):
 
 Un producto puntual: si está registrado, su banda y su registro ("¿qué banda tiene el Tordon D 30?", sin cultivo), si está autorizado para un cultivo y su dosis registrada para ese cultivo. "¿Cuál es la dosis correcta?" después de un aviso de dosis viene acá, con el producto y el cultivo de la conversación. Si el nombre coincide con varios productos, devuelve la lista para elegir.
 
+Si SENASA no publica los usos del producto (6 de cada 7 productos), no es un "no resuelto": muestra el registro y la banda, dice que la dosis no se puede verificar y, si el producto tiene marbete con texto, busca ahí la dosis para ese cultivo (el RAG de `consultar_marbete`, `servicios/marbete.py`) y cita la página.
+
 ## `consultar_productos`
 
 ```python
@@ -78,11 +80,22 @@ class ConsultarProductosArgs(BaseModel):
     cultivo: str | None = None
     adversidad: str | None = None
     principio_activo: str | None = None
-    aptitud: str | None = None
-    banda_maxima: str | None = None  # "III" incluye III y IV
+    aptitud: str | None = None       # "fungicidas", "herbicidas o insecticidas", "curasemillas"
+    banda: str | None = None         # una o varias, o su color
+    banda_maxima: str | None = None  # "III" o "azul" incluye III y IV
+    firma: str | None = None         # empresa registrante
+    marca: str | None = None         # parte del nombre comercial
+    localidad: str | None = None     # con distancia_m: filtra por las bandas permitidas
+    provincia: str | None = None     # solo si la tool la pidió
+    tipo_aplicacion: str | None = None  # sin él, una respuesta por tipo
+    distancia_m: float | None = None    # siempre a la zona urbana
 ```
 
-Listado de lo registrado ("¿qué hay para yuyo colorado en soja?"). Informa, no recomienda. Sin cultivo, adversidad ni principio activo, pide uno.
+Listado de lo registrado, con cualquier combinación de filtros ("¿qué hay para yuyo colorado en soja?", "fungicidas de Syngenta banda verde"). Informa, no recomienda. Una fila por producto, con el total real.
+
+Una localidad y una distancia equivalen a filtrar por banda: las que se pueden aplicar a esa distancia de la zona urbana, con el mismo criterio que `listar_limitaciones` (`servicios/limitaciones.py::bandas_a_distancia`). "¿Qué fungicidas para trigo puedo aplicar con avión a 1500 m de El Trébol?" es una sola llamada. Sin tipo de aplicación, responde para aérea y terrestre; si las dos permiten las mismas bandas, es una sola lista que lo aclara. Las normas que deciden van en *Fuentes*.
+
+Un filtro que no está en el registro (una firma o una aptitud que no existen, un cultivo que no se reconoce) se omite en la búsqueda y se avisa. Con cultivo o plaga, avisa que solo aparecen los productos con usos cargados en SENASA.
 
 ## `consultar_marbete`
 

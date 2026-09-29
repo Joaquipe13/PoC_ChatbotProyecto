@@ -79,49 +79,120 @@ def buscar_productos_por_nombre(
     ]
 
 
+@dataclass
+class ListadoProductos:
+    productos: list[dict]
+    total: int  # los que cumplen los filtros, no solo los de esta página
+
+
 def listar_productos_por_filtro(
     conn: psycopg.Connection,
     cultivo_id: int | None = None,
     adversidad_id: int | None = None,
     principio_activo_id: int | None = None,
+    aptitudes: list[str] | None = None,
+    firma_ids: list[int] | None = None,
+    marca: str | None = None,
     bandas_permitidas: list[str] | None = None,
-    limite: int = 20,
+    limite: int = 10,
     offset: int = 0,
-) -> list[dict]:
-    """Retriever de `consultar_productos`: al menos uno de
-    cultivo_id/adversidad_id/principio_activo_id resuelto por embedding
-    contra `catalogo.cultivo`/`adversidad`/`principio_activo` antes de
-    llamar acá (ver skill, tool `consultar_productos`)."""
-    if cultivo_id is None and adversidad_id is None and principio_activo_id is None:
+) -> ListadoProductos:
+    """Retriever de `consultar_productos`: una fila por producto que cumple todos los
+    filtros dados, en cualquier combinación. Cultivo, adversidad y principio activo llegan
+    ya resueltos por embedding contra su tabla; la aptitud se filtra sobre el JSONB del
+    registro (`crudo_api->'productos_aptitudes'`); la marca, por texto contenido.
+
+    Con cultivo o adversidad, solo entran los productos con un uso registrado que coincida,
+    y cada fila trae las dosis de esos usos y de cuántas plagas son. Antes era una fila por
+    uso: el mismo producto salía diez veces, una por maleza, y el total era el `LIMIT`."""
+    if not any((
+        cultivo_id, adversidad_id, principio_activo_id, aptitudes, firma_ids, marca,
+        bandas_permitidas,
+    )):
         raise ValueError("listar_productos_por_filtro requiere al menos un filtro")
 
     with conn.cursor() as cur:
         cur.execute(
             """
-            SELECT DISTINCT
-                p.id, p.numero_inscripcion, p.marca, p.banda_toxicologica,
-                ur.dosis, c.nombre AS cultivo, a.nombre_comun AS adversidad
-            FROM catalogo.uso_registrado ur
-            JOIN catalogo.producto p ON p.id = ur.producto_id
-            JOIN catalogo.cultivo c ON c.id = ur.cultivo_id
-            LEFT JOIN catalogo.adversidad a ON a.id = ur.adversidad_id
-            LEFT JOIN catalogo.producto_principio_activo ppa ON ppa.producto_id = p.id
-            LEFT JOIN catalogo.principio_activo pa ON pa.id = ppa.principio_activo_id
-            WHERE (%(cultivo_id)s::bigint IS NULL OR c.id = %(cultivo_id)s)
-              AND (%(adversidad_id)s::bigint IS NULL OR a.id = %(adversidad_id)s)
-              AND (%(principio_id)s::bigint IS NULL OR pa.id = %(principio_id)s)
+            WITH usos AS (
+                SELECT ur.producto_id,
+                       array_remove(array_agg(DISTINCT NULLIF(ur.dosis->>'texto_original', '')),
+                                    NULL) AS dosis,
+                       count(DISTINCT ur.adversidad_id) AS adversidades
+                FROM catalogo.uso_registrado ur
+                WHERE %(con_usos)s
+                  AND (%(cultivo_id)s::bigint IS NULL OR ur.cultivo_id = %(cultivo_id)s)
+                  AND (%(adversidad_id)s::bigint IS NULL OR ur.adversidad_id = %(adversidad_id)s)
+                GROUP BY ur.producto_id
+            )
+            SELECT p.id, p.numero_inscripcion, p.marca, p.banda_toxicologica,
+                   f.nombre AS firma, u.dosis, u.adversidades,
+                   count(*) OVER () AS total
+            FROM catalogo.producto p
+            LEFT JOIN catalogo.firma f ON f.id = p.firma_id
+            LEFT JOIN usos u ON u.producto_id = p.id
+            WHERE (NOT %(con_usos)s OR u.producto_id IS NOT NULL)
+              AND (%(principio_id)s::bigint IS NULL OR EXISTS (
+                    SELECT 1 FROM catalogo.producto_principio_activo ppa
+                    WHERE ppa.producto_id = p.id
+                      AND ppa.principio_activo_id = %(principio_id)s))
+              AND (%(aptitudes)s::text[] IS NULL OR EXISTS (
+                    SELECT 1
+                    FROM jsonb_array_elements(
+                        COALESCE(p.crudo_api->'productos_aptitudes', '[]'::jsonb)) apt
+                    WHERE apt->'nomenclador'->>'descripcion' = ANY(%(aptitudes)s)))
+              AND (%(firma_ids)s::bigint[] IS NULL OR p.firma_id = ANY(%(firma_ids)s))
+              AND (%(marca)s::text IS NULL OR p.marca ILIKE '%%' || %(marca)s || '%%')
               AND (%(bandas)s::text[] IS NULL OR p.banda_toxicologica = ANY(%(bandas)s))
-            ORDER BY p.marca
+            ORDER BY p.marca, p.numero_inscripcion
             LIMIT %(limite)s OFFSET %(offset)s
             """,
             {
+                "con_usos": cultivo_id is not None or adversidad_id is not None,
                 "cultivo_id": cultivo_id, "adversidad_id": adversidad_id,
-                "principio_id": principio_activo_id, "bandas": bandas_permitidas,
-                "limite": limite, "offset": offset,
+                "principio_id": principio_activo_id, "aptitudes": aptitudes or None,
+                "firma_ids": firma_ids or None, "marca": marca or None,
+                "bandas": bandas_permitidas, "limite": limite, "offset": offset,
             },
         )
         columnas = [d.name for d in cur.description]
-        return [dict(zip(columnas, fila, strict=True)) for fila in cur.fetchall()]
+        filas = [dict(zip(columnas, fila, strict=True)) for fila in cur.fetchall()]
+    total = filas[0].pop("total") if filas else 0
+    for f in filas[1:]:
+        f.pop("total")
+    return ListadoProductos(productos=filas, total=total)
+
+
+def aptitudes_registradas(conn: psycopg.Connection) -> list[str]:
+    """Las aptitudes que usa el registro ("Fungicida", "Terapico trat. semillas"...), para
+    resolver lo que dijo el operario contra ellas."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT DISTINCT apt->'nomenclador'->>'descripcion'
+            FROM catalogo.producto p,
+                 jsonb_array_elements(
+                     COALESCE(p.crudo_api->'productos_aptitudes', '[]'::jsonb)) apt
+            WHERE apt->'nomenclador'->>'descripcion' IS NOT NULL
+            """
+        )
+        return sorted(f[0] for f in cur.fetchall())
+
+
+def resolver_firmas(conn: psycopg.Connection, nombre: str, umbral: float = 0.7) -> list[int]:
+    """Las firmas cuyo nombre contiene lo que dijo el operario ("Syngenta" -> "SYNGENTA
+    AGRO S.A." y cualquier otra razón social de la misma empresa). Por trigram de palabras:
+    tolera un error de tipeo."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT id FROM catalogo.firma
+            WHERE word_similarity(%(nombre)s, nombre) >= %(umbral)s
+            ORDER BY word_similarity(%(nombre)s, nombre) DESC
+            """,
+            {"nombre": nombre, "umbral": umbral},
+        )
+        return [f[0] for f in cur.fetchall()]
 
 
 def resolver_entidad_por_nombre(

@@ -12,8 +12,8 @@ from fitosanitarios.servicios.formato import (
     todas_las_citas,
     unir_secciones,
 )
+from fitosanitarios.servicios.limitaciones import BANDAS
 from fitosanitarios.servicios.reglas import DISTANCIA_SIN_LIMITE_M
-from fitosanitarios.tools.listar_limitaciones.utils import BANDAS
 
 # --- avisos de la tool ---
 

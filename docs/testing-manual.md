@@ -1,6 +1,6 @@
 # Guía de testing manual — todas las tools del agente
 
-Checklist de preguntas/mensajes para probar a mano, por el canal web, cada una de las
+Checklist de preguntas/mensajes para probar a mano, desde `notebooks/chat.ipynb`, cada una de las
 10 tools del agente (`leer_receta`, `validar_producto_registro`, `consultar_productos`,
 `evaluar_riesgo`, `evaluar_viabilidad_legal`, `responder_consulta_normativa`,
 `resolver_vehiculo`, `registrar_evento`, `consultar_agenda`, `agendar_aplicacion`)
@@ -15,14 +15,14 @@ borde y confirmes que cada tool responde lo esperado con datos reales.
 
 ```bash
 docker compose up -d db
-USE_FIXTURES=false uv run uvicorn fitosanitarios.canales.web.app_produccion:app --port 8001
+uv run jupyter notebook notebooks/chat.ipynb
 ```
 
-Abrí `http://localhost:8001/`. `USE_FIXTURES=false` es obligatorio: con `true`
-(el default de `.env`) `leer_receta` y `responder_consulta_normativa` usan un LLM
-fake y degradan en silencio. "Nueva conversación" arranca un `thread_id` limpio
-sin reiniciar el servidor — usalo entre bloques de esta checklist para no
-arrastrar estado de una prueba a otra.
+Corré la celda de preparación y usá el chat del notebook (o `enviar("...")`). El notebook
+fija `USE_FIXTURES=false` por su cuenta: con `true` (el default de `.env`) `leer_receta` y
+las respuestas con RAG usan un LLM fake y degradan en silencio. "Nueva conversación" (o `nueva()`) arranca un
+`thread_id` limpio: usalo entre bloques de esta checklist para no arrastrar estado de una
+prueba a otra.
 
 Los datos reales cargados hoy son de una sola localidad: **El Trébol** (Santa Fe,
 `jurisdiccion_id = el-trebol`), con la Ordenanza 841/2010 y un subconjunto del

@@ -5,9 +5,11 @@ productos, 187 con detalle)."""
 import pytest
 
 from fitosanitarios.datos.retrievers.catalogo import (
+    aptitudes_registradas,
     buscar_productos_por_nombre,
     listar_productos_por_filtro,
     resolver_entidad_por_nombre,
+    resolver_firmas,
 )
 
 
@@ -61,9 +63,12 @@ def test_listar_productos_por_cultivo(conexion, modelo_embeddings):
         conexion, "cultivo", "nombre", "soja", modelo_embeddings
     )
     assert cultivo_id is not None
-    productos = listar_productos_por_filtro(conexion, cultivo_id=cultivo_id, limite=10)
-    assert len(productos) > 0
-    assert all("marca" in p for p in productos)
+    listado = listar_productos_por_filtro(conexion, cultivo_id=cultivo_id, limite=10)
+    assert len(listado.productos) == 10 and listado.total > 10
+    assert all("marca" in p for p in listado.productos)
+    # una fila por producto, no una por uso registrado
+    registros = [p["numero_inscripcion"] for p in listado.productos]
+    assert len(registros) == len(set(registros))
 
 
 def test_listar_productos_sin_ningun_filtro_lanza_error(conexion):
@@ -75,8 +80,36 @@ def test_listar_productos_por_banda(conexion, modelo_embeddings):
     cultivo_id = resolver_entidad_por_nombre(
         conexion, "cultivo", "nombre", "soja", modelo_embeddings
     )
-    productos = listar_productos_por_filtro(
+    listado = listar_productos_por_filtro(
         conexion, cultivo_id=cultivo_id, bandas_permitidas=["III", "IV"], limite=10
     )
-    for p in productos:
+    for p in listado.productos:
         assert p["banda_toxicologica"] in ("III", "IV", None)
+
+
+def test_listar_productos_por_aptitud_filtra_el_jsonb_del_registro(conexion):
+    """La aptitud se aceptaba pero no se filtraba: "fungicidas para trigo" listaba 2,4-D."""
+    listado = listar_productos_por_filtro(conexion, aptitudes=["Fungicida"], limite=50)
+    assert listado.total > 0
+    with conexion.cursor() as cur:
+        cur.execute(
+            "SELECT count(*) FROM catalogo.producto p WHERE p.id = ANY(%s) AND NOT "
+            "p.crudo_api->'productos_aptitudes' @> '[{\"nomenclador\": "
+            "{\"descripcion\": \"Fungicida\"}}]'",
+            ([p["id"] for p in listado.productos],),
+        )
+        assert cur.fetchone()[0] == 0
+
+
+def test_listar_productos_por_firma_y_marca(conexion):
+    firmas = resolver_firmas(conexion, "Syngenta")
+    assert firmas
+    listado = listar_productos_por_filtro(conexion, firma_ids=firmas, marca="amistar")
+    assert listado.productos
+    assert all("amistar" in p["marca"].lower() for p in listado.productos)
+    assert all("syngenta" in p["firma"].lower() for p in listado.productos)
+
+
+def test_aptitudes_registradas_incluye_las_comunes(conexion):
+    aptitudes = aptitudes_registradas(conexion)
+    assert {"Fungicida", "Herbicida", "Insecticida"} <= set(aptitudes)

@@ -13,7 +13,9 @@ llamada: "¿es lo mismo por avión que por tierra?", "¿qué diferencia hay entr
 mosquito y el avión?" (si nombra dos equipos o dos tipos, sin `tipo_aplicacion`: la
 respuesta separa aérea y terrestre) y "¿qué diferencia hay entre banda amarilla y verde?"
 (`banda` con las dos: "amarilla y verde"). El texto de un artículo por su número:
-`consultar_articulo`. Para evaluar una receta con dosis y cultivo: `evaluar_riesgo`.
+`consultar_articulo`. Para evaluar una receta con dosis y cultivo: `evaluar_riesgo`. Qué
+productos (fungicidas, para trigo...) se pueden aplicar a una distancia:
+`consultar_productos`, sin llamar también a esta.
 
 Args:
     localidad: la de la consulta o la de la receta en curso.

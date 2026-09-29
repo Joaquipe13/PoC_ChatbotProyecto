@@ -43,17 +43,18 @@ uv run jupyter notebook notebooks/demo_e2e.ipynb   # o notebooks/demo_sin_whatsa
 
 Correr todas las celdas con kernel limpio ("Restart & Run All"). El guion completo, con el mensaje exacto de cada caso y el resultado esperado, está en [`docs/guion-demo.md`](docs/guion-demo.md). Para el canal real de WhatsApp (opcional, requiere credenciales de Meta y un túnel HTTPS), ver [`docs/setup-whatsapp.md`](docs/setup-whatsapp.md).
 
-## Canal web (GUI de chat)
+## Chat desde un notebook
 
-Alternativa al canal WhatsApp para probar el agente por navegador, sin depender del número de prueba de Meta ni de un túnel HTTPS (ver Fase 11 en `plandefases.md` y `DECISIONES.md`). Reutiliza el mismo orquestador; solo cambia el transporte.
+Para conversar con el bot sin WhatsApp (sin el número de prueba de Meta ni un túnel HTTPS): `notebooks/chat.ipynb`, con el mismo orquestador y el mismo formato de respuesta que WhatsApp.
 
 ```bash
-USE_FIXTURES=false uv run uvicorn fitosanitarios.canales.web.app_produccion:app --port 8001
+docker compose up -d db
+uv run jupyter notebook notebooks/chat.ipynb
 ```
 
-Abrir `http://localhost:8001/` — soporta texto, adjuntar foto de receta y los botones/listas de las repreguntas (renderizados como chips clickeables a partir de los mismos patrones `[Opción]` / `- opción` que ya emite el formateador). "Nueva conversación" arranca un `thread_id` nuevo sin reiniciar el servidor.
+Correr la celda de preparación y escribir en el chat: texto, foto de una receta (*Foto*) y las opciones del bot (`[Confirmar] [Corregir]`, `[Agendar] [No, gracias]`) como botones. Sin widgets: `enviar("mensaje")`, `enviar(foto="ruta.jpg")` y `nueva()`. El notebook usa `canales/notebook.py::Conversacion`, que también sirve desde un script. Fija `USE_FIXTURES=false`: con `true` (el default de `.env`, pensado para tests) `leer_receta` y las respuestas con RAG usan un LLM fake.
 
-**`USE_FIXTURES=false` es necesario** para un canal real (mismo criterio que `evals/run_evals.py`, ver más abajo): el modelo del agente siempre es Gemini real, pero `leer_receta` y `responder_consulta_normativa` resuelven su LLM interno según este flag — con `USE_FIXTURES=true` (el default de `.env`, pensado para tests) esas dos tools usan un LLM fake y degradan en silencio (p. ej. cualquier foto da "no pude leer la imagen"). El servidor loguea un warning al arrancar si detecta el flag en `true`.
+Hasta el 28/09/2026 había un canal web (`canales/web/`, Fase 11); se sacó y lo reemplaza este notebook (ver `DECISIONES.md`).
 
 Para medir la exactitud de ruteo contra el LLM real (sale a la red, no es parte de `pytest`):
 
@@ -85,4 +86,4 @@ Extensiones (Fase 9): `resolver_vehiculo` (interpreta en lenguaje natural el equ
 
 Demo, documentación y defensa (Fase 10): [`docs/guion-demo.md`](docs/guion-demo.md) con los 6 casos obligatorios (APTA, OBSERVADA, consulta de productos, repregunta, fuera de dominio, no resuelto) más 3 adicionales, todos verificados contra datos reales; `notebooks/demo_e2e.ipynb` corrido de punta a punta con kernel limpio. Al armar el guion se encontró y corrigió un bug real que venía arrastrándose desde la Fase 7 sin diagnosticar: `servicios/dosis.py` solo reconocía la unidad `"cm³"` con el superíndice unicode, nunca `"cm3"` (como lo escribe cualquiera desde un celular) — daba `NO_EVALUABLE` en el caso APTA exacto del plan. `evals/run_evals.py` (dos corridas consecutivas, mismo resultado): 79 % de exactitud de ruteo, por debajo del objetivo de 90 % — reportado sin inflar el número, con el análisis caso por caso de por qué en `DECISIONES.md` (ninguno es una regresión de esta fase; la mitad son repreguntas correctas que la métrica cuenta mal, la otra mitad es un patrón preexistente ya documentado desde antes de la Fase 8).
 
-Canal web (Fase 11): GUI de chat (`canales/web/`) como alternativa al canal WhatsApp para desarrollo y demo — decidido con el usuario tras cargar los insumos reales de un único municipio, tras encontrar el canal WhatsApp poco confiable para iterar rápido en las pruebas. Reutiliza el mismo `orquestador/turno.py::ejecutar_turno` de WhatsApp (misma separación LLM-orquesta/núcleo-decide, mismo checkpointer Postgres); solo cambia el transporte: HTML+JS autocontenido sin dependencias externas, con equivalentes de navegador para las modalidades de entrada de WhatsApp que usa el agente (texto, `<input type=file>` para la foto de receta, botones/listas renderizados como chips a partir de los mismos patrones de texto `[Opción]`/`- opción` que ya emitía el formateador). El canal WhatsApp (Fase 8) no se tocó — queda como implementación futura, ver `docs/setup-whatsapp.md`.
+Canal web (Fase 11, reemplazado el 28/09/2026 por `notebooks/chat.ipynb`): GUI de chat (`canales/web/`) como alternativa al canal WhatsApp para desarrollo y demo — decidido con el usuario tras cargar los insumos reales de un único municipio, tras encontrar el canal WhatsApp poco confiable para iterar rápido en las pruebas. Reutiliza el mismo `orquestador/turno.py::ejecutar_turno` de WhatsApp (misma separación LLM-orquesta/núcleo-decide, mismo checkpointer Postgres); solo cambia el transporte: HTML+JS autocontenido sin dependencias externas, con equivalentes de navegador para las modalidades de entrada de WhatsApp que usa el agente (texto, `<input type=file>` para la foto de receta, botones/listas renderizados como chips a partir de los mismos patrones de texto `[Opción]`/`- opción` que ya emitía el formateador). El canal WhatsApp (Fase 8) no se tocó — queda como implementación futura, ver `docs/setup-whatsapp.md`.

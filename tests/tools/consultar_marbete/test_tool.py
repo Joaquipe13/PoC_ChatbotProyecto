@@ -10,6 +10,7 @@ from fitosanitarios.dominio.modelos import RespuestaAgente
 from fitosanitarios.dominio.motivos import MotivoNoResuelto
 from fitosanitarios.llm.fake import ClienteLLMFake
 from fitosanitarios.orquestador.formateador import formatear_respuesta
+from fitosanitarios.servicios import marbete as servicio_marbete
 from fitosanitarios.tools.consultar_marbete import ConsultarMarbeteArgs, consultar_marbete_logica
 from fitosanitarios.tools.consultar_marbete import tool as modulo
 
@@ -34,8 +35,10 @@ class ModeloFalso:
 @pytest.fixture
 def retriever(monkeypatch):
     monkeypatch.setattr(modulo, "buscar_productos_por_nombre", lambda c, n, m: [VERTIMEC])
-    monkeypatch.setattr(modulo, "fragmentos_de_marbete", lambda c, e, pid: FRAGMENTOS)
-    monkeypatch.setattr(modulo, "palabras_de", lambda c, t: ["carenci", "citric"])
+    monkeypatch.setattr(
+        servicio_marbete, "fragmentos_de_marbete", lambda c, e, pid: FRAGMENTOS
+    )
+    monkeypatch.setattr(servicio_marbete, "palabras_de", lambda c, t: ["carenci", "citric"])
 
 
 REFORMULADA = "carencia, días antes de la cosecha, intervalo de seguridad"
@@ -88,7 +91,7 @@ def test_una_pregunta_fuera_de_tema_no_busca_ni_responde(monkeypatch):
     """"¿qué hora es?" se reformulaba como carencia ("tiempo de espera") y recuperaba páginas."""
     monkeypatch.setattr(modulo, "buscar_productos_por_nombre", lambda c, n, m: [VERTIMEC])
     monkeypatch.setattr(
-        modulo, "fragmentos_de_marbete",
+        servicio_marbete, "fragmentos_de_marbete",
         lambda c, e, pid: pytest.fail("no tenía que buscar en el marbete"),
     )
     resultado = _consultar({}, reformulada="FUERA")

@@ -19,12 +19,7 @@ from fitosanitarios.datos.retrievers.catalogo import buscar_productos_por_nombre
 from fitosanitarios.datos.retrievers.territorio import reglas_candidatas
 from fitosanitarios.dominio.modelos import CampoFaltante, Cita, ResultadoTool
 from fitosanitarios.dominio.motivos import MotivoNoResuelto
-from fitosanitarios.servicios.matching import Candidato, hay_empate_ambiguo, rankear_candidatos
-from fitosanitarios.servicios.reglas import ReglaCandidata
-from fitosanitarios.servicios.ubicacion import resolver_ubicacion_o_cortar
-from fitosanitarios.tools.listar_limitaciones import mensajes
-from fitosanitarios.tools.listar_limitaciones.prompts import DESCRIPCION
-from fitosanitarios.tools.listar_limitaciones.utils import (
+from fitosanitarios.servicios.limitaciones import (
     distancias_que_rigen,
     equipo_sin_norma,
     filtrar_reglas,
@@ -34,6 +29,11 @@ from fitosanitarios.tools.listar_limitaciones.utils import (
     normalizar_tipo_zona,
     restricciones_a_distancia,
 )
+from fitosanitarios.servicios.matching import Candidato, hay_empate_ambiguo, rankear_candidatos
+from fitosanitarios.servicios.reglas import ReglaCandidata
+from fitosanitarios.servicios.ubicacion import resolver_ubicacion_o_cortar
+from fitosanitarios.tools.listar_limitaciones import mensajes
+from fitosanitarios.tools.listar_limitaciones.prompts import DESCRIPCION
 
 
 class ListarLimitacionesArgs(BaseModel):
