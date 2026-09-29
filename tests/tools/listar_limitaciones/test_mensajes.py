@@ -81,7 +81,10 @@ def test_a_una_distancia_la_excepcion_solo_referencia_la_norma():
     texto = plantilla_limitaciones(None, [_a_1500([
         _restriccion("aerea", ["II"], 3000, "ley-11273-1995", "33", [excepcion]),
     ], localidad="Rafaela")])
-    assert "- *Aérea:* ✅ Ia, Ib, III y IV · ⚠️ II solo con excepción (Ley 055297/2017, art. 51)" in texto
+    assert (
+        "- *Aérea:* ✅ Ia, Ib, III y IV · ⚠️ II solo con excepción (Ley 055297/2017, art. 51)"
+        in texto
+    )
     assert "condiciones largas" not in texto
 
 

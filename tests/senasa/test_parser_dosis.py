@@ -96,7 +96,9 @@ def test_dosis_none_no_parseable():
 def test_dosis_con_abreviaturas_del_catalogo(texto, valor_min, valor_max, unidad):
     resultado = parsear_dosis(texto)
     assert resultado.parseable is True
-    assert (resultado.valor_min, resultado.valor_max, resultado.unidad) == (valor_min, valor_max, unidad)
+    assert (resultado.valor_min, resultado.valor_max, resultado.unidad) == (
+        valor_min, valor_max, unidad
+    )
 
 
 def test_dosis_en_mezcla_de_tanque_toma_la_de_antes_del_mas():

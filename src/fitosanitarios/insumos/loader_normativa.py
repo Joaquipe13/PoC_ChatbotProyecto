@@ -30,6 +30,7 @@ compuesto, dado que `archivo` solo es único dentro de su carpeta, no global.
 """
 
 import argparse
+import json
 import logging
 import re
 from pathlib import Path
@@ -150,10 +151,10 @@ def cargar_normas_de_carpeta(
             """,
             (
                 ambito, localidad_id, provincia_id, tipo, numero, anio, archivo,
-                '{"paginas_sin_texto": %s, "sin_fuente_oficial": %s}' % (
-                    "true" if requiere_revision else "false",
-                    "true" if sin_fuente_oficial else "false",
-                ),
+                json.dumps({
+                    "paginas_sin_texto": bool(requiere_revision),
+                    "sin_fuente_oficial": bool(sin_fuente_oficial),
+                }),
             ),
         )
         norma_id = cur.fetchone()[0]

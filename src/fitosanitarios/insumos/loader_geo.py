@@ -124,7 +124,9 @@ def _nombre_desde_municipios(cur, provincia_nombre: str, jurisdiccion_id: str) -
     return None
 
 
-def cargar_localidad_sin_geometria(cur, jurisdiccion_id: str, nombre: str, provincia_id: int) -> int:
+def cargar_localidad_sin_geometria(
+    cur, jurisdiccion_id: str, nombre: str, provincia_id: int
+) -> int:
     """Localidad sin `localidad.geojson` (22/09/2026, ver DECISIONES.md,
     "Localidades y normas sin fuente oficial"): sin límite ni zonas
     protegidas, solo sirve para que le cuelguen normas y reglas de distancia."""
