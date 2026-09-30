@@ -85,6 +85,34 @@ Los comandos van con `python -m` (`python -m pytest`, `python -m notebook`, `pyt
 
 Para el canal real de WhatsApp (credenciales de Meta y un túnel HTTPS), ver [`docs/setup-whatsapp.md`](docs/setup-whatsapp.md).
 
+## Actualizar la base de Colab
+
+Colab baja la base del adjunto `fitosanitarios.dump` del Release `datos-v1` (la URL está fija en `scripts/colab/preparar.sh`). Para publicar una base nueva (por ejemplo, después de recargar el catálogo de SENASA o agregar normativa):
+
+1. Con la base local levantada, generá el dump:
+
+   ```bash
+   docker exec fitosanitarios-db pg_dump -U postgres -d fitosanitarios -Fc -Z 6 --no-owner --no-privileges \
+     --exclude-table-data='operacion.*' --exclude-table-data='public.checkpoints' \
+     --exclude-table-data='public.checkpoint_blobs' --exclude-table-data='public.checkpoint_writes' \
+     -f /tmp/fitosanitarios.dump
+   docker cp fitosanitarios-db:/tmp/fitosanitarios.dump data/dump/fitosanitarios.dump
+   ```
+
+   **No saques los `--exclude-table-data`.** Las tablas de `operacion` y las del checkpointer tienen las conversaciones, recetas, agenda y números de WhatsApp de las pruebas. Así se copia su estructura pero no su contenido, y el dump queda solo con datos públicos (SENASA, normativa, localidades). Tarda un par de minutos y pesa unos 340 MB. `data/dump/` está en `.gitignore`: el dump nunca va a git.
+
+2. En GitHub, entrá a **Releases** del repo:
+   - **Si todavía no existe `datos-v1`:** *Draft a new release* → en *Choose a tag* escribí `datos-v1` y elegí *Create new tag* → arrastrá `data/dump/fitosanitarios.dump` → esperá a que termine de subir → **Publish release** (no *Save draft*: un borrador no crea el tag ni publica el adjunto, y Colab recibe un 404).
+   - **Si ya existe:** editalo (el lápiz), borrá el adjunto `fitosanitarios.dump` viejo (GitHub no deja dos adjuntos con el mismo nombre), subí el nuevo y **Update release**.
+
+3. Verificá que se pueda bajar sin sesión de GitHub (tiene que responder `200`):
+
+   ```bash
+   curl -sL -r 0-99 -o /dev/null -w "%{http_code}\n" https://github.com/Joaquipe13/PoC_ChatbotProyecto/releases/download/datos-v1/fitosanitarios.dump
+   ```
+
+Cada entorno nuevo de Colab baja el dump de cero, así que el cambio vale desde la próxima vez que alguien abra una notebook. Un entorno que ya estaba abierto sigue con la base vieja hasta que se reinicie (*Entorno de ejecución → Desconectar y borrar el entorno*).
+
 ## Tests
 
 ```bash
