@@ -110,4 +110,4 @@ Implementadas en `src/fitosanitarios/insumos/validador.py` (Fase 3). Dos niveles
 - **Para arrancar la Fase 3** (carga real, en paralelo con la Fase 2): 2 localidades completas + las leyes provinciales correspondientes.
 - **Para cerrar la Fase 5**: las 10 localidades del caso de estudio tienen que estar cargadas. (No se llegó: al 29/09/2026 hay 3 cargadas.)
 
-Esto es responsabilidad del equipo que provee los insumos, no una tarea de código de este plan (ver `plandefases.md`, sección 6 / decisión abierta #7).
+Esto es responsabilidad del equipo que provee los insumos, no una tarea de código.

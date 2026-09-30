@@ -101,9 +101,9 @@ gratuita) puede fallar o inventar. Además permite tests confiables sin red.
   desarrollo y llegaron a borrarle datos reales.
 - **Los tests usan una copia congelada de los insumos reales** (`tests/fixtures/insumos/`);
   las localidades y normas inventadas de las primeras fases se borraron el 26/09.
-- **Evaluación con Gemini real** (`evals/`, fuera de `pytest`): exactitud de ruteo y una
-  **evaluación conversacional** donde un agente simula un operario y otro analiza las
-  conversaciones. Encontró errores que los tests no veían.
+- **Evaluación con Gemini real** (fuera de `pytest` y del repo publicado): exactitud de
+  ruteo y una **evaluación conversacional** donde un agente simula un operario y otro analiza
+  las conversaciones. Encontró errores que los tests no veían.
 - **Chequeo de credenciales al arrancar un canal:** si una key o el token de WhatsApp están
   mal, el servidor no arranca en vez de fallar con el primer mensaje.
 
@@ -125,5 +125,5 @@ gratuita) puede fallar o inventar. Además permite tests confiables sin red.
   por tool), `servicios/` (lógica determinista), `datos/` (migraciones SQL y consultas),
   `senasa/` (crawl y carga), `insumos/` (carga de normativa y reglas), `canales/`.
 - `data/insumos/`: normativa, `reglas.csv`, `localidades.csv`, `reglas_viento.csv`.
-- `docs/`: modelo de datos, guion de la demo, guion de la presentación, contrato de insumos.
-- Cómo levantarlo: `README.md`.
+- `docs/`: modelo de datos, contrato de insumos, WhatsApp y este registro de decisiones.
+- Cómo levantarlo (en local o en Google Colab): `README.md`.

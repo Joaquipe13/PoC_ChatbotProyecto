@@ -1,7 +1,10 @@
-# Recetas de ejemplo para probar `leer_receta`
+# Recetas de ejemplo
 
-Carpeta para subir fotos reales (o escaneos) de recetas fitosanitarias y probarlas a mano contra el canal web (`http://localhost:8001/`, con `USE_FIXTURES=false`) o contra WhatsApp.
+Imágenes **sintéticas** (generadas con `scripts/generar_recetas_ejemplo_el_trebol.py`, con productos y dosis reales del catálogo de SENASA) para probar la lectura de recetas desde `notebooks/chat.ipynb`, en local o en Colab. Las recetas no dicen la localidad: después de mandar la foto, decile al bot "en El Trébol".
 
-- Formatos: JPG/PNG, como los acepta `leer_receta` (ver skill, "Canal WhatsApp: gotchas": hasta 5 MB).
-- Nunca se versionan (`.gitignore`): pueden traer datos reales de un productor o ingeniero agrónico, aunque el proyecto no los use.
-- No confundir con `tests/fixtures/recetas/`: esas son sintéticas y sí están versionadas, porque las usan los tests automáticos (`pytest`) y no pueden tener datos reales.
+| Archivo | Qué es | Resultado esperado |
+|---|---|---|
+| `02_apta_aerea_banda_ii.jpg` | Reg. SENASA 41881, banda II, aplicación aérea, 170 cm3/ha | APTA, con distancia mínima de 3.000 m a zona urbana (Ordenanza 841/2010 de El Trébol, art. 7) |
+| `03_observada_dosis_fuera_de_rango.jpg` | Reg. SENASA 41759, banda III, 150 g/ha (registrada: 70 g/ha) | OBSERVADA por dosis |
+
+Fotos propias: se pueden dejar en esta carpeta, pero no se versionan (`.gitignore`), porque una receta real puede traer datos de un productor o de un ingeniero agrónomo. Las recetas que usan los tests automáticos están en `tests/fixtures/recetas/`.

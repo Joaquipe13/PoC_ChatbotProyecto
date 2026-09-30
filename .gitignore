@@ -20,10 +20,15 @@ data/insumos/**/*.pdf
 data/insumos/**/*.geojson
 !tests/fixtures/**
 
-# Fotos reales de recetas para pruebas manuales (pueden traer datos reales,
-# a diferencia de tests/fixtures/recetas/ que son sintéticas)
+# Fotos de recetas para pruebas manuales: solo se versionan las sintéticas de ejemplo
+# (las genera scripts/generar_recetas_ejemplo_el_trebol.py); una foto real puede traer
+# datos de un productor o ingeniero agrónomo.
 data/recetas_ejemplo/*
 !data/recetas_ejemplo/README.md
+!data/recetas_ejemplo/0*.jpg
+
+# Dump de la base para Colab (se publica en el Release datos-v1, no en git)
+*.dump
 
 # Notebooks: mantener limpios de outputs pesados no es automático,
 # se revisa a mano antes de commitear (ver DECISIONES.md)

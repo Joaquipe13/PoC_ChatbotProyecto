@@ -2,7 +2,7 @@
 
 Arquitectura del sistema experto (canal, orquestador, tools, servicios y base), diagrama ER de los tres schemas (`catalogo`, `territorio`, `operacion`) y la consulta SQL que ejecuta el retriever de cada una de las 5 tools RAG. Migraciones fuente: `src/fitosanitarios/datos/migraciones/00{1..7}_*.sql` (la 006 y la 007 agregan los índices de fragmentos de normas y de marbetes). Contratos de dominio: `src/fitosanitarios/dominio/modelos.py`.
 
-Material para la defensa (ver Fase 10 de `plandefases.md`).
+Material para la defensa.
 
 ## Arquitectura del sistema experto
 
@@ -490,6 +490,6 @@ Hace falta al menos un filtro (ver `docs/matriz-parametros.md`). Hasta el 28/09/
 
 ## Por qué no es una tabla plana
 
-Criterio transversal de aceptación de la cátedra (ver `plandefases.md`, sección "Reglas para escribir el plan"): no existe ninguna tabla genérica `documento + embedding + metadata`. Cada entidad que se busca por significado (`producto`, `principio_activo`, `cultivo`, `adversidad`, `articulo`, `regla_distancia`) tiene su propia tabla relacional con su propia columna `vector`, sus propias FK y sus propias columnas para filtrar (banda, tipo de zona, ámbito, etc.). `tests/datos/test_sin_tabla_plana.py` (Fase 5) verifica esto por consulta a `information_schema`.
+Criterio transversal de aceptación de la cátedra: no existe ninguna tabla genérica `documento + embedding + metadata`. Cada entidad que se busca por significado (`producto`, `principio_activo`, `cultivo`, `adversidad`, `articulo`, `regla_distancia`) tiene su propia tabla relacional con su propia columna `vector`, sus propias FK y sus propias columnas para filtrar (banda, tipo de zona, ámbito, etc.). `tests/datos/test_sin_tabla_plana.py` (Fase 5) verifica esto por consulta a `information_schema`.
 
 Los fragmentos de los RAG tampoco son una tabla genérica: `catalogo.fragmento_marbete` cuelga de su documento y de su producto (se busca siempre dentro del marbete de un producto) y `territorio.fragmento_norma` de su norma y, cuando lo hay, de su artículo (se filtra por jurisdicción y se cita el artículo). Son dos tablas distintas, en su schema, con sus FK.
