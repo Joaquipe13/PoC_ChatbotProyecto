@@ -2,10 +2,9 @@
 -- artículo) y reglas de distancia. Ver docs/modelo-datos.md y
 -- docs/contrato-insumos.md (formato de los insumos que cargan estas tablas).
 --
--- Sin PostGIS: las geometrías se guardan como GeoJSON en JSONB (EPSG:4326) y se
--- prefiltran por bounding box en columnas numéricas; el punto-en-polígono y las
--- distancias exactas se calculan en Python (geopandas/shapely/pyproj), ver
--- servicios/geo.py (Fase 5).
+-- Sin PostGIS: las geometrías se guardan como GeoJSON en JSONB (EPSG:4326), con su
+-- bounding box en columnas numéricas. Desde el 19/09/2026 la localidad se resuelve por
+-- nombre y ninguna consulta es geográfica (ver DECISIONES.md).
 
 CREATE EXTENSION IF NOT EXISTS vector;
 CREATE EXTENSION IF NOT EXISTS pg_trgm;

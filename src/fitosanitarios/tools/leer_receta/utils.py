@@ -14,7 +14,6 @@ import hashlib
 import json
 import logging
 from datetime import date
-from pathlib import Path
 from typing import Protocol
 
 from pydantic import BaseModel, Field, ValidationError
@@ -78,22 +77,6 @@ class ClienteLLMMultimodalProtocolo(Protocol):
 class CacheExtraccion(Protocol):
     def get(self, clave: str) -> str | None: ...
     def __setitem__(self, clave: str, valor: str) -> None: ...
-
-
-class CacheDiscoJSON:
-    """Cache en disco, un archivo por clave. Evita re-llamar al LLM para la
-    misma imagen (ver skill: "Cachear leer_receta por hash de imagen")."""
-
-    def __init__(self, directorio: Path) -> None:
-        self._directorio = directorio
-        self._directorio.mkdir(parents=True, exist_ok=True)
-
-    def get(self, clave: str) -> str | None:
-        ruta = self._directorio / f"{clave}.json"
-        return ruta.read_text(encoding="utf-8") if ruta.exists() else None
-
-    def __setitem__(self, clave: str, valor: str) -> None:
-        (self._directorio / f"{clave}.json").write_text(valor, encoding="utf-8")
 
 
 def _hash_imagen(imagen: bytes) -> str:

@@ -28,16 +28,6 @@ class ClienteLLM(Protocol):
     def generar(self, prompt: str, *, system: str | None = None) -> str: ...
 
 
-class ClienteLLMMultimodal(Protocol):
-    """Subconjunto de proveedores que aceptan imagen + texto (hoy solo Gemini;
-    ver skill, "LLM: proveedor intercambiable... Gemini Flash multimodal como
-    principal"). `ClienteGroq` no lo implementa."""
-
-    def generar_con_imagen(
-        self, imagen: bytes, prompt: str, *, system: str | None = None
-    ) -> str: ...
-
-
 def es_error_cuota(exc: BaseException) -> bool:
     texto = str(exc).upper()
     return "429" in texto or "RESOURCE_EXHAUSTED" in texto or "RATE LIMIT" in texto

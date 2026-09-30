@@ -1,6 +1,6 @@
 # Matriz de parámetros de las tools
 
-Los argumentos de las 14 tools tal como están en el código (`src/fitosanitarios/tools/<tool>/tool.py`, clase `...Args`), qué hace cada una cuando falta algo y en qué tipo de respuesta termina. Lo que lee el LLM para elegir la tool y completar los argumentos está en `tools/<tool>/prompts.py` (`DESCRIPCION`); lo que lee el operario, en `tools/<tool>/mensajes.py`. Actualizado al 28/09/2026.
+Los argumentos de las 14 tools tal como están en el código (`src/fitosanitarios/tools/<tool>/tool.py`, clase `...Args`), qué hace cada una cuando falta algo y en qué tipo de respuesta termina. Lo que lee el LLM para elegir la tool y completar los argumentos está en `tools/<tool>/prompts.py` (`DESCRIPCION`); lo que lee el operario, en `tools/<tool>/mensajes.py`. Actualizado al 29/09/2026 (verificado contra los `args_schema` de `orquestador/agente.py::TOOLS`).
 
 Fuentes para completar un parámetro, en este orden: **mensaje actual → receta en curso → turnos previos**. Nunca por suposición (ver skill, "Matriz de parámetros"). Los textos del operario (fechas, horas, tipo de aplicación, banda, equipo) se pasan **tal como los dijo**: los interpreta el código, no el LLM.
 
@@ -27,6 +27,8 @@ Fuentes para completar un parámetro, en este orden: **mensaje actual → receta
 
 Doce tools terminan el turno apenas corren (`return_direct=True`) y su `tipo` sale de la tabla `orquestador/respuesta_directa.py::TIPO_POR_TOOL`: si la tool devolvió `no_resuelto` va a `no_resuelto`, y si devolvió `faltan_datos` va a `repregunta` (salvo `agendar_aplicacion`, cuya plantilla muestra lo que falta junto con la agenda del día). Las dos que pasan por el modelo son `evaluar_riesgo` (su resultado puede mostrarse como condiciones de aplicación o como la banda de cada producto, según de qué se venía hablando) y `resolver_vehiculo` (alimenta a otra tool).
 
+**Tope por turno:** `ToolCallLimitMiddleware(run_limit=4)` (`LIMITE_TOOLS_POR_TURNO`): pasadas 4 llamadas a tools en el mismo turno, las siguientes reciben un aviso y no se ejecutan.
+
 ## `leer_receta`
 
 ```python
@@ -34,7 +36,7 @@ class LeerRecetaArgs(BaseModel):
     imagen_base64: str  # imagen ya descargada del media de WhatsApp, en base64
 ```
 
-En el agente se usa la versión **ligada** (`crear_tool_leer_receta_ligada`): la foto del turno queda en una clausura y la tool no tiene argumentos, porque el LLM no puede devolver una imagen como argumento (límite de tokens de salida; ver DECISIONES.md). Solo está en la lista de tools cuando el mensaje trae una foto, y el middleware `LeerLaFotoPrimero` (`orquestador/agente.py`) obliga a que sea la primera llamada del turno.
+En el agente se usa la versión **ligada** (`crear_tool_leer_receta_ligada`): la foto del turno queda en una clausura y la tool no tiene argumentos, porque el LLM no puede devolver una imagen como argumento (límite de tokens de salida; ver DECISIONES.md). Cuando el mensaje trae una foto, esa versión reemplaza a la original en la lista de tools y el middleware `LeerLaFotoPrimero` (`orquestador/agente.py`) obliga a que sea la primera llamada del turno. Sin foto queda la versión original, con `imagen_base64`, que el LLM no tiene cómo completar.
 
 - Si a la receta le falta un dato obligatorio (cultivo, localidad, tipo de aplicación, producto, dosis, lote o superficie; `servicios/receta.py`), no ofrece confirmar: pregunta lo que falta y muestra lo que pudo leer.
 - Una foto que no es una receta, o que no se lee: `IMAGEN_ILEGIBLE` ("📷 No pude leer una receta en esa foto").

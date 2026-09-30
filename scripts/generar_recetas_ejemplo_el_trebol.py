@@ -2,10 +2,8 @@
 evaluar_viabilidad_legal) contra los datos reales de El Trébol cargados en
 esta sesión (ver DECISIONES.md, "Carga de datos reales de El Trébol").
 
-A diferencia de `generar_fixtures_recetas.py` (Fase 4, casos sintéticos para
-probar extracción de campos), estas 3 usan productos y dosis reales del
-catálogo SENASA ya cargado, pensadas para ejercitar las reglas de la
-Ordenanza 841/2010 de El Trébol (arts. 6 y 7).
+Usan productos y dosis reales del catálogo SENASA ya cargado, pensadas para
+ejercitar las reglas de la Ordenanza 841/2010 de El Trébol (arts. 6 y 7).
 
 Las imágenes no llevan localidad: se le dice al bot por texto ("en El
 Trébol"). El sistema ya no usa la ubicación del lote; informa la banda de la
@@ -17,13 +15,61 @@ README).
 Uso: uv run python scripts/generar_recetas_ejemplo_el_trebol.py
 """
 
-import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from generar_fixtures_recetas import dibujar_receta  # noqa: E402
+from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 BASE = Path(__file__).resolve().parent.parent / "data" / "recetas_ejemplo"
+
+ANCHO, ALTO = 900, 1100
+
+
+def _fuente(tamano: int) -> ImageFont.FreeTypeFont:
+    for candidato in ("arial.ttf", "Arial.ttf", "DejaVuSans.ttf"):
+        try:
+            return ImageFont.truetype(candidato, tamano)
+        except OSError:
+            continue
+    return ImageFont.load_default()
+
+
+def dibujar_receta(
+    ruta: Path,
+    campos: dict[str, str],
+    titulo: str = "RECETA AGRONOMICA",
+    numero: str = "0042",
+    desenfocar: bool = False,
+) -> None:
+    img = Image.new("RGB", (ANCHO, ALTO), "white")
+    dibujo = ImageDraw.Draw(img)
+    fuente_titulo = _fuente(32)
+    fuente_texto = _fuente(24)
+
+    y = 60
+    dibujo.text((60, y), f"{titulo} N. {numero}", fill="black", font=fuente_titulo)
+    y += 60
+    dibujo.line((60, y, ANCHO - 60, y), fill="black", width=2)
+    y += 40
+
+    for etiqueta, valor in campos.items():
+        dibujo.text((60, y), f"{etiqueta}:", fill="black", font=fuente_texto)
+        dibujo.text((320, y), valor, fill="black", font=fuente_texto)
+        y += 50
+
+    y += 30
+    dibujo.line((60, y, ANCHO - 60, y), fill="black", width=1)
+    y += 30
+    dibujo.text(
+        (60, y), "Firma: Ing. Agr. (firma ilegible, sello de matricula)",
+        fill="black", font=_fuente(18),
+    )
+
+    if desenfocar:
+        img = img.filter(ImageFilter.GaussianBlur(radius=8))
+
+    ruta.parent.mkdir(parents=True, exist_ok=True)
+    img.save(ruta, "JPEG", quality=85)
+
 
 CASOS = [
     {

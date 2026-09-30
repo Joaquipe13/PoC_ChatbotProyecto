@@ -137,10 +137,3 @@ def leer_listado_jsonl(ruta: Path) -> list[ProductoListado]:
     return productos
 
 
-def leer_detalle_jsonl(ruta: Path) -> list[DetalleProducto]:
-    detalles = []
-    with ruta.open(encoding="utf-8") as f:
-        for linea in f:
-            if linea.strip():
-                detalles.append(DetalleProducto.model_validate(json.loads(linea)))
-    return detalles

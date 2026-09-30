@@ -2,7 +2,7 @@
 más el cliente Graph, conectados al webhook (ver plandefases.md Fase 8,
 tarea 9). Entrypoint para correr el servidor:
 
-    uv run uvicorn fitosanitarios.canales.whatsapp.app_produccion:app
+    uv run python -m uvicorn fitosanitarios.canales.whatsapp.app_produccion:app
 
 Ver docs/setup-whatsapp.md para la configuración de la app de Meta y el
 túnel HTTPS.

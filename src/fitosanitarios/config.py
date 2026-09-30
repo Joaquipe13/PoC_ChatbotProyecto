@@ -49,7 +49,6 @@ class Settings(BaseSettings):
     # artículo genuinamente relevante scoreó 0.50-0.58 en el corpus de
     # prueba; 0.75 dejaba todo por debajo del umbral). Ver DECISIONES.md.
     rag_umbral_similitud: float = 0.35
-    radio_busqueda_zonas_m: float = 2000.0
 
     # Pronóstico del tiempo al agendar (Open-Meteo, ver servicios/meteorologia.py). Es
     # información: no controla nada. Más allá del horizonte el pronóstico de viento sirve

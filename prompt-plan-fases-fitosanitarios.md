@@ -1,5 +1,10 @@
 # Prompt: generar `plandefases.md` del agente de recetas fitosanitarias
 
+> **Documento histórico (11/09/2026).** Es el prompt con el que se generó `plandefases.md` al
+> arrancar el proyecto; no describe el estado actual. La propuesta que menciona
+> (`docs/propuesta-tp2-fitosanitarios.md`) nunca se agregó al repo. Lo vigente está en la skill
+> (`.claude/skills/agente-fitosanitarios/SKILL.md`), `README.md` y `DECISIONES.md`.
+
 ## Cómo usarlo
 
 1. Guardá la skill `agente-fitosanitarios` (la tarjeta que acompaña este documento).

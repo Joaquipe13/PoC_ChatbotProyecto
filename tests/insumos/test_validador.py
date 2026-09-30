@@ -267,36 +267,6 @@ def test_f6_nombre_de_carpeta_valido(tmp_path):
     assert resultado.es_valido
 
 
-# --- A2: zona protegida lejos del límite de su localidad ---
-
-
-def test_a2_zona_protegida_lejos_del_limite(tmp_path):
-    zona_muy_lejos = {"type": "Point", "coordinates": [-58.0, -32.92]}  # a decenas de km
-    ruta = tmp_path / "caso.geojson"
-    _escribir_geojson(ruta, [
-        {"type": "Feature", "properties": {"tipo": "limite", "nombre": "A", "provincia": "x"},
-         "geometry": LIMITE_VALIDO},
-        {"type": "Feature", "properties": {"tipo": "escuela", "nombre": "Lejana"},
-         "geometry": zona_muy_lejos},
-    ])
-    resultado = validar_geojson(ruta, radio_busqueda_m=2000)
-    assert resultado.es_valido  # no es un error, es una advertencia
-    assert any(a.codigo == "A2" for a in resultado.advertencias)
-
-
-def test_sin_a2_cuando_la_zona_esta_cerca(tmp_path):
-    zona_cerca = {"type": "Point", "coordinates": [-60.6505, -32.9295]}
-    ruta = tmp_path / "caso.geojson"
-    _escribir_geojson(ruta, [
-        {"type": "Feature", "properties": {"tipo": "limite", "nombre": "A", "provincia": "x"},
-         "geometry": LIMITE_VALIDO},
-        {"type": "Feature", "properties": {"tipo": "escuela", "nombre": "Cercana"},
-         "geometry": zona_cerca},
-    ])
-    resultado = validar_geojson(ruta, radio_busqueda_m=2000)
-    assert not any(a.codigo == "A2" for a in resultado.advertencias)
-
-
 # --- A3: PDF sin texto extraíble (requiere OCR) ---
 
 

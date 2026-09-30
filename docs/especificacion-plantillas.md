@@ -6,7 +6,7 @@ Una entrada por cada valor de `RespuestaAgente.tipo` (`src/fitosanitarios/domini
 
 **Formato WhatsApp general:** `*negrita*`, listas con `-`/`1.`, sin tablas ni encabezados markdown, ≤ 4096 caracteres por mensaje (si se pasa, se parte por sección), coma decimal con unidad separada ("1,8 mm", "500 cm3/ha", sin ".0"), fechas `dd/mm/aaaa` y horas en la hora local del operario, sección `*Fuentes*` al final si hay citas que no se mostraron en la misma línea. Los botones se escriben `[BOTONES: A | B]` y las listas `[LISTA: A | B]` en los ejemplos: el canal los manda como botones o lista interactiva de WhatsApp.
 
-Los ejemplos son **salidas reales** del bot contra la base de desarrollo (la mayoría de las conversaciones del plan de pruebas del 26 y 27/09/2026, `docs/plan_pruebas.md`; los de productos y "Corregir", del 28/09/2026).
+Los ejemplos son **salidas reales** del bot contra la base de desarrollo (la mayoría, de las conversaciones del plan de pruebas del 26 y 27/09/2026, `evals/agente_prueba.py` con los escenarios `evals/escenarios/plan_*.yaml`; los de productos y "Corregir", del 28/09/2026).
 
 ## `confirmacion_receta`
 

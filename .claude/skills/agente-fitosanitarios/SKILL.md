@@ -5,7 +5,7 @@ description: Arquitectura, contratos y reglas del agente experto que valida rece
 
 # Agente de recetas fitosanitarios
 
-POC de un sistema experto conversacional: el operario manda por WhatsApp la foto de una receta agronómica o una consulta. Un LLM orquestador interpreta el mensaje, elige la tool y sus parámetros, repregunta lo que falta o avisa que no puede resolverlo. Un núcleo determinista contrasta la receta con el registro de SENASA, las capas SIG y la normativa de 10 localidades, y emite un dictamen citable.
+POC de un sistema experto conversacional: el operario manda por WhatsApp la foto de una receta agronómica o una consulta. Un LLM orquestador interpreta el mensaje, elige la tool y sus parámetros, repregunta lo que falta o avisa que no puede resolverlo. Un núcleo determinista contrasta la receta con el registro de SENASA, las capas SIG y la normativa de las localidades cargadas (hoy El Trébol, Sastre y San Jorge, en Santa Fe, más la ley provincial), y emite un dictamen citable.
 
 Requisitos de la cátedra: LangChain como base y demostrar agentes, RAG, embeddings y NLP/LLM.
 
@@ -41,9 +41,9 @@ Requisitos de la cátedra: LangChain como base y demostrar agentes, RAG, embeddi
 
 ```
 canales/whatsapp  →  orquestador  →  tools  →  servicios  →  datos
-(webhook, envío)     (create_agent,   (fachadas   (geo, dosis,   (Postgres + pgvector:
-                      estado,          finas)      matching,      productos, usos, chunks,
-                      formateador)                 reglas, RAG)   geometrías, reglas, estado)
+(webhook, envío)     (create_agent,   (fachadas   (localidad,    (Postgres + pgvector:
+                      estado,          finas)      dosis, reglas, productos, usos, chunks,
+                      formateador)                 matching, RAG) geometrías, reglas, estado)
 ```
 
 - Los adaptadores (`canales/`, `senasa/`) son los únicos que conocen formatos crudos. Nada del payload de Meta ni del JSON HAL de SENASA pasa de ahí.
@@ -61,7 +61,7 @@ src/fitosanitarios/
   datos/          migraciones SQL por schema, repositorios y retrievers
   senasa/         cliente de la API, crawler, normalizador, parser de dosis
   insumos/        loaders y validadores de SIG, normativa y reglas
-  servicios/      geo, dosis, matching, reglas, dictamen, recursos, ubicacion, formato (lo que usa más de una tool)
+  servicios/      localidad, dosis, matching, reglas, dictamen, recursos, ubicacion, formato (lo que usa más de una tool)
   tools/          una carpeta por tool: tool.py (schema + lógica + la tool de LangChain),
                   prompts.py (DESCRIPCION, lo que lee el LLM), mensajes.py (lo que lee el
                   operario: preguntas, avisos, plantilla de respuesta), utils.py si hace falta
@@ -95,7 +95,7 @@ Requisito de la cátedra: PostgreSQL con JSON y vectores, consultado con RAG a t
 | `catalogo.fragmento_marbete` | N:1 documento, producto | — | fragmento de una página del marbete (RAG de marbetes) |
 | `territorio.provincia` | 1:N localidad, norma | — | — |
 | `territorio.localidad` | N:1 provincia · 1:N zona_protegida, norma | limite (GeoJSON) | — |
-| `territorio.zona_protegida` | N:1 localidad | geometria (GeoJSON), propiedades | — |
+| `territorio.zona_protegida` | N:1 localidad | geometria (GeoJSON), propiedades | — (se carga del GeoJSON; desde que la localidad se resuelve por nombre, ninguna tool la consulta) |
 | `territorio.norma` | N:1 localidad, provincia o nacional · 1:N articulo, regla_distancia | metadatos | — |
 | `territorio.articulo` | N:1 norma | metadatos (capítulo, página, OCR) | texto del artículo |
 | `territorio.fragmento_norma` | N:1 norma, articulo (NULL en fallos y normas sin PDF) | — | fragmento de 800 caracteres (RAG de normativa) |
@@ -108,7 +108,7 @@ Requisito de la cátedra: PostgreSQL con JSON y vectores, consultado con RAG a t
 Más las tablas propias del checkpointer de LangGraph.
 
 - Índices: HNSW (`vector_cosine_ops`) en cada embedding, GIN en los JSONB que se consultan, `pg_trgm` en nombres (marca, principio activo, cultivo, adversidad) y full-text en español sobre `articulo`.
-- Sin PostGIS: `localidad` y `zona_protegida` guardan el bounding box en columnas numéricas para prefiltrar en SQL; la geometría exacta se calcula en Python desde el GeoJSON.
+- Sin PostGIS: `localidad` y `zona_protegida` guardan el GeoJSON y su bounding box en columnas numéricas. Hoy ninguna consulta es geográfica: la localidad se resuelve por nombre (ver "Geo").
 - `docs/modelo-datos.md` documenta el diagrama ER (mermaid) y la consulta SQL de cada tool RAG. Es material para la defensa.
 
 ### Tools RAG sobre la base
@@ -194,15 +194,13 @@ class RespuestaAgente(BaseModel):      # response_format del agente
 
 | Motivo | Cuándo |
 |---|---|
-| `JURISDICCION_NO_CUBIERTA` | el punto no cae en ningún polígono cargado |
+| `JURISDICCION_NO_CUBIERTA` | la localidad no está entre las cargadas ni es un municipio conocido de una provincia con normativa |
 | `SIN_REGLA_APLICABLE` | la jurisdicción no tiene regla para ese tipo de zona o aplicación |
 | `PRODUCTO_NO_ENCONTRADO` | ningún candidato supera el umbral de matching |
 | `SIN_USOS_REGISTRADOS` | el producto no tiene cultivos/dosis estructurados ni extraídos del marbete. En `validar_producto_registro` no se muestra como no resuelto: registro, banda, dosis no verificada y, si hay marbete con texto, lo que dice |
-| `DOSIS_NO_COMPARABLE` | unidades imposibles de normalizar entre receta y registro |
 | `NORMATIVA_SIN_RESPALDO` | ningún fragmento supera el umbral de similitud |
 | `IMAGEN_ILEGIBLE` | la extracción no alcanza la confianza mínima en campos clave |
 | `LIMITE_REPREGUNTAS` | 2 intentos fallidos por el mismo dato |
-| `SERVICIO_NO_DISPONIBLE` | cuota del LLM agotada, base o servicio caído |
 | `VEHICULO_NO_ENCONTRADO` | Fase 9: `resolver_vehiculo` no reconoce la descripción |
 | `SIN_EVENTO_EN_CURSO` | Fase 9: `registrar_evento("finalizar")` sin un `iniciar` previo |
 | `ARTICULO_NO_ENCONTRADO` | `consultar_articulo`: el número no está en la norma (o en ninguna, o en varias sin desambiguar) |
@@ -275,7 +273,7 @@ Estado: checkpointer de LangGraph en Postgres con `thread_id` = número de Whats
 
 ### Geo
 
-**Cambio de diseño (19/09/2026, Fase 12, ver DECISIONES.md): ya no se compara la ubicación del lote (lat/lon) contra la geometría cargada.** La localidad se resuelve por **nombre** (`servicios/localidad.py::resolver_localidad`: coincidencia exacta contra `jurisdiccion_id` o nombre, si no por texto contenido uno en el otro; ambigua o desconocida se pregunta, nunca se adivina). Con eso, `evaluar_riesgo`/`evaluar_viabilidad_legal` informan la **banda de la aplicación** (la más peligrosa entre los productos) y la **distancia mínima que exige la norma** para cada tipo de zona -- no una distancia real medida desde el lote. `servicios/geo.py::resolver_jurisdiccion` (punto en polígono) quedó en el código pero sin ningún llamador.
+**Cambio de diseño (19/09/2026, ver DECISIONES.md): ya no se compara la ubicación del lote (lat/lon) contra la geometría cargada.** La localidad se resuelve por **nombre** (`servicios/localidad.py::resolver_localidad`: coincidencia exacta contra `jurisdiccion_id` o nombre, si no por texto contenido uno en el otro; ambigua o desconocida se pregunta, nunca se adivina). Con eso, `evaluar_riesgo`/`evaluar_viabilidad_legal` informan la **banda de la aplicación** (la más peligrosa entre los productos) y la **distancia mínima que exige la norma** para cada tipo de zona -- no una distancia real medida desde el lote. El código de punto en polígono y distancias (`servicios/geo.py` y sus retrievers) se borró el 29/09/2026.
 
 - Reglas candidatas (`datos/retrievers/territorio.py::reglas_candidatas`): las de la localidad, las provinciales de su provincia y las nacionales. Aplica la que coincide en `tipo_zona`, `tipo_aplicacion` (o `todas`) y banda del producto (o `todas`). Con varias, gana la más restrictiva (mayor `distancia_min_m`), citando todas.
 - `regla_distancia.permitido`: `N` (prohibición) es la única que usan el dictamen y el agendado -- dentro de esa distancia no se puede. `S` (condicional) nunca bloquea ni ablanda una `N`; solo sirve para consultas ("¿puedo aplicar a X m bajo alguna condición?", `listar_limitaciones` con `distancia_m`).
@@ -330,15 +328,14 @@ Forma de cada plantilla. Las salidas reales actuales, una por cada `tipo`, está
 
 **Dictamen**
 ```
-*Dictamen* — Lote 4 · San Carlos Centro
+*Dictamen* — San Carlos Centro
 *Resultado:* ❌ OBSERVADA
 
 *Observaciones*
-1. Distancia a escuela insuficiente: el lote está a 80 m y el mínimo es 100 m.
-2. Dosis de Glifosato Full 48 SL: 5 L/ha, por encima del rango registrado para soja (2–3 L/ha).
+1. Dosis de Glifosato Full 48 SL: 5 L/ha, por encima del rango registrado para soja (2–3 L/ha).
 
-*Productos*
-- Glifosato Full 48 SL · Reg. SENASA 12345 · Banda IV (verde) · autorizado para soja ✅
+*Condiciones de aplicación* — San Carlos Centro · terrestre · banda IV (verde)
+- *Distancia mínima a escuelas:* 100 m (Ordenanza 914/2018, art. 8)
 
 *Fuentes*
 - Ordenanza 914/2018, art. 8 (San Carlos Centro)
@@ -348,7 +345,7 @@ Forma de cada plantilla. Las salidas reales actuales, una por cada `tipo`, está
 **Repregunta**
 ```
 Para evaluar la receta me faltan 2 datos:
-1. *Ubicación del lote*: mandámela desde 📎 → Ubicación, marcando el lote en el mapa.
+1. *Localidad*: ¿en qué localidad se aplica? (p. ej. "El Trébol")
 2. *Tipo de aplicación*: elegí una opción.
 [Terrestre] [Aérea]
 ```
@@ -357,7 +354,7 @@ Para evaluar la receta me faltan 2 datos:
 ```
 ⚠️ *No pude completar la evaluación*
 *Qué no pude determinar:* la distancia mínima a zonas protegidas.
-*Por qué:* el lote está fuera de las localidades cargadas en el sistema.
+*Por qué:* la localidad no está entre las cargadas en el sistema.
 *Qué sí evalué:* el producto está registrado y autorizado para soja ✅
 *Qué podés hacer:* consultar la ordenanza de esa localidad o al área de ambiente del municipio.
 ```
@@ -426,10 +423,9 @@ data/insumos/
   - `tipo_zona`: los valores de `tipo` del GeoJSON, salvo `limite`. `tipo_aplicacion`: `terrestre | aerea | todas`. `bandas`: `todas` o lista con `;` (`Ia;Ib;II`).
   - `norma`: nombre de un PDF de la misma carpeta, sin extensión (`ordenanza-914-2018`). `articulo`: número.
   - `observaciones`: condiciones que el modelo no cubre (aviso previo, horarios, viento). El dictamen las muestra como advertencia.
-- Cada zona protegida pertenece a la localidad de su carpeta, pero la búsqueda de distancias considera también zonas de localidades vecinas dentro del radio.
-- El validador falla con mensajes claros si: a una carpeta de localidad le falta `localidad.geojson` o al menos un PDF; el GeoJSON no tiene exactamente un `limite` o trae un tipo desconocido; una geometría es inválida o cae fuera de Argentina; la `provincia` del límite no coincide con la carpeta de la provincia donde está la localidad; una regla cita una norma que no está en su carpeta; un nombre de archivo o carpeta no respeta la convención.
-- El validador avisa (sin fallar) si: una zona protegida queda a más de `RADIO_BUSQUEDA_ZONAS_M` del límite de su localidad; un PDF no tiene texto extraíble (escaneado, va por OCR).
-- Para desarrollar y testear hay datos sintéticos con la misma estructura en `tests/fixtures/insumos/`, nunca los reales.
+- El validador falla con mensajes claros si: a una carpeta de localidad o de provincia le falta al menos una norma (PDF o `.md`); el GeoJSON no tiene exactamente un `limite` o trae un tipo desconocido; una geometría es inválida o cae fuera de Argentina; la `provincia` del límite no coincide con la carpeta de la provincia donde está la localidad; una regla cita una norma que no está en su carpeta; un nombre de archivo o carpeta no respeta la convención.
+- El validador avisa (sin fallar) si: un PDF no tiene texto extraíble (escaneado, va por OCR); una jurisdicción no tiene filas en `reglas.csv` (sus distancias se leen del PDF); una localidad no tiene `localidad.geojson` (es opcional desde el 22/09/2026).
+- Para testear, `tests/fixtures/insumos/` es una copia congelada de `data/insumos/` (desde el 26/09/2026 no hay datos inventados; ver DECISIONES.md). `scripts/generar_fixtures_insumos.py` la regenera.
 - Los loaders cargan todo al schema `territorio`: los archivos son la fuente, pero las tools consultan la base.
 
 ## Canal WhatsApp: gotchas
@@ -445,15 +441,15 @@ data/insumos/
 ## LLM y cuotas
 
 - Proveedor por configuración: Gemini Flash (multimodal, principal) o Groq. Verificar modelos y cuotas vigentes; no hardcodear límites.
-- Rotación de `GEMINI_API_KEY_1..3` ante 429, reintentos con backoff y `SERVICIO_NO_DISPONIBLE` si se agotan todas.
+- Rotación de `GEMINI_API_KEY_1..5` ante 429, en el agente (`RotarKeyAnteCuota`) y en las llamadas sueltas de las tools. Si se agotan todas, el turno responde el mensaje de error técnico.
 - Cachear `leer_receta` por hash de imagen y la extracción de marbetes por n.º de registro.
 - Con `USE_FIXTURES=true` todo el flujo corre sin red (LLM grabado o fake, SENASA desde snapshot).
 
 ## Tests y evaluación
 
-- Unitarios de servicios (geo, dosis, reglas, matching, parser de dosis) con casos borde: punto sobre el borde, punto dentro de la zona, unidades raras, rangos con coma decimal, empates de matching.
+- Unitarios de servicios (localidad, dosis, reglas, matching, parser de dosis) con casos borde: localidad ambigua, unidades raras, rangos con coma decimal, empates de matching.
 - Tools con base de test (Docker) y fixtures.
-- Retrievers con tests de integración contra Postgres real (Docker) y datos sintéticos; por ejemplo, que el filtro por jurisdicción excluya artículos de otras localidades.
+- Retrievers con tests de integración contra Postgres real (Docker) y la copia de los insumos reales; por ejemplo, que el filtro por jurisdicción excluya artículos de otras localidades.
 - Test de esquema: no existe ninguna tabla genérica de documentos + embedding.
 - Orquestador con LLM fake: ruteo, repregunta, límite de repreguntas, fuera de dominio, cancelar.
 - Snapshot de cada plantilla.
@@ -463,6 +459,6 @@ data/insumos/
 
 - Python 3.12, pydantic v2, FastAPI, pytest, ruff, type hints en todo.
 - Dominio en español (`receta`, `evaluar_riesgo`, `jurisdiccion_id`); infraestructura genérica puede ir en inglés.
-- Configuración solo por `config.py` leyendo `.env` (nunca versionado). Variables: `DATABASE_URL`, `LLM_PROVIDER`, `GEMINI_API_KEY_1..3`, `GEMINI_MODEL`, `GROQ_API_KEY`, `GROQ_MODEL`, `EMBEDDINGS_MODEL`, `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_APP_SECRET`, `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_GRAPH_VERSION`, `WHATSAPP_AR_QUITAR_9`, `SENASA_BASE_URL`, `SENASA_REQ_POR_SEG`, `DOSIS_TOLERANCIA_PCT`, `RAG_UMBRAL_SIMILITUD`, `RADIO_BUSQUEDA_ZONAS_M`, `USE_FIXTURES`.
+- Configuración solo por `config.py` leyendo `.env` (nunca versionado). Variables: `DATABASE_URL`, `LLM_PROVIDER`, `GEMINI_API_KEY_1..5`, `GEMINI_MODEL`, `GROQ_API_KEY`, `GROQ_MODEL`, `EMBEDDINGS_MODEL`, `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_APP_SECRET`, `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_GRAPH_VERSION`, `WHATSAPP_AR_QUITAR_9`, `SENASA_BASE_URL`, `SENASA_REQ_POR_SEG`, `DOSIS_TOLERANCIA_PCT`, `RAG_UMBRAL_SIMILITUD`, `METEO_BASE_URL`, `METEO_HORIZONTE_DIAS`, `MODO_DEMO_REFORMULACION`, `USE_FIXTURES`.
 - Logs estructurados por turno (intención, tools, estados, latencia, tokens). Nunca tokens de API, imágenes ni números de teléfono completos.
 - Commits chicos, uno por tarea del plan.

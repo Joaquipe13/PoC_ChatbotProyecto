@@ -9,8 +9,6 @@ import re
 _TAG_HTML = re.compile(r"<[^>]+>")
 _ESPACIOS_REPETIDOS = re.compile(r"\s+")
 
-BANDAS_VALIDAS = {"Ia", "Ib", "II", "III", "IV"}
-
 # Roman numeral / clase tal como viene en claseToxicologica.claseTox -> banda normalizada.
 _MAPA_BANDA = {
     "IA": "Ia",

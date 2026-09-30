@@ -13,11 +13,9 @@ class MotivoNoResuelto(StrEnum):
     SIN_REGLA_APLICABLE = "sin_regla_aplicable"
     PRODUCTO_NO_ENCONTRADO = "producto_no_encontrado"
     SIN_USOS_REGISTRADOS = "sin_usos_registrados"
-    DOSIS_NO_COMPARABLE = "dosis_no_comparable"
     NORMATIVA_SIN_RESPALDO = "normativa_sin_respaldo"
     IMAGEN_ILEGIBLE = "imagen_ilegible"
     LIMITE_REPREGUNTAS = "limite_repreguntas"
-    SERVICIO_NO_DISPONIBLE = "servicio_no_disponible"
     # Fase 9 (extensiones RF6/RF7): la skill no cubre estos RF, así que no
     # están en su "Catálogo MotivoNoResuelto" -- se agregan acá siguiendo el
     # mismo patrón, ver DECISIONES.md.
@@ -44,10 +42,6 @@ DESCRIPCION_MOTIVO: dict[MotivoNoResuelto, str] = {
         "SENASA no publica para qué cultivos ni en qué dosis está registrado el producto, "
         "así que no se pueden verificar."
     ),
-    MotivoNoResuelto.DOSIS_NO_COMPARABLE: (
-        "No se pudieron normalizar las unidades de la dosis de la receta "
-        "contra las del registro."
-    ),
     MotivoNoResuelto.NORMATIVA_SIN_RESPALDO: (
         "La normativa cargada no dice nada que responda la pregunta (o lo que se "
         "encontró no alcanza para citar una norma)."
@@ -58,10 +52,6 @@ DESCRIPCION_MOTIVO: dict[MotivoNoResuelto, str] = {
     ),
     MotivoNoResuelto.LIMITE_REPREGUNTAS: (
         "Se alcanzaron 2 intentos fallidos repreguntando el mismo dato."
-    ),
-    MotivoNoResuelto.SERVICIO_NO_DISPONIBLE: (
-        "Se agotó la cuota del LLM configurada o un servicio externo "
-        "(base de datos, etc.) no respondió."
     ),
     MotivoNoResuelto.VEHICULO_NO_ENCONTRADO: (
         "No hay ningún vehículo cargado en el catálogo para ofrecer como opción."

@@ -160,9 +160,3 @@ def extraer_reglas_de_articulo(norma: str, numero: str, texto: str) -> list[Regl
     return reglas
 
 
-def oraciones_con_distancia_sin_extraer(texto: str) -> list[str]:
-    """Oraciones que mencionan una distancia y que el extractor NO tomó como
-    regla (excepciones, condiciones, rangos, redacciones ambiguas): es lo que
-    una persona tiene que revisar a mano al armar un `reglas.csv`."""
-    tomadas = {r.oracion for r in extraer_reglas_de_articulo("", "", texto)}
-    return [o for o in _oraciones(texto) if _DISTANCIA.search(o) and o not in tomadas]

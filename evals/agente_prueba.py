@@ -1,5 +1,5 @@
 """Agente de prueba con Gemini: un usuario simulado que conversa con el bot siguiendo los
-casos del plan de pruebas (`docs/plan_pruebas.md`, `evals/escenarios/*.yaml`).
+casos del plan de pruebas (`evals/escenarios/plan_*.yaml`).
 
 Por cada caso, Gemini hace de operario: recibe solo la persona, el objetivo, los datos y
 el comportamiento del escenario (no el código, ni el prompt del bot, ni lo esperado), lee

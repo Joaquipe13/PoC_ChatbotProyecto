@@ -1,6 +1,6 @@
 # Evaluación conversacional (Fase 12)
 
-Un agente **simulador** (un usuario que no conoce el sistema) conversa por WhatsApp simulado con el
+Un **simulador** (un usuario que no conoce el sistema) conversa por WhatsApp simulado con el
 bot; cada conversación queda registrada; unos **invariantes** en código y un agente **analista** las
 interpretan. El orquestador del bot es Gemini real: es la prueba más realista posible sin usuarios.
 
@@ -17,12 +17,27 @@ Todo esto sale a la red y gasta cuota: **no corre con `pytest` ni en CI**. Lo ú
 | `corrida.py` | `iniciar`, `pendientes`, `marcar`, `analizar` (invariantes + métricas). Corridas reanudables. |
 | `invariantes.py` | Chequeos automáticos sin LLM (números y citas con respaldo, dictamen, plantilla, repreguntas, prompt, confirmación…). |
 | `metricas.py` | Métricas por corrida para comparar. |
-| `escenarios/*.yaml` | Persona, objetivo, datos y comportamiento del simulador; `expectativas_duras` y `tools_esperadas` solo para el análisis. |
+| `escenarios/*.yaml` | Persona, objetivo, datos y comportamiento del simulador; `expectativas_duras` y `tools_esperadas` solo para el análisis. `conjunto`: `desarrollo` (los 3 del piloto) o `plan` (los 15 `plan_*.yaml` del plan de pruebas). No hay escenarios `holdout` todavía. |
+| `agente_prueba.py` | Simulador con Gemini: corre de punta a punta los escenarios del plan (ver abajo). |
 | `../.claude/agents/simulador-operario.md` | Definición del simulador. |
 | `../.claude/agents/analista-conversaciones.md` | Definición del analista (solo lectura). |
 | `run_evals.py`, `run_consultas_normativa.py` | Evals de un turno (ruteo y consultas de normativa). |
 
-## Cómo se corre
+## Dos simuladores
+
+Hay dos formas de hacer de usuario, con los mismos escenarios, el mismo harness (`chat.py`) y los mismos invariantes:
+
+- **Gemini** (`agente_prueba.py`): un script, sin intervención. Es con el que se corrió el plan de pruebas del 26 y 27/09/2026 (de ahí salen los ejemplos de `docs/especificacion-plantillas.md`). Usa las API keys en orden inverso al del bot para repartir la cuota.
+
+  ```bash
+  uv run python -m evals.base_eval crear
+  uv run python -m evals.agente_prueba                       # los 15 escenarios del plan
+  uv run python -m evals.agente_prueba --casos plan_marbete --reps 2
+  ```
+
+- **Subagente de Claude Code** (`simulador-operario`) más el `analista-conversaciones`: el piloto del 21/09/2026, con corridas reanudables por `corrida.py`. Se describe a continuación.
+
+## Cómo se corre (con el subagente)
 
 ```bash
 uv run python -m evals.base_eval crear                    # clon de la base para las corridas
@@ -57,4 +72,6 @@ crearon se usó un agente general que lee solo la definición del simulador.
 - "Objetivo logrado" es lo que **declara el simulador**: no verifica el contenido. Lo verifica el
   analista.
 - Las corridas viven en `evals/runs/` (ignorado por git). Lo que se arregla deja un test permanente
-  (o una conversación en `evals/golden/`) y una línea en `DIFICULTADES.md`.
+  y una línea en `DIFICULTADES.md`.
+- `ultima_corrida.json` (de `run_evals.py`) es del 11/09/2026: anterior a la mayoría de las tools, no
+  refleja el ruteo actual.

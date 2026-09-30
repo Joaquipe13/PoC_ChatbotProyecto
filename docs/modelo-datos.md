@@ -1,8 +1,145 @@
 # Modelo de datos
 
-Diagrama ER de los tres schemas (`catalogo`, `territorio`, `operacion`) y la consulta SQL que ejecuta el retriever de cada una de las 5 tools RAG. Migraciones fuente: `src/fitosanitarios/datos/migraciones/00{1..7}_*.sql` (la 006 y la 007 agregan los índices de fragmentos de normas y de marbetes). Contratos de dominio: `src/fitosanitarios/dominio/modelos.py`.
+Arquitectura del sistema experto (canal, orquestador, tools, servicios y base), diagrama ER de los tres schemas (`catalogo`, `territorio`, `operacion`) y la consulta SQL que ejecuta el retriever de cada una de las 5 tools RAG. Migraciones fuente: `src/fitosanitarios/datos/migraciones/00{1..7}_*.sql` (la 006 y la 007 agregan los índices de fragmentos de normas y de marbetes). Contratos de dominio: `src/fitosanitarios/dominio/modelos.py`.
 
 Material para la defensa (ver Fase 10 de `plandefases.md`).
+
+## Arquitectura del sistema experto
+
+El LLM orquesta y el núcleo decide: Gemini interpreta el mensaje y elige la tool con sus argumentos; las tools llaman a servicios deterministas que consultan la base con SQL parametrizado, y la respuesta se arma en código a partir de lo que devolvieron las tools (el LLM no escribe números, normas ni dosis).
+
+### Capas y recorrido de un mensaje
+
+```mermaid
+flowchart TB
+    OP(["Operario en WhatsApp"])
+    META["WhatsApp Cloud API · Meta"]
+
+    subgraph CANAL["1 · Canal · canales/whatsapp/"]
+        WH["webhook.py · FastAPI<br/>firma HMAC · 200 inmediato · dedup por message.id"]
+        GRAPH["cliente_graph.py<br/>descarga la foto · envía texto, botones y listas"]
+    end
+
+    subgraph ORQ["2 · Orquestador · orquestador/"]
+        TURNO["turno.py · ejecutar_turno<br/>límite de repreguntas · log del turno"]
+        AG["agente.py · create_agent de LangChain<br/>tope de 4 tools · LeerLaFotoPrimero · RotarKeyAnteCuota"]
+        FMT["respuesta_directa.py + formateador.py<br/>tipo de respuesta · plantillas WhatsApp"]
+    end
+
+    subgraph TOOLS["3 · Tools · tools/ · 14"]
+        TL["validan argumentos · llaman servicios<br/>devuelven ResultadoTool como artifact"]
+    end
+
+    subgraph SERV["4 · Núcleo experto determinista · servicios/"]
+        SV["matching · localidad · reglas · dosis · dictamen<br/>limitaciones · marbete · eventos · fechas"]
+    end
+
+    subgraph DATOS["5 · Datos · datos/"]
+        RET["retrievers catalogo y territorio<br/>SQL parametrizado: joins + JSONB + pgvector + trigram"]
+        PG[("PostgreSQL + pgvector<br/>catalogo · territorio · operacion<br/>checkpointer LangGraph")]
+    end
+
+    GEM["Gemini"]
+    EMB["sentence-transformers"]
+    METEO["Open-Meteo"]
+
+    OP <--> META
+    META -- "POST /webhook" --> WH
+    WH --> TURNO
+    TURNO --> AG
+    AG <-- "elige tool y argumentos" --> GEM
+    AG -- "tool call" --> TL
+    TL --> SV
+    SV --> RET
+    RET --> PG
+    AG <-- "historial por thread_id" --> PG
+    TL -- "artifact" --> FMT
+    FMT --> TURNO
+    TURNO -- "mensajes" --> GRAPH
+    GRAPH --> META
+    TL -. "leer receta · RAG" .-> GEM
+    SV -. "embeddings" .-> EMB
+    SV -. "pronóstico" .-> METEO
+```
+
+**Un turno, de punta a punta:**
+
+1. Meta hace `POST /webhook`. El webhook valida la firma, responde 200 enseguida, descarta los duplicados por `message.id` y procesa en segundo plano. Si el mensaje trae una foto, la descarga por la Graph API.
+2. `ejecutar_turno` invoca al agente con `thread_id` igual al número del operario. El checkpointer de LangGraph recupera la conversación.
+3. Gemini elige la tool y arma los argumentos. Con foto, `LeerLaFotoPrimero` fuerza a que la primera llamada sea `leer_receta`. Hay un tope de 4 llamadas a tools por turno, y si una key se queda sin cuota se pasa a la siguiente.
+4. La tool valida los argumentos y llama a los servicios. Los servicios resuelven con código determinista: matching de productos, localidad, reglas, dosis y dictamen. Consultan la base por los retrievers, con SQL parametrizado que combina joins, filtros sobre columnas y JSONB, y distancia vectorial.
+5. La tool devuelve un `ResultadoTool` como artifact. 12 de las 14 tools cierran el turno ahí (`return_direct`), y el tipo de respuesta sale de la tabla de `respuesta_directa.py`. Con `evaluar_riesgo` y `resolver_vehiculo`, el modelo elige el tipo.
+6. El formateador arma los mensajes de WhatsApp a partir de los artifacts, no del texto del LLM. `cliente_graph.py` los envía, y el turno queda registrado en `operacion.turno`.
+
+### Qué usa cada tool
+
+Los servicios de receta y dictamen son funciones puras sobre lo que ya trajeron los demás: no consultan la base.
+
+```mermaid
+flowchart LR
+    subgraph TOOLS["Tools"]
+        T_REC["Receta<br/>leer_receta · completar_receta<br/>evaluar_viabilidad_legal · evaluar_riesgo"]
+        T_PROD["Productos SENASA<br/>validar_producto_registro<br/>consultar_productos · consultar_marbete"]
+        T_NORM["Normativa<br/>responder_consulta_normativa<br/>consultar_articulo · listar_limitaciones"]
+        T_OP["Operación<br/>resolver_vehiculo · registrar_evento<br/>consultar_agenda · agendar_aplicacion"]
+    end
+
+    subgraph SERV["Servicios"]
+        S_REC["receta · confirmacion · dictamen<br/>dosis · condiciones_aplicacion"]
+        S_PROD["validacion_producto · matching<br/>marbete · busqueda_hibrida"]
+        S_NORM["ubicacion · localidad · reglas<br/>limitaciones · reformulacion"]
+        S_OP["eventos · fechas · resolucion_vehiculo<br/>meteorologia · viento"]
+    end
+
+    subgraph BD["PostgreSQL"]
+        DB_CAT[("catalogo<br/>producto · uso_registrado<br/>fragmento_marbete · vehiculo")]
+        DB_TER[("territorio<br/>localidad · norma · articulo<br/>regla_distancia · fragmento_norma")]
+        DB_OP[("operacion<br/>receta · evento_aplicacion")]
+    end
+
+    GEM["Gemini"]
+    METEO["Open-Meteo"]
+
+    T_REC --> S_REC
+    T_REC --> S_PROD
+    T_REC --> S_NORM
+    T_PROD --> S_PROD
+    T_PROD --> S_NORM
+    T_NORM --> S_NORM
+    T_NORM --> S_PROD
+    T_OP --> S_OP
+    T_OP --> S_NORM
+
+    S_PROD -- "retrievers/catalogo.py" --> DB_CAT
+    S_NORM -- "retrievers/territorio.py" --> DB_TER
+    S_OP --> DB_OP
+    S_OP -- "vehiculo" --> DB_CAT
+    S_OP --> METEO
+
+    T_REC -. "leer_receta" .-> GEM
+    T_PROD -. "marbete" .-> GEM
+    T_NORM -. "consulta normativa" .-> GEM
+```
+
+
+| Tool | Servicios | Tablas | Externo |
+|---|---|---|---|
+| `leer_receta` | receta | — | Gemini multimodal |
+| `completar_receta` | receta | — (la receta sale del artifact anterior) | — |
+| `evaluar_viabilidad_legal` | receta, confirmacion, validacion_producto, condiciones_aplicacion, dictamen, ubicacion | `catalogo.producto`, `uso_registrado`; `territorio.localidad`, `regla_distancia` | — |
+| `evaluar_riesgo` | validacion_producto, condiciones_aplicacion, dictamen, ubicacion | ídem | — |
+| `validar_producto_registro` | validacion_producto, marbete, condiciones_aplicacion | `catalogo.producto`, `uso_registrado`, `fragmento_marbete` | Gemini, si busca la dosis en el marbete |
+| `consultar_productos` | limitaciones, reglas, ubicacion | `catalogo.*` (producto, cultivo, adversidad, principio_activo, firma); `territorio.regla_distancia` | — |
+| `consultar_marbete` | matching, marbete, busqueda_hibrida, reformulacion | `catalogo.producto`, `fragmento_marbete` | Gemini |
+| `responder_consulta_normativa` | ubicacion, reformulacion | `territorio.fragmento_norma`, `regla_distancia` | Gemini |
+| `consultar_articulo` | ubicacion, localidad | `territorio.norma`, `articulo` | — |
+| `listar_limitaciones` | limitaciones, reglas, condiciones_aplicacion, matching, ubicacion | `territorio.regla_distancia`; `catalogo.producto` (banda) | — |
+| `resolver_vehiculo` | resolucion_vehiculo | `catalogo.vehiculo` | — |
+| `registrar_evento` | eventos, resolucion_vehiculo, fechas | `operacion.evento_aplicacion`, `receta`; `catalogo.vehiculo` | — |
+| `consultar_agenda` | eventos, fechas | `operacion.receta`, `evento_aplicacion` | — |
+| `agendar_aplicacion` | eventos, fechas, localidad, reglas, meteorologia, viento | `operacion.receta`; `territorio.regla_viento` | Open-Meteo |
+
+Todas usan `servicios/recursos.py`, que da la conexión y el modelo de embeddings, y `servicios/formato.py`. La carga es offline y no pasa por el agente: el vademécum de SENASA se scrapea una vez a un snapshot y se carga a `catalogo`, y los insumos de cada localidad (GeoJSON, normas y `reglas.csv`) se validan y se cargan a `territorio`.
 
 ## Diagrama ER
 
@@ -234,25 +371,10 @@ Sin candidatos por encima del umbral combinado → `PRODUCTO_NO_ENCONTRADO`. `us
 
 ### `evaluar_riesgo`
 
-Tres consultas encadenadas (localidad → zonas en radio → reglas candidatas); la geometría exacta (punto en polígono, distancia) se resuelve en Python sobre el resultado.
+La localidad se resuelve por nombre (`servicios/localidad.py::resolver_localidad`, sobre `listar_localidades` y `listar_municipios`); desde el 19/09/2026 no se usa la ubicación del lote. Con la localidad, una sola consulta trae las reglas candidatas, y en Python se filtran por tipo de zona, aplicación y banda y gana la más restrictiva.
 
 ```sql
--- 1) Localidad(es) candidata(s) por bbox (prefiltro; el punto-en-polígono exacto es en Python)
-SELECT id, jurisdiccion_id, nombre, provincia_id, limite
-FROM territorio.localidad
-WHERE :lon BETWEEN bbox_min_lon AND bbox_max_lon
-  AND :lat BETWEEN bbox_min_lat AND bbox_max_lat;
-
--- 2) Zonas protegidas dentro del radio de búsqueda, también de localidades vecinas
---    (prefiltro por bbox expandido en grados; la distancia exacta se recalcula en
---    Python reproyectando a estimate_utm_crs(), ver servicios/geo.py)
-SELECT zp.id, zp.tipo, zp.nombre, zp.geometria, l.jurisdiccion_id
-FROM territorio.zona_protegida zp
-JOIN territorio.localidad l ON l.id = zp.localidad_id
-WHERE zp.bbox_min_lon <= :lon + :radio_grados AND zp.bbox_max_lon >= :lon - :radio_grados
-  AND zp.bbox_min_lat <= :lat + :radio_grados AND zp.bbox_max_lat >= :lat - :radio_grados;
-
--- 3) Reglas candidatas: de la localidad del lote, su provincia y las nacionales
+-- Reglas candidatas: de la localidad del lote, su provincia y las nacionales
 -- (:permitido = false para el dictamen y el agendado; true trae las condicionales, para consultas)
 SELECT rd.tipo_zona, rd.tipo_aplicacion, rd.bandas, rd.distancia_min_m, rd.observaciones,
        rd.permitido, rd.condiciones, n.ambito, n.archivo AS norma, a.numero AS articulo
@@ -265,7 +387,7 @@ WHERE rd.permitido = :permitido
     OR (n.ambito = 'nacional'));
 ```
 
-`:radio_grados` es una conversión aproximada de `RADIO_BUSQUEDA_ZONAS_M` a grados (varía con la latitud); solo sirve de prefiltro amplio, nunca para decidir la distancia final. Sin resultados en la consulta 1 → `JURISDICCION_NO_CUBIERTA`. Consulta 3 vacía para el tipo de zona/aplicación del caso → `SIN_REGLA_APLICABLE`.
+Localidad desconocida (ni cargada ni municipio de una provincia con normativa) → `JURISDICCION_NO_CUBIERTA`. Consulta vacía para el tipo de zona/aplicación del caso → `SIN_REGLA_APLICABLE`.
 
 ### `responder_consulta_normativa`
 

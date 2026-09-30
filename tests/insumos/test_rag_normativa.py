@@ -3,7 +3,6 @@ escritas como oración, y el retriever que los busca juntos por similitud."""
 
 from fitosanitarios.datos.retrievers.territorio import (
     contexto_normativo_por_similitud,
-    obtener_localidad_por_jurisdiccion_id,
 )
 from fitosanitarios.insumos.loader_reglas import texto_de_regla
 from fitosanitarios.servicios.fragmentos import (
@@ -52,10 +51,14 @@ def test_texto_de_una_prohibicion_sin_limite_y_de_una_excepcion():
 
 
 def test_el_retriever_trae_fragmentos_y_reglas_de_la_jurisdiccion(conexion, modelo_embeddings):
-    localidad = obtener_localidad_por_jurisdiccion_id(conexion, "el-trebol")
+    with conexion.cursor() as cur:
+        cur.execute(
+            "SELECT id, provincia_id FROM territorio.localidad WHERE jurisdiccion_id = 'el-trebol'"
+        )
+        localidad_id, provincia_id = cur.fetchone()
     embedding = modelo_embeddings.encode("¿a qué distancia del pueblo puedo aplicar con avión?")
     filas = contexto_normativo_por_similitud(
-        conexion, embedding.tolist(), localidad.id, localidad.provincia_id, top_k=20
+        conexion, embedding.tolist(), localidad_id, provincia_id, top_k=20
     )
 
     assert {f["tipo"] for f in filas} == {"fragmento", "regla"}

@@ -73,9 +73,7 @@ Resto de las columnas:
 
 **Sin filas para una jurisdicción, la fuente es el PDF.** Al cargar (`loader_reglas`) las distancias de esa carpeta se leen del texto de sus artículos, de forma **determinista** (un parser, sin LLM) y solo si son prohibiciones firmes con una única distancia, zona y clases explícitas; excepciones, condiciones, rangos y redacciones ambiguas se descartan. Se guardan como `N` con `fuente='pdf_extraido'` y la respuesta avisa que se leyeron del texto de la norma y que hay que verificarlas. Con al menos una fila en `reglas.csv`, el CSV es la única fuente de esa jurisdicción y es la vía para cargar lo que el parser no toma (excepciones como filas `S`, distancias en tablas). **La normativa nacional nunca se lee del PDF:** está para consultas, así que sin filas nacionales no aporta reglas al dictamen.
 
-**Cómo armar las filas de una carpeta.** El CSV revisado por una persona es la fuente confiable; la lectura del PDF queda como respaldo. Para no empezar de cero: `uv run python -m fitosanitarios.insumos.borrador_reglas --data data/insumos` escribe en cada carpeta un `reglas.borrador.csv` (filas que el extractor tomó, con `provincia` y `jurisdiccion` ya completas y la columna `oracion` para auditarlas) y un `reglas.borrador-pendientes.txt` (oraciones con distancia que descartó: excepciones, condiciones, rangos, tablas). Si el `reglas.csv` ya tiene filas de esa carpeta, imprime además qué difiere. Se copian las filas que sirvan al `reglas.csv`, se completan a mano y se recarga con `loader_reglas`. Las filas de una jurisdicción reemplazan por completo lo que leería el PDF: tienen que incluir todas las reglas, también las que el extractor sí toma. Los borradores están en `.gitignore`.
-
-Cada zona protegida pertenece a la localidad de su carpeta, pero la búsqueda de distancias considera también zonas de localidades vecinas dentro de `RADIO_BUSQUEDA_ZONAS_M`.
+**Cómo armar las filas de una carpeta.** El CSV revisado por una persona es la fuente confiable; la lectura del PDF queda como respaldo. Las filas de una jurisdicción reemplazan por completo lo que leería el PDF: tienen que incluir todas las reglas, también las que el parser sí toma. Se recargan con `loader_reglas`.
 
 ## Validaciones
 
@@ -99,18 +97,17 @@ Implementadas en `src/fitosanitarios/insumos/validador.py` (Fase 3). Dos niveles
 
 | # | Condición |
 |---|---|
-| A2 | Una zona protegida queda a más de `RADIO_BUSQUEDA_ZONAS_M` del límite de su propia localidad. |
 | A3 | Un PDF no tiene texto extraíble (escaneado): se marca `requiere_revision=true` en `territorio.articulo` y sigue por OCR (Fase 3). |
 | A4 | Una provincia o localidad no tiene filas en `reglas.csv`: sus distancias se leerán del texto de los PDF (fuente `pdf_extraido`). No aplica a la nacional. |
 | A5 | Una carpeta de localidad no tiene `localidad.geojson` (22/09/2026): se carga sin límite ni zonas protegidas. |
 
-## Datos sintéticos para desarrollo y tests
+## Datos para tests
 
-`tests/fixtures/insumos/`: 2-3 localidades sintéticas completas (GeoJSON + PDF de prueba) y un `reglas.csv` único, con la misma estructura que los datos reales. El desarrollo y los tests de las Fases 3, 5 y 6 corren 100 % contra estas fixtures; los datos reales del equipo son un insumo que se carga aparte, no una dependencia del código para poder avanzar (ver `plandefases.md`, Fase 3).
+`tests/fixtures/insumos/` es una copia congelada de `data/insumos/` (El Trébol, Sastre, San Jorge, la Ley 11.273 y su decreto): desde el 26/09/2026 los tests usan hechos reales, no localidades inventadas (ver `DECISIONES.md`). Se regenera con `uv run python scripts/generar_fixtures_insumos.py` después de cambiar los insumos reales.
 
 ## Mínimo para arrancar vs. mínimo para cerrar
 
 - **Para arrancar la Fase 3** (carga real, en paralelo con la Fase 2): 2 localidades completas + las leyes provinciales correspondientes.
-- **Para cerrar la Fase 5**: las 10 localidades del caso de estudio tienen que estar cargadas.
+- **Para cerrar la Fase 5**: las 10 localidades del caso de estudio tienen que estar cargadas. (No se llegó: al 29/09/2026 hay 3 cargadas.)
 
 Esto es responsabilidad del equipo que provee los insumos, no una tarea de código de este plan (ver `plandefases.md`, sección 6 / decisión abierta #7).

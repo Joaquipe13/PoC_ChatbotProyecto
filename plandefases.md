@@ -2,6 +2,12 @@
 
 POC de un agente conversacional por WhatsApp que lee recetas agronómicas de fitosanitarios, las contrasta con el registro de SENASA y la normativa de 10 localidades, y dictamina si la aplicación es viable/legal. Fuente de verdad de arquitectura, contratos y reglas: skill `agente-fitosanitarios` (`.claude/skills/agente-fitosanitarios/SKILL.md`). Entrega: 30/09/2026.
 
+> **Estado al 29/09/2026.** Fases 0 a 10 y 12 cerradas; la 11 (canal web) se hizo y se retiró el 28/09 (la reemplaza `notebooks/chat.ipynb`). El plan se escribió el 11/09 y cada fase conserva lo que se planificó; lo que cambió después está en `DECISIONES.md`. Los cambios que más lo desactualizan:
+> - Se cargaron 3 localidades reales (El Trébol, Sastre y San Jorge) más la normativa de Santa Fe, no 10. Los tests usan una copia congelada de esos insumos, no datos sintéticos (26/09).
+> - Desde el 19/09 la localidad se resuelve por nombre y el dictamen informa la distancia mínima que rige, sin medir la distancia desde el lote. El punto en polígono y las distancias (`servicios/geo.py`, retrievers por punto y por radio, `RADIO_BUSQUEDA_ZONAS_M`) se borraron el 29/09.
+> - También se borraron el 29/09 `senasa/extraccion_marbete.py` (los marbetes van por el RAG de `consultar_marbete`), `insumos/borrador_reglas.py`, `scripts/benchmark_embeddings.py` y `scripts/generar_fixtures_recetas.py`, y los docs de guiones y pruebas manuales (`docs/guion-demo.md`, `docs/casos-leer-receta.md`, `docs/validacion-insumos.md` y otros). El guion de la demo vive en `notebooks/demo_e2e.ipynb`.
+> - Se sumaron tools que el plan no tenía: `completar_receta`, `agendar_aplicacion`, `consultar_articulo`, `listar_limitaciones` y `consultar_marbete` (ver `docs/matriz-parametros.md`).
+
 ## Diagrama de arquitectura
 
 ```mermaid
@@ -87,7 +93,8 @@ graph TD
 | 8 | Canal WhatsApp | Núcleo | 14–20 |
 | 9 | Extensiones (RF6–RF9) | Extensión, recortable | 20–30 |
 | 10 | Demo, documentación y defensa | Núcleo | 10–16 |
-| 11 | Canal Web (GUI de chat) | Extensión, agregada post-Fase 10 | — (real, ver fase) |
+| 11 | Canal Web (GUI de chat) | Extensión, agregada post-Fase 10; retirada el 28/09 | — (real, ver fase) |
+| 12 | Evaluación conversacional | Extensión, posterior a la Fase 11 | — |
 | | **Total núcleo (0–8, 10)** | | **156–228** |
 | | **Total con extensiones** | | **176–258** |
 
@@ -114,6 +121,8 @@ Las horas asumen una persona trabajando sola; con más manos las fases 2/3, 4/6 
 **(verificar)** esta numeración exacta contra `docs/propuesta-tp2-fitosanitarios.md` en cuanto esté disponible; si difiere, actualizar esta tabla y anotarlo en `DECISIONES.md`.
 
 ## Decisiones abiertas
+
+> **Estado al 29/09/2026:** #1 sigue abierta (la propuesta nunca se agregó). #2: se entregó con recortes (3 localidades, ver "Qué recortar"). #3 cerrada. #4: se usa `uv`. #5: `create_agent` con middleware y `response_format` verificado y en uso desde la Fase 7. #6: la cuota se maneja rotando hasta 5 keys de Gemini (agente y tools). #7: se cargaron 3 localidades reales, no 10.
 
 1. **Propuesta original no disponible.** El prompt pide leer `docs/propuesta-tp2-fitosanitarios.md` (tools, RAGs, RF1–RF11 y stack) antes de planificar; ese archivo no existe en este repo. Se usó la skill `agente-fitosanitarios` como única fuente de verdad, tal como indica su propia regla de precedencia. Falta: copiar la propuesta real a `docs/propuesta-tp2-fitosanitarios.md` y contrastar el mapeo RF de la tabla anterior antes de cerrar la Fase 1.
 2. **Presupuesto de tiempo ajustado.** De hoy (11/09/2026) a la entrega (30/09/2026) hay 19 días corridos. El total estimado de núcleo (156–228 h) implica entre 8 y 12 h/día si trabaja una sola persona sin extensiones, lo cual es exigente. Se necesita definir con el usuario: dedicación real disponible por día, si hay más de una persona, y si se acepta arrancar a recortar alcance (ver "Qué recortar" al final) antes de llegar a fases avanzadas, no después.
@@ -583,6 +592,8 @@ No avanzar a la fase siguiente sin confirmación del usuario. (Es la última fas
 
 ## Fase 11 — Canal Web (GUI de chat)
 
+> **Retirada el 28/09/2026:** `canales/web/` y `tests/canales/test_web.py` se borraron; lo reemplaza `notebooks/chat.ipynb` (`canales/notebook.py`). Lo de abajo queda como registro de lo que se hizo.
+
 > **Actualización 19/09/2026:** el botón de ubicación y los campos `lat`/`lon` del canal web se quitaron: el sistema ya no usa la ubicación del lote, la normativa se elige por localidad (ver DECISIONES.md). Lo de abajo describe el plan original de la fase.
 
 **Sub-planificación confirmada por el usuario (12/09/2026)**, agregada después de cerrar la Fase 10: con los insumos reales de un único municipio ya cargados para probar, el canal WhatsApp resultó poco práctico para iterar (número de prueba con máximo 5 destinatarios verificados, dependencia de un túnel HTTPS activo). El usuario pidió una GUI web como canal de desarrollo/demo, sin tocar el canal WhatsApp existente (queda como implementación futura).
@@ -631,11 +642,15 @@ No avanzar a la fase siguiente sin confirmación del usuario.
 
 **Estado (21/09/2026):** harness, logger, invariantes, simulador, analista y una corrida piloto hechos (`evals/runs/20260921-192037/`); el informe está a la espera de decidir qué hallazgos se atacan. No se arregló nada sin esa decisión.
 
+**Estado (29/09/2026):** se sumaron 15 escenarios del plan de pruebas (`evals/escenarios/plan_*.yaml`) y un simulador con Gemini (`evals/agente_prueba.py`), corridos seis veces entre el 26 y el 27/09; los hallazgos y sus arreglos están en `DIFICULTADES.md`. El conjunto `holdout` no se armó.
+
 No avanzar sin confirmación del usuario.
 
 ---
 
 ## Riesgos transversales
+
+> Escritos el 11/09/2026, antes de empezar; se dejan como estaban.
 
 - **Cuotas del LLM (Gemini/Groq).** No verificadas (decisión abierta #6); la POC entera depende de que la cuota gratuita alcance para desarrollo, evals y demo. Mitigación: rotación de keys desde la Fase 0, `USE_FIXTURES=true` como default de desarrollo, y medir consumo real apenas se empiece a usar LLM real en la Fase 2.
 - **Cambios en la API de SENASA.** Sin documentación pública, relevada por inspección el 11/09/2026; puede cambiar sin aviso. Mitigación: snapshot versionado (nunca se consulta en vivo en producción/demo) y reverificación de endpoints en DevTools antes del crawl completo de la Fase 2.
@@ -645,6 +660,8 @@ No avanzar sin confirmación del usuario.
 - **Dependencia de insumos externos (SIG y normativa).** El equipo provee las capas y PDFs; si llegan tarde o incompletos, la Fase 3 (y todo lo que depende de datos reales) se atrasa. Mitigación: desarrollo y tests 100 % contra fixtures sintéticas, de forma que solo la carga de datos reales quede bloqueada, no el código.
 
 ## Qué recortar si no se llega al 30/09
+
+> **Qué se aplicó:** el recorte 2 (3 localidades reales en vez de 10) y, en parte, el 3 (detalle completo de SENASA para una muestra de productos). La Fase 9 se hizo completa, así que `docs/extensiones-pendientes.md` no hizo falta.
 
 En este orden, de menor a mayor impacto en el núcleo evaluable:
 

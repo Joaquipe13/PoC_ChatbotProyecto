@@ -199,16 +199,6 @@ def enviar_mensajes(settings: Settings, to: str, mensajes: list[str]) -> None:
             enviar_texto(settings, to, mensaje)
 
 
-def enviar_botones(settings: Settings, to: str, texto: str, botones: list[dict]) -> None:
-    _enviar(settings, _payload_botones(to, texto, botones))
-
-
-def enviar_lista(
-    settings: Settings, to: str, texto: str, titulo_boton: str, filas: list[dict]
-) -> None:
-    _enviar(settings, _payload_lista(to, texto, titulo_boton, filas))
-
-
 def obtener_url_media(settings: Settings, media_id: str) -> str:
     """La URL devuelta vence a los 5 minutos (ver skill) -- usar enseguida."""
     resp = httpx.get(_url_media(settings, media_id), headers=_headers(settings), timeout=10.0)

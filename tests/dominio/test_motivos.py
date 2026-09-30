@@ -7,8 +7,9 @@ def test_todos_los_motivos_tienen_descripcion():
         assert DESCRIPCION_MOTIVO[motivo].strip() != ""
 
 
-def test_son_nueve_motivos_del_nucleo_segun_la_skill_mas_los_de_extensiones():
-    # La skill documenta exactamente 9 para el núcleo (RF1-5, RF10, RF11).
+def test_son_siete_motivos_del_nucleo_segun_la_skill_mas_los_de_extensiones():
+    # La skill documenta 7 para el núcleo (RF1-5, RF10, RF11): `dosis_no_comparable` y
+    # `servicio_no_disponible` se sacaron el 29/09/2026 porque nada los emitía.
     # Los otros 4 son extensiones: 2 de la Fase 9 (RF6/RF7, fuera del alcance de
     # la skill, ver DECISIONES.md), `articulo_no_encontrado`, de la consulta de
     # artículos por número, y `marbete_sin_respaldo`, del RAG de marbetes. No cuentan
@@ -16,12 +17,12 @@ def test_son_nueve_motivos_del_nucleo_segun_la_skill_mas_los_de_extensiones():
     # para esos casos.
     motivos_del_nucleo = {
         "jurisdiccion_no_cubierta", "sin_regla_aplicable", "producto_no_encontrado",
-        "sin_usos_registrados", "dosis_no_comparable", "normativa_sin_respaldo",
-        "imagen_ilegible", "limite_repreguntas", "servicio_no_disponible",
+        "sin_usos_registrados", "normativa_sin_respaldo", "imagen_ilegible",
+        "limite_repreguntas",
     }
     todos = {m.value for m in MotivoNoResuelto}
     assert motivos_del_nucleo <= todos
-    assert len(motivos_del_nucleo) == 9
+    assert len(motivos_del_nucleo) == 7
     assert len(todos - motivos_del_nucleo) == 4
 
 

@@ -85,7 +85,7 @@ normal en la cuenta gratis y a Meta no le aparece.
 ## 5. Suscribir el webhook
 
 1. Levantar el servidor local con `USE_FIXTURES=false` (en `.env` o en la
-   línea de comando): `uv run uvicorn fitosanitarios.canales.whatsapp.app_produccion:app --port 8000`.
+   línea de comando): `uv run python -m uvicorn fitosanitarios.canales.whatsapp.app_produccion:app --port 8000`.
    Al arrancar se chequean las credenciales (`canales/chequeo_credenciales.py`):
    Postgres y el catálogo, cada `GEMINI_API_KEY_*` y el token de WhatsApp
    contra la Graph API (muestra el número asociado). Si algo falla, el

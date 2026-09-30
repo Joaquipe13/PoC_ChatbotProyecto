@@ -3,11 +3,11 @@
 Resumen de [`DECISIONES.md`](DECISIONES.md) para entender el proyecto sin leer el registro
 completo. Cada punto dice **qué** se decidió y **por qué**; el detalle, las alternativas
 descartadas y las fechas están en `DECISIONES.md`, y lo que falló y cómo se arregló, en
-[`DIFICULTADES.md`](DIFICULTADES.md). Estado al 26/09/2026.
+[`DIFICULTADES.md`](DIFICULTADES.md). Estado al 29/09/2026.
 
 ## 1. Qué es
 
-Un chatbot por WhatsApp (y un canal web para probar) para operarios que aplican
+Un chatbot por WhatsApp (y un notebook de chat para probar) para operarios que aplican
 fitosanitarios en Santa Fe. Lee la foto de la receta agronómica, la contrasta con el registro
 de SENASA y la normativa (ley provincial, ordenanzas, fallos), y responde consultas: si se
 puede aplicar, a qué distancia del pueblo, qué banda tiene un producto, qué dice su etiqueta,
@@ -37,7 +37,7 @@ gratuita) puede fallar o inventar. Además permite tests confiables sin red.
 | LLM | Gemini 3.5 Flash-Lite (`google-genai`) | Multimodal (lee la foto), cuota gratuita; hasta 5 keys para rotar en las tools |
 | Base | PostgreSQL 16 + JSONB + pgvector + pg_trgm (Docker) | Un solo motor para lo relacional, lo semiestructurado y los embeddings (requisito: sin tablas planas) |
 | Embeddings | `paraphrase-multilingual-mpnet-base-v2` (768 dim, CPU) | Buen español; elegido con un benchmark |
-| Canales | WhatsApp Cloud API (webhook FastAPI) + canal web | El web se agregó para probar sin depender de Meta ni de un túnel |
+| Canales | WhatsApp Cloud API (webhook FastAPI) + `notebooks/chat.ipynb` | El notebook permite probar sin depender de Meta ni de un túnel; reemplazó al canal web el 28/09 |
 | Clima | Open-Meteo (sin API key) | Pronóstico hora por hora gratuito |
 | Dependencias | `uv` | Rápido y con `pyproject.toml` estándar |
 
@@ -72,7 +72,7 @@ gratuita) puede fallar o inventar. Además permite tests confiables sin red.
   El único polígono disponible de El Trébol era la mancha urbana, así que ningún lote real
   "caía" en la localidad. Ahora, con la localidad, el tipo de aplicación y la banda de la mezcla
   (la más peligrosa), el bot dice la distancia mínima que rige y la norma que la fija. El código
-  de geometría quedó sin uso.
+  de geometría quedó sin uso y se borró el 29/09.
 - **La distancia que rige es la más restrictiva** entre la ley, la ordenanza y los fallos; una
   excepción provincial no levanta una prohibición municipal.
 - **Consultas de normativa en tres tools:** `listar_limitaciones` (lista completa desde las

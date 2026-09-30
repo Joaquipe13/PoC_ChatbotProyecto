@@ -11,12 +11,10 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
-import geopandas as gpd
 import pdfplumber
 from shapely.geometry import shape
 from shapely.validation import explain_validity
 
-from fitosanitarios.config import get_settings
 from fitosanitarios.insumos.estructura import (
     alcance_de_carpeta,
     carpeta_nacional,
@@ -75,7 +73,7 @@ def _en_argentina(geom) -> bool:
     )
 
 
-def validar_geojson(ruta: Path, radio_busqueda_m: float | None = None) -> ResultadoValidacion:
+def validar_geojson(ruta: Path) -> ResultadoValidacion:
     import json
 
     resultado = ResultadoValidacion()
@@ -92,8 +90,6 @@ def validar_geojson(ruta: Path, radio_busqueda_m: float | None = None) -> Result
             )
         )
 
-    geom_limite = None
-    geoms_zonas = []
     for feature in features:
         tipo = feature.get("properties", {}).get("tipo")
         if tipo not in TIPOS_FEATURE_CONOCIDOS:
@@ -117,32 +113,6 @@ def validar_geojson(ruta: Path, radio_busqueda_m: float | None = None) -> Result
                     "F4", str(ruta), f"geometría (tipo={tipo}) fuera del bbox de Argentina"
                 )
             )
-            continue
-
-        if tipo == "limite" and len(limites) == 1:
-            geom_limite = geom
-        elif tipo != "limite":
-            nombre = feature.get("properties", {}).get("nombre", "(sin nombre)")
-            geoms_zonas.append((nombre, geom))
-
-    if geom_limite is not None and geoms_zonas:
-        radio = radio_busqueda_m
-        if radio is None:
-            radio = get_settings().radio_busqueda_zonas_m
-        serie = gpd.GeoSeries([geom_limite, *[g for _, g in geoms_zonas]], crs="EPSG:4326")
-        crs_metrico = serie.estimate_utm_crs()
-        serie_metrica = serie.to_crs(crs_metrico)
-        limite_metrico = serie_metrica.iloc[0]
-        for (nombre, _), geom_metrico in zip(geoms_zonas, serie_metrica.iloc[1:], strict=True):
-            distancia = geom_metrico.distance(limite_metrico)
-            if distancia > radio:
-                resultado.advertencias.append(
-                    AdvertenciaValidacion(
-                        "A2", str(ruta),
-                        f"la zona '{nombre}' está a {distancia:.0f} m del límite de su "
-                        f"localidad, más que RADIO_BUSQUEDA_ZONAS_M ({radio:.0f} m)",
-                    )
-                )
 
     return resultado
 

@@ -22,35 +22,12 @@ import psycopg
 
 from fitosanitarios.config import get_settings
 from fitosanitarios.senasa.cliente import DetalleProducto, ProductoListado
-from fitosanitarios.senasa.crawler import leer_detalle_jsonl, leer_listado_jsonl
 from fitosanitarios.senasa.normalizador import limpiar_html, normalizar_banda, normalizar_nombre
 from fitosanitarios.senasa.parser_dosis import parsear_dosis
 
 logger = logging.getLogger(__name__)
 
 ProductoConDetalle = tuple[ProductoListado, DetalleProducto | None]
-
-
-def construir_snapshot(ruta_listado: Path, ruta_detalle: Path, ruta_snapshot: Path) -> int:
-    """Une listado + detalle por id en un único JSONL versionado (una línea
-    por producto: {"listado": {...}, "detalle": {...} | null}). Es el "dump"
-    de la sección 5 del plan; se versiona por nombre de archivo/fecha, no
-    dentro del propio archivo."""
-    listado = leer_listado_jsonl(ruta_listado)
-    detalles_por_id: dict[int, DetalleProducto] = {}
-    if ruta_detalle.exists():
-        detalles_por_id = {d.id: d for d in leer_detalle_jsonl(ruta_detalle)}
-
-    ruta_snapshot.parent.mkdir(parents=True, exist_ok=True)
-    with ruta_snapshot.open("w", encoding="utf-8") as f:
-        for item in listado:
-            detalle = detalles_por_id.get(item.id)
-            linea = {
-                "listado": item.model_dump(by_alias=True),
-                "detalle": detalle.model_dump(by_alias=True) if detalle else None,
-            }
-            f.write(json.dumps(linea, ensure_ascii=False) + "\n")
-    return len(listado)
 
 
 def leer_snapshot(ruta_snapshot: Path) -> list[ProductoConDetalle]:
