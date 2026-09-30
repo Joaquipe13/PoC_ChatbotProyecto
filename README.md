@@ -10,6 +10,8 @@ El canal de producción es WhatsApp. Para probarlo sin WhatsApp hay notebooks qu
 | [`notebooks/demo_sin_whatsapp.ipynb`](notebooks/demo_sin_whatsapp.ipynb) | Recorrido corto: un caso por tipo de consulta | [![Abrir en Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Joaquipe13/PoC_ChatbotProyecto/blob/master/notebooks/demo_sin_whatsapp.ipynb) |
 | [`notebooks/demo_e2e.ipynb`](notebooks/demo_e2e.ipynb) | Guion completo de la demo (APTA, OBSERVADA, repregunta, fuera de dominio…) | [![Abrir en Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Joaquipe13/PoC_ChatbotProyecto/blob/master/notebooks/demo_e2e.ipynb) |
 
+> **Caso de negocio, decisiones técnicas y dificultades:** ver [`docs/CASO_DE_NEGOCIO.md`](docs/CASO_DE_NEGOCIO.md).
+
 ## Cómo funciona
 
 **El LLM orquesta, el núcleo decide.** Gemini entiende el mensaje, elige la herramienta (tool) y sus argumentos, repregunta lo que falta y detecta lo que está fuera de tema. Todo lo que es un dato (registro, banda toxicológica, dosis, distancias, normas, fechas) lo resuelve código determinista contra la base, y la respuesta la arma un formateador con plantillas a partir de los resultados de las tools. El LLM nunca escribe un número, una norma o un registro que no venga de una tool. Si un chequeo obligatorio no se pudo hacer, no hay dictamen APTA: **la falta de evidencia no cuenta como aprobación**.
@@ -152,6 +154,7 @@ docs/            modelo de datos, contrato de insumos, WhatsApp, decisiones y di
 
 ## Documentación
 
+- [`docs/CASO_DE_NEGOCIO.md`](docs/CASO_DE_NEGOCIO.md): explicación breve del caso de negocio elegido, las decisiones técnicas tomadas y las dificultades encontradas.
 - [`docs/DECISIONES_PRINCIPALES.md`](docs/DECISIONES_PRINCIPALES.md): resumen de las decisiones de diseño y por qué.
 - [`docs/DECISIONES.md`](docs/DECISIONES.md) y [`docs/DIFICULTADES.md`](docs/DIFICULTADES.md): registro completo de decisiones y de los problemas encontrados (los comentarios del código los citan).
 - [`docs/modelo-datos.md`](docs/modelo-datos.md): diagrama entidad-relación y consultas de las tools RAG.
